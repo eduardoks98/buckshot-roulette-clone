@@ -54,7 +54,8 @@ function createRoom(hostSocket, hostName, password = null) {
             handcuffImmune: false,
             sawedOff: false,
             alive: true,
-            hadZeroItems: false
+            hadZeroItems: false,
+            roundWins: 0  // Contador de rodadas vencidas
         }],
         gameState: null,
         started: false,
@@ -93,7 +94,8 @@ function joinRoom(code, socket, playerName, password = null) {
         handcuffImmune: false,
         sawedOff: false,
         alive: true,
-        hadZeroItems: false
+        hadZeroItems: false,
+        roundWins: 0  // Contador de rodadas vencidas
     });
 
     return { room };
@@ -607,19 +609,102 @@ function processItem(room, playerId, itemId, targetId = null, stealItemIndex = n
                     result.targetId = targetId;
                     result.targetName = target.name;
 
-                    // ✅ USAR o item roubado imediatamente!
-                    // Adicionar item ao jogador temporariamente
-                    player.items.push(stolen);
+                    // ✅ USAR o item roubado DIRETAMENTE (sem adicionar ao inventário)
+                    // Isso evita o bug de ficar com 2 serras se o jogador já tinha uma
+                    result.usedItemResult = { item: stolen, playerId, playerName: player.name };
 
-                    // Usar o item (para handcuffs, usar no mesmo alvo)
-                    const useTargetId = (stolen.id === 'handcuffs') ? targetId : null;
-                    const useResult = processItem(room, playerId, stolen.id, useTargetId, null);
+                    // Aplicar efeito do item roubado
+                    switch (stolen.id) {
+                        case 'magnifying_glass':
+                            room.revealedShell = room.shells[room.currentShellIndex];
+                            result.usedItemResult.revealedShell = room.revealedShell;
+                            break;
 
-                    if (useResult) {
-                        result.usedItemResult = useResult;
-                        // Atualizar shellsRemaining do resultado do uso
-                        result.shellsRemaining = useResult.shellsRemaining;
+                        case 'beer':
+                            const ejected = room.shells[room.currentShellIndex];
+                            room.currentShellIndex++;
+                            room.revealedShell = null;
+                            result.usedItemResult.ejectedShell = ejected;
+                            if (room.currentShellIndex >= room.shells.length) {
+                                loadShotgun(room);
+                                room.players.forEach(p => p.hadZeroItems = false);
+                                const itemCount = Math.floor(Math.random() * 5) + 1;
+                                const maxHp = room.players[0]?.maxHp || 4;
+                                distributeItems(room, itemCount, maxHp);
+                                result.usedItemResult.reloaded = true;
+                                result.usedItemResult.newShells = {
+                                    total: room.shells.length,
+                                    live: room.shells.filter(s => s === 'live').length,
+                                    blank: room.shells.filter(s => s === 'blank').length
+                                };
+                            }
+                            break;
+
+                        case 'cigarettes':
+                            if (player.hp < player.maxHp) {
+                                player.hp++;
+                                result.usedItemResult.healed = 1;
+                            }
+                            break;
+
+                        case 'handcuffs':
+                            // Usar no mesmo alvo da adrenalina
+                            if (!target.handcuffImmune && !target.handcuffed) {
+                                target.handcuffed = true;
+                                result.usedItemResult.targetId = targetId;
+                                result.usedItemResult.targetName = target.name;
+                            } else {
+                                result.usedItemResult.failed = true;
+                                result.usedItemResult.failReason = target.handcuffImmune ? 'imune' : 'ja_algemado';
+                            }
+                            break;
+
+                        case 'hand_saw':
+                            player.sawedOff = true;
+                            break;
+
+                        case 'phone':
+                            const remaining = room.shells.length - room.currentShellIndex;
+                            if (remaining > 1) {
+                                const randomOffset = Math.floor(Math.random() * (remaining - 1)) + 1;
+                                const position = room.currentShellIndex + randomOffset;
+                                result.usedItemResult.revealedPosition = position;
+                                result.usedItemResult.revealedPositionShell = room.shells[position];
+                            }
+                            break;
+
+                        case 'inverter':
+                            const currentIdx = room.currentShellIndex;
+                            room.shells[currentIdx] = room.shells[currentIdx] === 'live' ? 'blank' : 'live';
+                            room.revealedShell = null;
+                            result.usedItemResult.inverted = true;
+                            break;
+
+                        case 'expired_medicine':
+                            const medSuccess = Math.random() < 0.5;
+                            if (medSuccess) {
+                                const healed = Math.min(2, player.maxHp - player.hp);
+                                player.hp += healed;
+                                result.usedItemResult.healed = healed;
+                                result.usedItemResult.success = true;
+                            } else {
+                                player.hp = Math.max(0, player.hp - 1);
+                                result.usedItemResult.damage = 1;
+                                result.usedItemResult.success = false;
+                                if (player.hp <= 0) {
+                                    player.alive = false;
+                                    result.usedItemResult.eliminated = true;
+                                }
+                            }
+                            break;
+
+                        case 'turn_reverser':
+                            room.turnDirection = room.turnDirection === 1 ? -1 : 1;
+                            result.usedItemResult.newDirection = room.turnDirection === 1 ? 'horario' : 'anti-horario';
+                            break;
                     }
+
+                    result.shellsRemaining = room.shells.length - room.currentShellIndex;
                 }
             }
             break;
@@ -864,11 +949,21 @@ io.on('connection', (socket) => {
                     // Verificar fim de rodada/jogo
                     if (result.roundOver) {
                         if (result.winner) {
-                            // Verificar se foi a última rodada
-                            if (room.currentRound >= 3) {
+                            // Incrementar vitórias do vencedor da rodada
+                            const winnerPlayer = room.players.find(p => p.id === result.winner.id);
+                            if (winnerPlayer) {
+                                winnerPlayer.roundWins = (winnerPlayer.roundWins || 0) + 1;
+                            }
+
+                            // Calcular vitórias necessárias (2 para 2-3 jogadores, 2 para 4 jogadores)
+                            const winsNeeded = 2;
+                            const winnerWins = winnerPlayer?.roundWins || 0;
+
+                            // Verificar se alguém ganhou o jogo (atingiu vitórias necessárias OU é a última rodada)
+                            if (winnerWins >= winsNeeded || room.currentRound >= 3) {
                                 io.to(code).emit('gameOver', {
                                     winner: result.winner,
-                                    reason: 'Venceu 3 rodadas'
+                                    reason: `Venceu ${winnerWins} rodada${winnerWins > 1 ? 's' : ''}!`
                                 });
                                 // Deletar sala após game over (não aparece mais na lista)
                                 rooms.delete(code);
@@ -927,17 +1022,36 @@ io.on('connection', (socket) => {
                     if (result.eliminated) {
                         const alivePlayers = room.players.filter(p => p.alive);
                         if (alivePlayers.length <= 1) {
-                            // Apenas 1 jogador vivo = fim do jogo
-                            io.to(code).emit('gameOver', {
-                                winner: alivePlayers[0] || null,
-                                reason: alivePlayers.length === 1
-                                    ? `${alivePlayers[0].name} é o último sobrevivente!`
-                                    : 'Todos foram eliminados'
-                            });
-                            // Deletar sala após game over
-                            rooms.delete(code);
+                            const winner = alivePlayers[0] || null;
+
+                            // Incrementar vitórias do vencedor da rodada
+                            if (winner) {
+                                winner.roundWins = (winner.roundWins || 0) + 1;
+                            }
+
+                            // Calcular vitórias necessárias
+                            const winsNeeded = 2;
+                            const winnerWins = winner?.roundWins || 0;
+
+                            // Verificar se alguém ganhou o jogo
+                            if (winnerWins >= winsNeeded || room.currentRound >= 3) {
+                                io.to(code).emit('gameOver', {
+                                    winner: winner,
+                                    reason: winner
+                                        ? `Venceu ${winnerWins} rodada${winnerWins > 1 ? 's' : ''}!`
+                                        : 'Todos foram eliminados'
+                                });
+                                rooms.delete(code);
+                            } else {
+                                // Próxima rodada
+                                room.currentRound++;
+                                const firstPlayer = room.firstToDie;
+                                setTimeout(() => {
+                                    startRound(room, firstPlayer);
+                                }, 3000);
+                            }
                         } else {
-                            // Jogador morreu mas jogo continua - reiniciar timer
+                            // Jogador morreu mas ainda há 2+ jogadores - reiniciar timer
                             startTurnTimer(room, code);
                         }
                     } else {

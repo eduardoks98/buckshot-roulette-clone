@@ -32,10 +32,22 @@ let turnTimeRemaining = 0;
 // ========================================
 
 function connectToServer() {
-    // Usa a mesma origem do site (funciona com localhost ou IP da rede)
+    // Se já está conectado, não fazer nada
+    if (socket && socket.connected) {
+        console.log('Já conectado ao servidor');
+        return;
+    }
+
     const serverUrl = window.location.origin;
     console.log('Conectando ao servidor:', serverUrl);
 
+    // Se socket existe mas não está conectado, reconectar
+    if (socket) {
+        socket.connect();
+        return;
+    }
+
+    // Criar nova conexão apenas se não existe socket
     socket = io(serverUrl);
 
     socket.on('connect', () => {
@@ -49,7 +61,7 @@ function connectToServer() {
         showLobbyScreen();
     });
 
-    // Eventos de sala
+    // Eventos de sala (registrados apenas UMA vez)
     socket.on('roomCreated', handleRoomCreated);
     socket.on('roomJoined', handleRoomJoined);
     socket.on('joinError', handleJoinError);
@@ -168,26 +180,20 @@ function handleShotFired(data) {
     multiplayerState.turnDirection = data.turnDirection;
     multiplayerState.revealedShell = null;
 
-    // Animação de tiro na espingarda
-    const shotgun = document.getElementById('mp-shotgun');
-    if (shotgun) {
-        shotgun.classList.add('firing');
-        setTimeout(() => {
-            shotgun.classList.remove('firing');
-            // Remover efeito de serra após o tiro
-            shotgun.classList.remove('sawed-off');
-        }, 500);
-    }
+    // Animação de tiro na espingarda (LIVE = forte, BLANK = leve)
+    playShotAnimation(data.shell);
 
     // Animação de dano no jogador alvo (se LIVE)
     if (data.shell === 'live') {
         setTimeout(() => {
             const targetElement = document.querySelector(`.mp-player[data-player-id="${data.target}"]`);
             if (targetElement) {
-                targetElement.classList.add('taking-damage');
-                setTimeout(() => targetElement.classList.remove('taking-damage'), 600);
+                targetElement.classList.add('player-damaged', 'player-damage-flash');
+                setTimeout(() => {
+                    targetElement.classList.remove('player-damaged', 'player-damage-flash');
+                }, 600);
             }
-        }, 200);
+        }, 150);
     }
 
     // Atualizar UI imediatamente (não esperar callback)
@@ -988,6 +994,52 @@ function showItemStealModal(targetId, targetName, items) {
 function cancelItemSteal() {
     document.getElementById('item-steal-modal').classList.add('hidden');
     pendingAdrenalineTarget = null;
+}
+
+// ========================================
+// ANIMAÇÕES DE TIRO
+// ========================================
+
+function playShotAnimation(shellType) {
+    const shotgun = document.getElementById('mp-shotgun');
+    if (!shotgun) return;
+
+    // Remover classes de animação anteriores
+    shotgun.classList.remove('shotgun-live-shot', 'shotgun-blank-shot', 'firing');
+
+    // Remover efeitos visuais anteriores
+    const oldFlash = shotgun.querySelector('.muzzle-flash-live');
+    const oldSmoke = shotgun.querySelector('.smoke-blank');
+    if (oldFlash) oldFlash.remove();
+    if (oldSmoke) oldSmoke.remove();
+
+    if (shellType === 'live') {
+        // Animação de LIVE - recuo forte + flash de fogo
+        shotgun.classList.add('shotgun-live-shot');
+
+        // Criar flash de fogo na ponta
+        const flash = document.createElement('div');
+        flash.className = 'muzzle-flash-live';
+        shotgun.appendChild(flash);
+
+        setTimeout(() => {
+            shotgun.classList.remove('shotgun-live-shot', 'sawed-off');
+            flash.remove();
+        }, 500);
+    } else {
+        // Animação de BLANK - tremida leve + fumaça
+        shotgun.classList.add('shotgun-blank-shot');
+
+        // Criar fumaça leve
+        const smoke = document.createElement('div');
+        smoke.className = 'smoke-blank';
+        shotgun.appendChild(smoke);
+
+        setTimeout(() => {
+            shotgun.classList.remove('shotgun-blank-shot', 'sawed-off');
+            smoke.remove();
+        }, 500);
+    }
 }
 
 function showMultiplayerMessage(text, callback = null) {
