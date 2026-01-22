@@ -1,0 +1,263 @@
+/* ==========================================
+   PROFILE STYLES
+   ========================================== */
+
+.profile-container {
+  min-height: 100vh;
+  padding: 2rem;
+  max-width: 500px;
+  margin: 0 auto;
+}
+
+.profile-container .back-btn {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+}
+
+.page-title {
+  text-align: center;
+  font-size: 2.5rem;
+  margin-top: 2rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Loading */
+.loading-message {
+  text-align: center;
+  padding: 3rem;
+  color: var(--text-dim);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+/* Login Section */
+.login-section {
+  text-align: center;
+  padding: 2rem;
+}
+
+.login-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.login-section h2 {
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+}
+
+.login-section p {
+  color: var(--text-dim);
+  margin-bottom: 1rem;
+}
+
+.benefits-list {
+  list-style: none;
+  padding: 0;
+  margin-bottom: 2rem;
+  text-align: left;
+  max-width: 250px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.benefits-list li {
+  color: var(--text-dim);
+  padding: 0.5rem 0;
+}
+
+.benefits-list li::before {
+  content: "✓ ";
+  color: var(--gold-accent);
+}
+
+.google-login-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  width: 100%;
+  max-width: 300px;
+  margin: 0 auto 1.5rem;
+  padding: 0.875rem 1.5rem;
+  background: #fff;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  color: #333;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.google-login-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2);
+}
+
+.google-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.guest-note {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+
+/* User Card */
+.user-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  padding: 2rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  margin-bottom: 1.5rem;
+}
+
+.user-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--gold-accent) 0%, #b8860b 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  font-weight: bold;
+  color: #000;
+  overflow: hidden;
+}
+
+.user-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.user-info {
+  text-align: center;
+}
+
+.user-name {
+  font-size: 1.5rem;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.user-username {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+
+.user-rank {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1rem 2rem;
+  border: 2px solid;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.rank-label {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+.rank-value {
+  font-size: 1.5rem;
+  font-weight: bold;
+}
+
+.elo-value {
+  font-size: 0.9rem;
+  color: var(--text-dim);
+}
+
+/* Stats Grid */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.stat-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+}
+
+.stat-value {
+  font-size: 1.5rem;
+  font-weight: bold;
+  color: var(--gold-accent);
+}
+
+.stat-label {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+/* Profile Actions */
+.profile-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.action-btn {
+  padding: 0.875rem;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.action-btn.leaderboard {
+  background: var(--gold-accent);
+  color: #000;
+  border: none;
+}
+
+.action-btn.leaderboard:hover {
+  background: #e8c84a;
+}
+
+.action-btn.logout {
+  background: transparent;
+  color: var(--red-live);
+  border: 1px solid var(--red-live);
+}
+
+.action-btn.logout:hover {
+  background: rgba(230, 57, 70, 0.1);
+}
+
+/* Responsive */
+@media (max-width: 400px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .stat-value {
+    font-size: 1.25rem;
+  }
+}

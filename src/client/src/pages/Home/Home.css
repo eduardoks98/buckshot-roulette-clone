@@ -1,0 +1,122 @@
+.home-container {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.home-content {
+  text-align: center;
+  max-width: 400px;
+  width: 100%;
+}
+
+.game-title {
+  font-size: 3.5rem;
+  font-weight: 900;
+  color: var(--gold-accent);
+  text-shadow: 0 0 30px rgba(212, 164, 24, 0.5);
+  margin-bottom: 0.5rem;
+  letter-spacing: 0.1em;
+  line-height: 1.1;
+}
+
+.subtitle {
+  color: var(--text-dim);
+  font-size: 1.1rem;
+  margin-bottom: 3rem;
+  text-transform: uppercase;
+  letter-spacing: 0.2em;
+}
+
+.menu-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-bottom: 2rem;
+}
+
+.auth-section {
+  margin-top: 2rem;
+  padding-top: 2rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.user-info {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.user-avatar {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: 2px solid var(--gold-accent);
+}
+
+.user-name {
+  color: var(--text-primary);
+  font-weight: bold;
+}
+
+.user-rank {
+  color: var(--gold-accent);
+  font-size: 0.9rem;
+}
+
+.logout-btn {
+  margin-top: 0.75rem;
+  padding: 0.5rem 1.5rem;
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.logout-btn:hover {
+  color: var(--red-live);
+  border-color: var(--red-live);
+  background: rgba(230, 57, 70, 0.1);
+}
+
+.google-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  width: 100%;
+  padding: 0.75rem 1.5rem;
+  background: #fff;
+  color: #333;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.google-btn:hover {
+  background: #f5f5f5;
+  transform: translateY(-2px);
+}
+
+.google-btn svg {
+  flex-shrink: 0;
+}
+
+@media (max-width: 480px) {
+  .game-title {
+    font-size: 2.5rem;
+  }
+
+  .subtitle {
+    font-size: 0.9rem;
+  }
+}

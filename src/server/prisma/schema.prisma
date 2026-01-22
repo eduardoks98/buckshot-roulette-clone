@@ -1,0 +1,204 @@
+// ==========================================
+// PRISMA SCHEMA - BUCKSHOT ROULETTE
+// ==========================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// USER & AUTHENTICATION
+// ==========================================
+
+model User {
+  id          String   @id @default(uuid())
+  email       String   @unique
+  username    String   @unique
+  displayName String
+  avatarUrl   String?
+
+  // OAuth
+  googleId String? @unique
+
+  // Stats
+  gamesPlayed  Int @default(0)
+  gamesWon     Int @default(0)
+  roundsPlayed Int @default(0)
+  roundsWon    Int @default(0)
+  totalKills   Int @default(0)
+  totalDeaths  Int @default(0)
+
+  // Ranking
+  eloRating Int    @default(1000)
+  rank      String @default("Bronze")
+
+  // Timestamps
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  lastLoginAt DateTime?
+
+  // Relations
+  sessions           Session[]
+  gameParticipations GameParticipant[]
+  leaderboardEntries LeaderboardEntry[]
+
+  @@index([eloRating(sort: Desc)])
+  @@index([googleId])
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  token     String   @unique
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([token])
+  @@index([userId])
+}
+
+// ==========================================
+// GAME DATA
+// ==========================================
+
+model Game {
+  id       String     @id @default(uuid())
+  roomCode String     @unique
+  status   GameStatus @default(WAITING)
+
+  // Game settings
+  maxPlayers  Int     @default(4)
+  isRanked    Boolean @default(false)
+  hasPassword Boolean @default(false)
+
+  // Game state
+  currentRound Int     @default(1)
+  maxRounds    Int     @default(3)
+  winnerId     String?
+
+  // Timestamps
+  createdAt DateTime  @default(now())
+  startedAt DateTime?
+  endedAt   DateTime?
+
+  // Relations
+  participants GameParticipant[]
+  rounds       Round[]
+
+  @@index([status])
+  @@index([roomCode])
+}
+
+enum GameStatus {
+  WAITING
+  IN_PROGRESS
+  COMPLETED
+  ABANDONED
+}
+
+model GameParticipant {
+  id     String  @id @default(uuid())
+  gameId String
+  userId String?
+
+  // Player info (for guests)
+  guestName String?
+
+  // Socket info (para reconexão)
+  socketId       String?
+  reconnectToken String?
+
+  // Game results
+  position  Int? // Final position (1st, 2nd, etc.)
+  roundsWon Int  @default(0)
+  kills     Int  @default(0)
+  deaths    Int  @default(0)
+  itemsUsed Int  @default(0)
+
+  // Detailed stats
+  damageDealt  Int @default(0)
+  damageTaken  Int @default(0)
+  selfDamage   Int @default(0)
+  shotsFired   Int @default(0)
+
+  // Elo change (for ranked)
+  eloChange Int?
+
+  // Timestamps
+  joinedAt DateTime  @default(now())
+  leftAt   DateTime?
+
+  // Relations
+  game Game  @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  user User? @relation(fields: [userId], references: [id])
+
+  @@unique([gameId, userId])
+  @@index([gameId])
+  @@index([userId])
+  @@index([socketId])
+}
+
+model Round {
+  id          String @id @default(uuid())
+  gameId      String
+  roundNumber Int
+
+  // Round config
+  maxHp       Int
+  shellsLive  Int
+  shellsBlank Int
+
+  // Result
+  winnerId String? // participant ID
+
+  // Timestamps
+  startedAt DateTime  @default(now())
+  endedAt   DateTime?
+
+  // Relations
+  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+
+  @@unique([gameId, roundNumber])
+  @@index([gameId])
+}
+
+// ==========================================
+// LEADERBOARD
+// ==========================================
+
+model LeaderboardEntry {
+  id     String @id @default(uuid())
+  userId String
+
+  // Period
+  period      LeaderboardPeriod
+  periodStart DateTime
+  periodEnd   DateTime
+
+  // Stats for this period
+  gamesPlayed Int   @default(0)
+  gamesWon    Int   @default(0)
+  winRate     Float @default(0)
+  eloGain     Int   @default(0)
+  peakElo     Int   @default(1000)
+
+  // Relations
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, period, periodStart])
+  @@index([period, periodStart, eloGain(sort: Desc)])
+}
+
+enum LeaderboardPeriod {
+  DAILY
+  WEEKLY
+  MONTHLY
+  ALL_TIME
+}

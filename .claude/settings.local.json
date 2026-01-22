@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(dir:*)",
+      "Bash(cmd /c \"cd /d e:\\\\Cursor\\\\buckshotcopy\\\\src\\\\server && npx tsc --noEmit\")",
+      "Bash(pushd:*)",
+      "Bash(timeout 15 npm run dev:*)",
+      "Bash(popd)",
+      "Bash(ping:*)",
+      "Bash(netstat:*)",
+      "Bash(findstr:*)",
+      "Bash(cmd //c \"taskkill /PID 110176 /F\")",
+      "Bash(cmd //c \"taskkill /PID 109212 /F\")",
+      "Bash(npx tsc --noEmit)",
+      "Bash(cd /d e:Cursorbuckshotcopysrcserver)",
+      "Bash(npx tsc:*)",
+      "Bash(taskkill:*)",
+      "Bash(cmd //c \"taskkill /PID 159524 /F\")"
+    ]
+  }
+}

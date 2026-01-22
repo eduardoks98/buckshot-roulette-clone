@@ -24,6 +24,25 @@ const io = new Server(server, {
 
 const rooms = new Map();
 
+// Constantes de reconexão
+const RECONNECT_GRACE_PERIOD = 60000; // 60 segundos para reconectar
+
+// Gerar token único para reconexão
+function generateReconnectToken() {
+    return Math.random().toString(36).substring(2, 15) +
+           Math.random().toString(36).substring(2, 15);
+}
+
+// Encontrar sala pelo ID do jogador
+function findRoomByPlayer(playerId) {
+    for (const [code, room] of rooms) {
+        if (room.players.find(p => p.id === playerId)) {
+            return { code, room };
+        }
+    }
+    return null;
+}
+
 function generateRoomCode() {
     const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
     let code = '';
@@ -55,7 +74,12 @@ function createRoom(hostSocket, hostName, password = null) {
             sawedOff: false,
             alive: true,
             hadZeroItems: false,
-            roundWins: 0  // Contador de rodadas vencidas
+            roundWins: 0,  // Contador de rodadas vencidas
+            // Campos de reconexão
+            disconnected: false,
+            disconnectTime: null,
+            reconnectToken: null,
+            originalSocketId: null
         }],
         gameState: null,
         started: false,
@@ -95,7 +119,12 @@ function joinRoom(code, socket, playerName, password = null) {
         sawedOff: false,
         alive: true,
         hadZeroItems: false,
-        roundWins: 0  // Contador de rodadas vencidas
+        roundWins: 0,  // Contador de rodadas vencidas
+        // Campos de reconexão
+        disconnected: false,
+        disconnectTime: null,
+        reconnectToken: null,
+        originalSocketId: null
     });
 
     return { room };
@@ -146,6 +175,135 @@ function leaveRoom(socket) {
         }
     }
     return null;
+}
+
+// ========================================
+// SISTEMA DE RECONEXÃO
+// ========================================
+
+// Verificar se timeout de reconexão expirou
+function checkReconnectTimeout(room, player) {
+    // Se jogador já reconectou, não fazer nada
+    if (!player.disconnected) return;
+
+    // Se sala não existe mais, não fazer nada
+    if (!rooms.has(room.code)) return;
+
+    // Se já passou o tempo, eliminar jogador
+    if (Date.now() - player.disconnectTime >= RECONNECT_GRACE_PERIOD) {
+        eliminateDisconnectedPlayer(room, player);
+    }
+}
+
+// Eliminar jogador que não reconectou a tempo
+function eliminateDisconnectedPlayer(room, player) {
+    player.alive = false;
+    player.disconnected = false;
+
+    console.log(`[${new Date().toLocaleString('pt-BR')}] Jogador ${player.name} eliminado por timeout de reconexão`);
+
+    io.to(room.code).emit('playerEliminated', {
+        playerId: player.originalSocketId || player.id,
+        playerName: player.name,
+        reason: 'Tempo de reconexão expirado'
+    });
+
+    // Verificar se jogo deve acabar
+    const alivePlayers = room.players.filter(p => p.alive && !p.disconnected);
+    if (alivePlayers.length <= 1) {
+        const winner = alivePlayers[0] || null;
+        if (winner) {
+            winner.roundWins = (winner.roundWins || 0) + 1;
+        }
+
+        const winsNeeded = 2;
+        const winnerWins = winner?.roundWins || 0;
+
+        if (winnerWins >= winsNeeded || room.currentRound >= 3) {
+            io.to(room.code).emit('gameOver', {
+                winner: winner,
+                reason: winner
+                    ? `${winner.name} é o último sobrevivente!`
+                    : 'Todos os jogadores desconectaram'
+            });
+            rooms.delete(room.code);
+        } else {
+            // Próxima rodada
+            room.currentRound++;
+            setTimeout(() => {
+                if (rooms.has(room.code)) {
+                    startRound(room);
+                }
+            }, 3000);
+        }
+    }
+}
+
+// Pular turno de jogador desconectado
+function skipDisconnectedPlayerTurn(room) {
+    const code = room.code;
+
+    // Limpar timer atual
+    clearTurnTimer(room);
+
+    // Encontrar próximo jogador válido (vivo e conectado)
+    let attempts = 0;
+    let nextIndex = room.currentPlayerIndex;
+
+    do {
+        nextIndex = (nextIndex + room.turnDirection + room.players.length) % room.players.length;
+        attempts++;
+        if (attempts > room.players.length) {
+            // Nenhum jogador válido encontrado
+            return;
+        }
+    } while (!room.players[nextIndex].alive || room.players[nextIndex].disconnected);
+
+    // Verificar se próximo jogador está algemado
+    const nextPlayer = room.players[nextIndex];
+    if (nextPlayer.handcuffed) {
+        nextPlayer.handcuffed = false;
+        nextPlayer.handcuffImmune = true;
+
+        io.to(code).emit('playerSkipped', {
+            playerId: nextPlayer.id,
+            playerName: nextPlayer.name,
+            reason: 'handcuffs'
+        });
+
+        room.currentPlayerIndex = nextIndex;
+
+        // Buscar o próximo após o algemado
+        attempts = 0;
+        do {
+            nextIndex = (nextIndex + room.turnDirection + room.players.length) % room.players.length;
+            attempts++;
+            if (attempts > room.players.length) return;
+        } while (!room.players[nextIndex].alive || room.players[nextIndex].disconnected);
+    }
+
+    room.currentPlayerIndex = nextIndex;
+
+    // Notificar novo turno
+    io.to(code).emit('turnChanged', {
+        currentPlayer: room.players[nextIndex].id,
+        reason: 'playerDisconnected',
+        players: room.players.map(p => ({
+            id: p.id,
+            name: p.name,
+            hp: p.hp,
+            maxHp: p.maxHp,
+            items: p.items,
+            alive: p.alive,
+            disconnected: p.disconnected,
+            handcuffed: p.handcuffed,
+            handcuffImmune: p.handcuffImmune || false,
+            sawedOff: p.sawedOff
+        }))
+    });
+
+    // Reiniciar timer para o novo jogador
+    startTurnTimer(room, code);
 }
 
 // ========================================

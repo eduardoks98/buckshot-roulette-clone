@@ -1,0 +1,177 @@
+/* ==========================================
+   PLAYER CARD COMPONENT STYLES
+   ========================================== */
+
+.player-card {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 2px solid var(--border-color);
+  border-radius: 12px;
+  transition: all 0.2s ease;
+}
+
+.player-card.clickable {
+  cursor: pointer;
+}
+
+.player-card.clickable:hover:not(.dead) {
+  border-color: var(--gold-accent);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.player-card.active {
+  border-color: var(--gold-accent);
+  box-shadow: 0 0 15px rgba(212, 164, 24, 0.3);
+}
+
+.player-card.selected {
+  border-color: var(--red-live);
+  background: rgba(230, 57, 70, 0.1);
+}
+
+.player-card.is-me {
+  border-color: var(--blue-blank);
+}
+
+.player-card.dead {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.player-card.disconnected {
+  border-style: dashed;
+}
+
+.player-card.compact {
+  padding: 0.75rem;
+}
+
+/* Avatar */
+.player-avatar {
+  position: relative;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--gold-accent) 0%, #b8860b 100%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.25rem;
+  font-weight: bold;
+  color: #000;
+  flex-shrink: 0;
+}
+
+.player-card.compact .player-avatar {
+  width: 40px;
+  height: 40px;
+  font-size: 1rem;
+}
+
+.player-card.dead .player-avatar {
+  background: var(--border-color);
+  filter: grayscale(1);
+}
+
+.disconnect-icon {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  font-size: 0.75rem;
+  background: var(--bg-dark);
+  border-radius: 50%;
+  padding: 2px;
+}
+
+/* Info */
+.player-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.player-name-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.player-name {
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.you-badge {
+  font-size: 0.65rem;
+  background: var(--blue-blank);
+  color: #fff;
+  padding: 0.1rem 0.4rem;
+  border-radius: 4px;
+  font-weight: bold;
+  text-transform: uppercase;
+}
+
+/* Status Effects */
+.player-status {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.status-effect {
+  font-size: 0.875rem;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
+}
+
+/* Items */
+.player-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-top: 0.5rem;
+}
+
+.item-icon {
+  font-size: 0.875rem;
+}
+
+/* Dead Overlay */
+.dead-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.7);
+  border-radius: 10px;
+  color: var(--red-live);
+  font-weight: bold;
+  font-size: 0.875rem;
+  letter-spacing: 0.1em;
+}
+
+/* Responsive */
+@media (max-width: 400px) {
+  .player-card {
+    padding: 0.75rem;
+  }
+
+  .player-avatar {
+    width: 40px;
+    height: 40px;
+    font-size: 1rem;
+  }
+}

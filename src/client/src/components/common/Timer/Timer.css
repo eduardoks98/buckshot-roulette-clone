@@ -1,0 +1,57 @@
+/* ==========================================
+   TIMER COMPONENT STYLES
+   ========================================== */
+
+.timer {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem 0.75rem;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.timer-value {
+  font-weight: bold;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-primary);
+}
+
+/* Sizes */
+.timer-sm {
+  font-size: 0.875rem;
+}
+
+.timer-md {
+  font-size: 1.125rem;
+}
+
+.timer-lg {
+  font-size: 1.5rem;
+  padding: 0.5rem 1rem;
+}
+
+/* Warning State */
+.timer.warning {
+  background: rgba(251, 191, 36, 0.2);
+}
+
+.timer.warning .timer-value {
+  color: var(--warning);
+}
+
+/* Critical State */
+.timer.critical {
+  background: rgba(230, 57, 70, 0.2);
+  animation: timerPulse 0.5s ease-in-out infinite;
+}
+
+.timer.critical .timer-value {
+  color: var(--red-live);
+}
+
+@keyframes timerPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}

@@ -1,0 +1,90 @@
+/* ==========================================
+   ITEM GRID COMPONENT STYLES
+   ========================================== */
+
+.item-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  justify-content: center;
+}
+
+.item-grid.empty {
+  min-height: 70px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.no-items {
+  color: var(--text-dim);
+  font-style: italic;
+  font-size: 0.9rem;
+}
+
+/* Item Slot */
+.item-slot {
+  width: 50px;
+  height: 50px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.05);
+  border: 2px solid var(--border-color);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.item-slot:hover:not(:disabled):not(.empty) {
+  border-color: var(--gold-accent);
+  transform: translateY(-2px);
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.item-slot.selected {
+  border-color: var(--gold-accent);
+  background: rgba(212, 164, 24, 0.2);
+  box-shadow: 0 0 10px rgba(212, 164, 24, 0.4);
+  animation: selectedPulse 1s ease-in-out infinite;
+}
+
+@keyframes selectedPulse {
+  0%, 100% { box-shadow: 0 0 10px rgba(212, 164, 24, 0.4); }
+  50% { box-shadow: 0 0 20px rgba(212, 164, 24, 0.6); }
+}
+
+.item-slot:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.item-slot.empty {
+  cursor: default;
+  opacity: 0.3;
+}
+
+.item-emoji {
+  font-size: 1.5rem;
+}
+
+.empty-slot {
+  color: var(--text-dim);
+  font-size: 1.25rem;
+}
+
+/* Responsive */
+@media (max-width: 400px) {
+  .item-slot {
+    width: 45px;
+    height: 45px;
+  }
+
+  .item-emoji {
+    font-size: 1.3rem;
+  }
+}
