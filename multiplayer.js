@@ -12,6 +12,7 @@ let myPlayerId = null;
 let myPlayerName = null;
 let isHost = false;
 let roomCode = null;
+let availableRooms = [];
 let multiplayerState = {
     players: [],
     currentPlayer: null,
@@ -21,6 +22,10 @@ let multiplayerState = {
     revealedPositions: [],
     round: 1
 };
+
+// Timer state
+let turnTimerInterval = null;
+let turnTimeRemaining = 0;
 
 // ========================================
 // CONEXÃO
@@ -40,7 +45,7 @@ function connectToServer() {
 
     socket.on('disconnect', () => {
         console.log('Desconectado do servidor');
-        showMultiplayerMessage('Desconectado do servidor', 3000);
+        showMultiplayerMessage('Desconectado do servidor');
         showLobbyScreen();
     });
 
@@ -52,6 +57,7 @@ function connectToServer() {
     socket.on('playerLeft', handlePlayerLeft);
     socket.on('hostChanged', handleHostChanged);
     socket.on('startError', handleStartError);
+    socket.on('roomList', handleRoomList);
 
     // Eventos de jogo
     socket.on('roundStarted', handleRoundStarted);
@@ -60,6 +66,13 @@ function connectToServer() {
     socket.on('playerDisconnected', handlePlayerDisconnected);
     socket.on('gameOver', handleGameOver);
     socket.on('actionError', handleActionError);
+    socket.on('playerItems', handlePlayerItems);  // Para seleção de item na Adrenalina
+
+    // Eventos do timer
+    socket.on('turnTimerStarted', handleTurnTimerStarted);
+    socket.on('turnTimedOut', handleTurnTimedOut);
+    socket.on('turnChanged', handleTurnChanged);
+    socket.on('playerSkipped', handlePlayerSkipped);
 }
 
 // ========================================
@@ -85,13 +98,13 @@ function handleRoomJoined(data) {
 }
 
 function handleJoinError(error) {
-    showMultiplayerMessage(`Erro: ${error}`, 3000);
+    showMultiplayerMessage(`Erro: ${error}`);
 }
 
 function handlePlayerJoined(data) {
     multiplayerState.players = data.players;
     updatePlayerList();
-    showMultiplayerMessage(`${data.newPlayer} entrou na sala`, 2000);
+    showMultiplayerMessage(`${data.newPlayer} entrou na sala`);
 }
 
 function handlePlayerLeft(data) {
@@ -100,14 +113,14 @@ function handlePlayerLeft(data) {
 }
 
 function handleHostChanged(data) {
-    showMultiplayerMessage(`${data.newHost} é o novo host`, 2500);
+    showMultiplayerMessage(`${data.newHost} é o novo host`);
     // Atualizar estado de host
     isHost = multiplayerState.players[0]?.id === myPlayerId;
     updatePlayerList();
 }
 
 function handleStartError(error) {
-    showMultiplayerMessage(`Erro: ${error}`, 3000);
+    showMultiplayerMessage(`Erro: ${error}`);
 }
 
 // ========================================
@@ -116,7 +129,11 @@ function handleStartError(error) {
 
 function handleRoundStarted(data) {
     multiplayerState.round = data.round;
-    multiplayerState.players = data.players;
+    // Garantir que todos os jogadores têm alive definido
+    multiplayerState.players = data.players.map(p => ({
+        ...p,
+        alive: p.alive !== undefined ? p.alive : true
+    }));
     multiplayerState.shells = data.shells;
     multiplayerState.currentPlayer = data.currentPlayer;
     multiplayerState.turnDirection = data.turnDirection;
@@ -126,7 +143,22 @@ function handleRoundStarted(data) {
     showMultiplayerGame();
     updateMultiplayerUI();
 
-    showMultiplayerMessage(`RODADA ${data.round} - ${data.maxHp} HP`, 3000);
+    // Pequeno delay para garantir que a tela está visível
+    setTimeout(() => {
+        // Mensagem de início de rodada estilo Buckshot Roulette
+        const msg = `
+            <div class="round-start-info">
+                <h2>🎯 RODADA ${data.round}</h2>
+                <div class="shell-announcement">
+                    <span class="live-shells">🔴 ${data.shells.live} LIVE</span>
+                    <span class="blank-shells">🔵 ${data.shells.blank} BLANK</span>
+                </div>
+                <p>⚡ ${data.maxHp} HP cada</p>
+                <p class="total-shells">Total: ${data.shells.live + data.shells.blank} cartuchos</p>
+            </div>
+        `;
+        showMultiplayerMessage(msg);
+    }, 200);
 }
 
 function handleShotFired(data) {
@@ -136,10 +168,48 @@ function handleShotFired(data) {
     multiplayerState.turnDirection = data.turnDirection;
     multiplayerState.revealedShell = null;
 
+    // Animação de tiro na espingarda
+    const shotgun = document.getElementById('mp-shotgun');
+    if (shotgun) {
+        shotgun.classList.add('firing');
+        setTimeout(() => {
+            shotgun.classList.remove('firing');
+            // Remover efeito de serra após o tiro
+            shotgun.classList.remove('sawed-off');
+        }, 500);
+    }
+
+    // Animação de dano no jogador alvo (se LIVE)
+    if (data.shell === 'live') {
+        setTimeout(() => {
+            const targetElement = document.querySelector(`.mp-player[data-player-id="${data.target}"]`);
+            if (targetElement) {
+                targetElement.classList.add('taking-damage');
+                setTimeout(() => targetElement.classList.remove('taking-damage'), 600);
+            }
+        }, 200);
+    }
+
+    // Atualizar UI imediatamente (não esperar callback)
+    updateMultiplayerUI();
+
+    // DEBUG: Ver dados recebidos
+    console.log('DEBUG shotFired:', {
+        shooter: data.shooter,
+        target: data.target,
+        shooterName: data.shooterName,
+        targetName: data.targetName,
+        myPlayerId: myPlayerId
+    });
+
     // Animação de tiro
-    const shooterName = data.shooterId === myPlayerId ? 'Você' : data.shooterName;
-    const targetName = data.targetId === myPlayerId ? 'você' : data.targetName;
-    const selfShot = data.shooterId === data.targetId;
+    const shooterId = data.shooter;
+    const targetId = data.target;
+    const shooterName = shooterId === myPlayerId ? 'Você' : data.shooterName;
+    const targetName = targetId === myPlayerId ? 'você' : data.targetName;
+    const selfShot = shooterId === targetId;
+
+    console.log('DEBUG selfShot:', selfShot, 'shooterId:', shooterId, 'targetId:', targetId);
 
     let message = '';
     if (selfShot) {
@@ -156,30 +226,61 @@ function handleShotFired(data) {
         }
     }
 
-    showMultiplayerMessage(message, 2500, () => {
+    showMultiplayerMessage(message, () => {
         if (data.reloaded) {
             multiplayerState.shells = data.newShells;
-            showMultiplayerMessage(`Recarregando: ${data.newShells.live} LIVE, ${data.newShells.blank} BLANK`, 2500);
+            showMultiplayerMessage(`🔫 Recarregando: ${data.newShells.live} LIVE, ${data.newShells.blank} BLANK`);
         }
         if (data.skippedPlayer) {
-            showMultiplayerMessage(`${data.skippedPlayerName} estava algemado! Turno pulado`, 2000);
+            showMultiplayerMessage(`${data.skippedPlayerName} estava algemado! Turno pulado`);
         }
-        updateMultiplayerUI();
-    });
 
-    // Verificar eliminação
-    const targetPlayer = multiplayerState.players.find(p => p.id === data.targetId);
-    if (targetPlayer && !targetPlayer.alive) {
-        setTimeout(() => {
-            showMultiplayerMessage(`☠️ ${data.targetName} foi eliminado!`, 2500);
-        }, 2600);
-    }
+        // Verificar eliminação
+        const targetPlayer = multiplayerState.players.find(p => p.id === targetId);
+        if (targetPlayer && !targetPlayer.alive) {
+            showMultiplayerMessage(`☠️ ${data.targetName} foi eliminado!`, () => {
+                updateMultiplayerUI();
+            });
+        } else {
+            updateMultiplayerUI();
+        }
+    });
 }
 
 function handleItemUsed(data) {
     multiplayerState.players = data.players;
     multiplayerState.shells = data.shellsRemaining;
     multiplayerState.turnDirection = data.turnDirection;
+
+    // Animações baseadas no item usado
+    if (data.item.id === 'cigarettes' || (data.item.id === 'expired_medicine' && data.success)) {
+        // Animação de cura
+        setTimeout(() => {
+            const playerElement = document.querySelector(`.mp-player[data-player-id="${data.playerId}"]`);
+            if (playerElement) {
+                playerElement.classList.add('healing');
+                setTimeout(() => playerElement.classList.remove('healing'), 700);
+            }
+        }, 100);
+    } else if (data.item.id === 'expired_medicine' && !data.success) {
+        // Animação de dano (remédio falhou)
+        setTimeout(() => {
+            const playerElement = document.querySelector(`.mp-player[data-player-id="${data.playerId}"]`);
+            if (playerElement) {
+                playerElement.classList.add('taking-damage');
+                setTimeout(() => playerElement.classList.remove('taking-damage'), 600);
+            }
+        }, 100);
+    } else if (data.item.id === 'hand_saw') {
+        // Adicionar efeito visual na espingarda para serra
+        const shotgun = document.getElementById('mp-shotgun');
+        if (shotgun) {
+            shotgun.classList.add('sawed-off');
+        }
+    }
+
+    // Atualizar UI imediatamente (não esperar callback)
+    updateMultiplayerUI();
 
     const userName = data.playerId === myPlayerId ? 'Você usou' : `${data.playerName} usou`;
 
@@ -205,7 +306,11 @@ function handleItemUsed(data) {
             break;
 
         case 'handcuffs':
-            message += `: ${data.targetName} algemado!`;
+            if (data.failed && data.failReason === 'imune') {
+                message += `: FALHOU! ${data.targetName} tem imunidade (foi algemado recentemente)`;
+            } else {
+                message += `: ${data.targetName} algemado!`;
+            }
             break;
 
         case 'hand_saw':
@@ -230,6 +335,53 @@ function handleItemUsed(data) {
         case 'adrenaline':
             if (data.stolenItem) {
                 message += `: Roubou ${data.stolenItem.emoji} de ${data.targetName}`;
+
+                // Mostrar efeito do item usado
+                if (data.usedItemResult) {
+                    const ur = data.usedItemResult;
+                    switch (data.stolenItem.id) {
+                        case 'magnifying_glass':
+                            if (data.playerId === myPlayerId) {
+                                multiplayerState.revealedShell = ur.revealedShell;
+                                message += ` → ${ur.revealedShell === 'live' ? 'LIVE' : 'BLANK'}`;
+                            }
+                            break;
+                        case 'beer':
+                            message += ` → Ejetado ${ur.ejectedShell === 'live' ? 'LIVE' : 'BLANK'}`;
+                            multiplayerState.revealedShell = null;
+                            break;
+                        case 'cigarettes':
+                            if (ur.healed) message += ` → +${ur.healed} HP`;
+                            break;
+                        case 'handcuffs':
+                            message += ` → ${data.targetName} algemado!`;
+                            break;
+                        case 'hand_saw':
+                            message += ` → Próximo tiro 2x dano!`;
+                            break;
+                        case 'phone':
+                            if (ur.revealedPosition !== undefined) {
+                                message += ` → Posição ${ur.relativePosition}: ${ur.revealedPositionShell === 'live' ? 'LIVE' : 'BLANK'}`;
+                            }
+                            break;
+                        case 'inverter':
+                            message += ` → Cartucho invertido!`;
+                            multiplayerState.revealedShell = null;
+                            break;
+                        case 'expired_medicine':
+                            if (ur.success) {
+                                message += ` → +${ur.healed} HP`;
+                            } else {
+                                message += ` → -1 HP`;
+                                if (ur.eliminated) message += ' ☠️';
+                            }
+                            break;
+                        case 'turn_reverser':
+                            const usedDir = ur.newDirection === 1 ? 'HORÁRIO' : 'ANTI-HORÁRIO';
+                            message += ` → Ordem: ${usedDir}`;
+                            break;
+                    }
+                }
             }
             break;
 
@@ -250,21 +402,27 @@ function handleItemUsed(data) {
             break;
     }
 
-    showMultiplayerMessage(message, 2500, () => {
+    showMultiplayerMessage(message, () => {
         if (data.reloaded) {
-            showMultiplayerMessage(`Recarregando espingarda...`, 2000);
+            showMultiplayerMessage(`Recarregando espingarda...`, () => {
+                updateMultiplayerUI();
+            });
+        } else {
+            updateMultiplayerUI();
         }
-        updateMultiplayerUI();
     });
 }
 
 function handlePlayerDisconnected(data) {
     multiplayerState.players = data.players;
-    showMultiplayerMessage('Um jogador desconectou', 2500);
+    showMultiplayerMessage('Um jogador desconectou');
     updateMultiplayerUI();
 }
 
 function handleGameOver(data) {
+    // Limpar timer ao fim do jogo
+    clearClientTimer();
+
     const winnerName = data.winner?.id === myPlayerId ? 'VOCÊ' : data.winner?.name;
     const isWinner = data.winner?.id === myPlayerId;
 
@@ -273,7 +431,97 @@ function handleGameOver(data) {
 }
 
 function handleActionError(error) {
-    showMultiplayerMessage(`Erro: ${error}`, 2000);
+    showMultiplayerMessage(`Erro: ${error}`);
+}
+
+// ========================================
+// HANDLERS DO TIMER
+// ========================================
+
+function handleTurnTimerStarted(data) {
+    console.log('DEBUG: Timer iniciado para:', data.currentPlayer, 'duração:', data.duration);
+    startClientTimer(data.duration);
+}
+
+function handleTurnTimedOut(data) {
+    console.log('DEBUG: Timeout para:', data.playerName);
+    clearClientTimer();
+    showMultiplayerMessage(`⏰ ${data.playerName} perdeu a vez por tempo!`);
+}
+
+function handleTurnChanged(data) {
+    console.log('DEBUG: Turno mudou para:', data.currentPlayer, 'razão:', data.reason);
+    multiplayerState.currentPlayer = data.currentPlayer;
+    if (data.players) {
+        multiplayerState.players = data.players;
+    }
+    updateMultiplayerUI();
+}
+
+function handlePlayerSkipped(data) {
+    showMultiplayerMessage(`⛓️ ${data.skippedPlayerName} estava algemado! Turno pulado`);
+}
+
+// ========================================
+// FUNÇÕES DO TIMER
+// ========================================
+
+function startClientTimer(duration) {
+    // Limpar timer anterior se existir
+    if (turnTimerInterval) {
+        clearInterval(turnTimerInterval);
+        turnTimerInterval = null;
+    }
+
+    turnTimeRemaining = duration;
+    updateTimerDisplay();
+
+    turnTimerInterval = setInterval(() => {
+        turnTimeRemaining -= 1000;
+        if (turnTimeRemaining < 0) turnTimeRemaining = 0;
+        updateTimerDisplay();
+
+        if (turnTimeRemaining <= 0) {
+            clearInterval(turnTimerInterval);
+            turnTimerInterval = null;
+        }
+    }, 1000);
+}
+
+function clearClientTimer() {
+    if (turnTimerInterval) {
+        clearInterval(turnTimerInterval);
+        turnTimerInterval = null;
+    }
+    turnTimeRemaining = 0;
+    updateTimerDisplay();
+}
+
+function updateTimerDisplay() {
+    const timerEl = document.getElementById('mp-turn-timer');
+    const display = document.getElementById('timer-display');
+
+    console.log('DEBUG updateTimerDisplay:', { timerEl: !!timerEl, display: !!display, turnTimeRemaining });
+
+    if (!timerEl || !display) {
+        console.error('ERRO: Elementos do timer não encontrados!');
+        return;
+    }
+
+    const minutes = Math.floor(turnTimeRemaining / 60000);
+    const seconds = Math.floor((turnTimeRemaining % 60000) / 1000);
+    display.textContent = `${minutes}:${seconds.toString().padStart(2, '0')}`;
+
+    // Mudar estilo baseado no tempo restante
+    timerEl.classList.remove('low-time', 'critical-time');
+
+    if (turnTimeRemaining <= 10000) {
+        // Menos de 10 segundos - crítico
+        timerEl.classList.add('critical-time');
+    } else if (turnTimeRemaining <= 30000) {
+        // Menos de 30 segundos - alerta
+        timerEl.classList.add('low-time');
+    }
 }
 
 // ========================================
@@ -282,37 +530,42 @@ function handleActionError(error) {
 
 function createRoom() {
     const nameInput = document.getElementById('player-name');
+    const passwordInput = document.getElementById('room-password');
+
     myPlayerName = nameInput.value.trim() || `Jogador${Math.floor(Math.random() * 1000)}`;
+    const password = passwordInput?.value.trim() || null;
 
     if (!socket?.connected) {
         connectToServer();
         setTimeout(() => {
-            socket.emit('createRoom', myPlayerName);
+            socket.emit('createRoom', { playerName: myPlayerName, password });
         }, 500);
     } else {
-        socket.emit('createRoom', myPlayerName);
+        socket.emit('createRoom', { playerName: myPlayerName, password });
     }
 }
 
 function joinRoom() {
     const nameInput = document.getElementById('player-name');
     const codeInput = document.getElementById('room-code');
+    const passwordInput = document.getElementById('join-room-password');
 
     myPlayerName = nameInput.value.trim() || `Jogador${Math.floor(Math.random() * 1000)}`;
     const code = codeInput.value.trim().toUpperCase();
+    const password = passwordInput?.value.trim() || null;
 
     if (!code) {
-        showMultiplayerMessage('Digite o código da sala', 2000);
+        showMultiplayerMessage('Digite o código da sala');
         return;
     }
 
     if (!socket?.connected) {
         connectToServer();
         setTimeout(() => {
-            socket.emit('joinRoom', { code, playerName: myPlayerName });
+            socket.emit('joinRoom', { code, playerName: myPlayerName, password });
         }, 500);
     } else {
-        socket.emit('joinRoom', { code, playerName: myPlayerName });
+        socket.emit('joinRoom', { code, playerName: myPlayerName, password });
     }
 }
 
@@ -323,6 +576,9 @@ function startMultiplayerGame() {
 }
 
 function leaveCurrentRoom() {
+    // Limpar timer ao sair da sala
+    clearClientTimer();
+
     if (socket?.connected) {
         socket.emit('leaveRoom');
     }
@@ -335,9 +591,9 @@ function shootPlayer(targetId) {
     }
 }
 
-function useMultiplayerItem(itemId, targetId = null) {
+function useMultiplayerItem(itemId, targetId = null, stealItemIndex = null) {
     if (socket?.connected && multiplayerState.currentPlayer === myPlayerId) {
-        socket.emit('useItem', { itemId, targetId });
+        socket.emit('useItem', { itemId, targetId, itemIndex: stealItemIndex });
     }
 }
 
@@ -351,6 +607,9 @@ function showLobbyScreen() {
     document.getElementById('multiplayer-lobby').classList.remove('hidden');
     document.getElementById('waiting-room').classList.add('hidden');
     document.getElementById('multiplayer-game').classList.add('hidden');
+
+    // Atualizar lista de salas automaticamente
+    setTimeout(() => refreshRoomList(), 300);
 }
 
 function showWaitingRoom() {
@@ -400,11 +659,63 @@ function updatePlayerList() {
         `${multiplayerState.players.length}/4 jogadores`;
 }
 
+// Calcula as posições dos jogadores no layout de mesa
+// O jogador atual (você) sempre fica na posição "bottom"
+function getPlayerPositions(players, myId) {
+    const numPlayers = players.length;
+    const positions = [];
+
+    // Encontrar índice do jogador atual
+    const myIndex = players.findIndex(p => p.id === myId);
+
+    // Posições disponíveis baseadas no número de jogadores
+    // 2 jogadores: top, bottom
+    // 3 jogadores: top, left, bottom ou top, right, bottom
+    // 4 jogadores: top, left, right, bottom
+    const positionMaps = {
+        2: ['top', 'bottom'],
+        3: ['top', 'left', 'bottom'],
+        4: ['top', 'left', 'right', 'bottom']
+    };
+
+    const availablePositions = positionMaps[numPlayers] || positionMaps[4];
+
+    // Reorganizar para que o jogador atual fique em "bottom"
+    for (let i = 0; i < numPlayers; i++) {
+        // Calcular offset para que myIndex vá para a última posição (bottom)
+        const offset = (i - myIndex + numPlayers) % numPlayers;
+        // Mapear para posição baseada no offset
+        const posIndex = offset === 0 ? availablePositions.length - 1 : offset - 1;
+        positions[i] = availablePositions[Math.min(posIndex, availablePositions.length - 1)];
+    }
+
+    // Garantir que eu estou em bottom
+    if (myIndex >= 0) {
+        positions[myIndex] = 'bottom';
+
+        // Reordenar os outros
+        let posCounter = 0;
+        for (let i = 0; i < numPlayers; i++) {
+            if (i !== myIndex) {
+                positions[i] = availablePositions[posCounter];
+                posCounter++;
+                if (posCounter >= availablePositions.length - 1) posCounter = 0;
+            }
+        }
+    }
+
+    return positions;
+}
+
 function updateMultiplayerUI() {
-    // Atualizar rodada e shells
+    // Atualizar rodada
     document.getElementById('mp-round').textContent = multiplayerState.round;
-    document.getElementById('mp-live-count').textContent = multiplayerState.shells.live;
-    document.getElementById('mp-blank-count').textContent = multiplayerState.shells.blank;
+
+    // Mostrar apenas total de cartuchos (não revelar LIVE/BLANK)
+    const total = (typeof multiplayerState.shells.total === 'number')
+        ? multiplayerState.shells.total
+        : (multiplayerState.shells.live + multiplayerState.shells.blank);
+    document.getElementById('mp-shell-count').innerHTML = `<span class="shells-remaining">${total} CARTUCHOS</span>`;
 
     // Atualizar direção
     const dirText = multiplayerState.turnDirection === 1 ? '→ Horário' : '← Anti-horário';
@@ -414,12 +725,24 @@ function updateMultiplayerUI() {
     const playersContainer = document.getElementById('mp-players');
     playersContainer.innerHTML = '';
 
-    multiplayerState.players.forEach(player => {
+    // Definir classe baseada no número de jogadores
+    const numPlayers = multiplayerState.players.length;
+    playersContainer.className = '';
+    if (numPlayers === 2) playersContainer.classList.add('two-players');
+    else if (numPlayers === 3) playersContainer.classList.add('three-players');
+
+    // Posições para layout de mesa (eu sempre fico embaixo)
+    const positions = getPlayerPositions(multiplayerState.players, myPlayerId);
+
+    multiplayerState.players.forEach((player, index) => {
         const isCurrentTurn = player.id === multiplayerState.currentPlayer;
         const isMe = player.id === myPlayerId;
+        const position = positions[index];
 
         const div = document.createElement('div');
         div.className = `mp-player ${!player.alive ? 'eliminated' : ''} ${isCurrentTurn ? 'current-turn' : ''} ${isMe ? 'is-me' : ''}`;
+        div.setAttribute('data-position', position);
+        div.setAttribute('data-player-id', player.id);
 
         // HP
         let hpHTML = '<div class="mp-hp">';
@@ -462,11 +785,20 @@ function updateMultiplayerUI() {
 
     // Atualizar indicador de turno
     const currentPlayer = multiplayerState.players.find(p => p.id === multiplayerState.currentPlayer);
-    const turnText = currentPlayer?.id === myPlayerId
-        ? 'SEU TURNO'
-        : `TURNO DE ${currentPlayer?.name?.toUpperCase() || '...'}`;
+    const isMyTurnNow = multiplayerState.currentPlayer === myPlayerId;
+    let turnText;
+    if (isMyTurnNow) {
+        turnText = 'SEU TURNO';
+    } else if (currentPlayer) {
+        const name = (typeof currentPlayer.name === 'string' && currentPlayer.name)
+            ? currentPlayer.name.toUpperCase()
+            : 'OUTRO JOGADOR';
+        turnText = `TURNO DE ${name}`;
+    } else {
+        turnText = 'AGUARDANDO...';
+    }
     document.getElementById('mp-turn-indicator').textContent = turnText;
-    document.getElementById('mp-turn-indicator').className = currentPlayer?.id === myPlayerId ? 'your-turn' : 'other-turn';
+    document.getElementById('mp-turn-indicator').className = isMyTurnNow ? 'your-turn' : 'other-turn';
 
     // Mostrar shell revelado
     const chamber = document.getElementById('mp-shell-chamber');
@@ -486,6 +818,20 @@ function updateActionButtons() {
     const isMyTurn = multiplayerState.currentPlayer === myPlayerId;
     const myPlayer = multiplayerState.players.find(p => p.id === myPlayerId);
 
+    // DEBUG DETALHADO
+    console.log('DEBUG updateActionButtons:', {
+        isMyTurn,
+        myPlayerId,
+        currentPlayer: multiplayerState.currentPlayer,
+        totalPlayers: multiplayerState.players.length,
+        players: multiplayerState.players.map(p => ({
+            id: p.id,
+            name: p.name,
+            alive: p.alive,
+            isMe: p.id === myPlayerId
+        }))
+    });
+
     if (!isMyTurn || !myPlayer?.alive) {
         container.innerHTML = '<p class="waiting-msg">Aguardando...</p>';
         return;
@@ -499,22 +845,32 @@ function updateActionButtons() {
     container.appendChild(selfBtn);
 
     // Botões para atirar em outros jogadores
+    let otherPlayersCount = 0;
     multiplayerState.players.forEach(player => {
+        console.log('DEBUG player check:', player.id, 'name:', player.name, 'isMe:', player.id === myPlayerId, 'alive:', player.alive);
+
         if (player.id !== myPlayerId && player.alive) {
+            otherPlayersCount++;
             const btn = document.createElement('button');
             btn.className = 'action-btn';
-            btn.textContent = `ATIRAR EM ${player.name.toUpperCase()}`;
+            // Garantir que name é uma string válida
+            const playerName = (typeof player.name === 'string' && player.name)
+                ? player.name.toUpperCase()
+                : `JOGADOR`;
+            btn.textContent = `ATIRAR EM ${playerName}`;
             btn.onclick = () => shootPlayer(player.id);
             container.appendChild(btn);
         }
     });
+
+    console.log('DEBUG: Botões criados para outros jogadores:', otherPlayersCount);
 }
 
 let selectedItemId = null;
 
 function selectItemToUse(itemId) {
     if (multiplayerState.currentPlayer !== myPlayerId) {
-        showMultiplayerMessage('Não é seu turno', 1500);
+        showMultiplayerMessage('Não é seu turno');
         return;
     }
 
@@ -529,6 +885,8 @@ function selectItemToUse(itemId) {
     }
 }
 
+let pendingAdrenalineTarget = null;
+
 function showTargetSelection(itemId) {
     const modal = document.getElementById('target-select-modal');
     const container = document.getElementById('target-options');
@@ -536,17 +894,40 @@ function showTargetSelection(itemId) {
 
     const itemName = itemId === 'handcuffs' ? 'Algemar' : 'Roubar item de';
 
-    multiplayerState.players.forEach(player => {
-        if (player.id !== myPlayerId && player.alive) {
-            const btn = document.createElement('button');
-            btn.className = 'action-btn';
-            btn.textContent = player.name;
-            btn.onclick = () => {
-                modal.classList.add('hidden');
+    // Filtrar jogadores válidos
+    let validTargets = multiplayerState.players.filter(player =>
+        player.id !== myPlayerId && player.alive
+    );
+
+    // Para algemas: excluir jogadores com imunidade OU já algemados
+    if (itemId === 'handcuffs') {
+        validTargets = validTargets.filter(player =>
+            !player.handcuffImmune && !player.handcuffed
+        );
+    }
+
+    // Se não há alvos válidos, mostrar mensagem
+    if (validTargets.length === 0) {
+        showMultiplayerMessage('Nenhum jogador válido para usar este item!');
+        return;
+    }
+
+    validTargets.forEach(player => {
+        const btn = document.createElement('button');
+        btn.className = 'action-btn';
+        btn.textContent = player.name;
+        btn.onclick = () => {
+            modal.classList.add('hidden');
+            if (itemId === 'adrenaline') {
+                // Para Adrenalina: primeiro mostrar itens do alvo
+                pendingAdrenalineTarget = player.id;
+                console.log('DEBUG: Emitindo getPlayerItems para:', player.id);
+                socket.emit('getPlayerItems', { targetId: player.id });
+            } else {
                 useMultiplayerItem(itemId, player.id);
-            };
-            container.appendChild(btn);
-        }
+            }
+        };
+        container.appendChild(btn);
     });
 
     document.getElementById('target-select-title').textContent = itemName + ':';
@@ -556,13 +937,64 @@ function showTargetSelection(itemId) {
 function cancelTargetSelection() {
     document.getElementById('target-select-modal').classList.add('hidden');
     selectedItemId = null;
+    pendingAdrenalineTarget = null;
 }
 
-function showMultiplayerMessage(text, duration = 2500, callback = null) {
+// Handler para receber itens do alvo (Adrenalina)
+function handlePlayerItems(data) {
+    console.log('DEBUG: handlePlayerItems recebido:', data);
+
+    if (data.items.length === 0) {
+        showMultiplayerMessage('Jogador não tem itens para roubar!');
+        pendingAdrenalineTarget = null;
+        return;
+    }
+    showItemStealModal(data.targetId, data.targetName, data.items);
+}
+
+// Modal para escolher qual item roubar
+function showItemStealModal(targetId, targetName, items) {
+    console.log('DEBUG: showItemStealModal chamado:', { targetId, targetName, items });
+
+    const modal = document.getElementById('item-steal-modal');
+    const container = document.getElementById('steal-item-options');
+
+    if (!modal) {
+        console.error('DEBUG: Modal item-steal-modal não encontrado!');
+        return;
+    }
+
+    container.innerHTML = '';
+
+    document.getElementById('steal-target-name').textContent = targetName;
+
+    items.forEach((item, index) => {
+        const btn = document.createElement('button');
+        btn.className = 'steal-item-btn';
+        btn.innerHTML = `<span class="item-emoji">${item.emoji}</span><span class="item-name">${item.name}</span>`;
+        btn.onclick = () => {
+            modal.classList.add('hidden');
+            // Usar o índice do item para roubar
+            useMultiplayerItem('adrenaline', targetId, item.index !== undefined ? item.index : index);
+            pendingAdrenalineTarget = null;
+        };
+        container.appendChild(btn);
+    });
+
+    modal.classList.remove('hidden');
+    console.log('DEBUG: Modal mostrado, classe atual:', modal.className);
+}
+
+function cancelItemSteal() {
+    document.getElementById('item-steal-modal').classList.add('hidden');
+    pendingAdrenalineTarget = null;
+}
+
+function showMultiplayerMessage(text, callback = null) {
     const overlay = document.getElementById('mp-message-overlay');
     const content = document.getElementById('mp-message-content');
 
-    content.innerHTML = text + '<br><span class="msg-hint">(clique para fechar)</span>';
+    content.innerHTML = text + '<br><span class="msg-hint">(clique para continuar)</span>';
     overlay.classList.remove('hidden');
 
     let closed = false;
@@ -574,8 +1006,8 @@ function showMultiplayerMessage(text, duration = 2500, callback = null) {
         if (callback) callback();
     };
 
+    // SÓ fecha com click, sem timeout automático
     overlay.addEventListener('click', closeMsg);
-    setTimeout(closeMsg, duration);
 }
 
 function showGameOverMultiplayer(title, reason, isWinner) {
@@ -594,6 +1026,103 @@ function restartMultiplayer() {
     document.getElementById('mp-game-over').classList.add('hidden');
     document.getElementById('multiplayer-game').classList.add('hidden');
     showLobbyScreen();
+}
+
+// ========================================
+// LISTA DE SALAS E SENHA
+// ========================================
+
+function handleRoomList(rooms) {
+    availableRooms = rooms;
+    renderRoomList();
+}
+
+function refreshRoomList() {
+    if (!socket?.connected) {
+        connectToServer();
+        setTimeout(() => {
+            if (socket?.connected) {
+                socket.emit('listRooms');
+            }
+        }, 500);
+    } else {
+        socket.emit('listRooms');
+    }
+}
+
+function renderRoomList() {
+    const container = document.getElementById('room-list');
+    if (!container) return;
+
+    container.innerHTML = '';
+
+    if (availableRooms.length === 0) {
+        container.innerHTML = '<p class="no-rooms">Nenhuma sala disponível</p>';
+        return;
+    }
+
+    availableRooms.forEach(room => {
+        const div = document.createElement('div');
+        div.className = 'room-item';
+        div.innerHTML = `
+            <span class="room-host">${room.hostName}</span>
+            <span class="room-code">${room.code}</span>
+            <span class="room-players">${room.playerCount}/4</span>
+            ${room.hasPassword ? '<span class="room-lock">🔒</span>' : '<span class="room-lock"></span>'}
+            <button onclick="joinRoomFromList('${room.code}', ${room.hasPassword})" class="main-btn small">ENTRAR</button>
+        `;
+        container.appendChild(div);
+    });
+}
+
+function joinRoomFromList(code, hasPassword) {
+    const nameInput = document.getElementById('player-name');
+    myPlayerName = nameInput.value.trim() || `Jogador${Math.floor(Math.random() * 1000)}`;
+
+    if (hasPassword) {
+        showPasswordModal(code);
+    } else {
+        if (!socket?.connected) {
+            connectToServer();
+            setTimeout(() => {
+                socket.emit('joinRoom', { code, playerName: myPlayerName, password: null });
+            }, 500);
+        } else {
+            socket.emit('joinRoom', { code, playerName: myPlayerName, password: null });
+        }
+    }
+}
+
+function showPasswordModal(code) {
+    const modal = document.getElementById('password-modal');
+    document.getElementById('password-room-code').value = code;
+    document.getElementById('join-password').value = '';
+    modal.classList.remove('hidden');
+}
+
+function submitPassword() {
+    const code = document.getElementById('password-room-code').value;
+    const password = document.getElementById('join-password').value;
+    const nameInput = document.getElementById('player-name');
+
+    myPlayerName = nameInput.value.trim() || `Jogador${Math.floor(Math.random() * 1000)}`;
+
+    document.getElementById('password-modal').classList.add('hidden');
+    document.getElementById('join-password').value = '';
+
+    if (!socket?.connected) {
+        connectToServer();
+        setTimeout(() => {
+            socket.emit('joinRoom', { code, playerName: myPlayerName, password });
+        }, 500);
+    } else {
+        socket.emit('joinRoom', { code, playerName: myPlayerName, password });
+    }
+}
+
+function cancelPasswordModal() {
+    document.getElementById('password-modal').classList.add('hidden');
+    document.getElementById('join-password').value = '';
 }
 
 // ========================================

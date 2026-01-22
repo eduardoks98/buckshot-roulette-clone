@@ -55,7 +55,6 @@
             <!-- Área do Jogador -->
             <section id="player-area">
                 <div id="player-status" class="status-indicator"></div>
-                <div id="player-items" class="items-display"></div>
                 <div id="player-hp" class="hp-display"></div>
                 <div class="character-label">VOCÊ</div>
             </section>
@@ -101,17 +100,45 @@
             <div class="lobby-form">
                 <input type="text" id="player-name" placeholder="Seu nome" maxlength="15" class="lobby-input">
 
-                <div class="lobby-buttons">
+                <!-- CRIAR SALA -->
+                <div class="create-section">
+                    <input type="password" id="room-password" placeholder="Senha (opcional)" maxlength="20" class="lobby-input">
                     <button onclick="createRoom()" class="main-btn">CRIAR SALA</button>
                 </div>
 
+                <!-- ENTRAR COM CÓDIGO -->
                 <div class="join-section">
-                    <p class="join-label">ou entre em uma sala:</p>
+                    <p class="join-label">ou entre com código:</p>
                     <input type="text" id="room-code" placeholder="CÓDIGO" maxlength="6" class="lobby-input code-input">
+                    <input type="password" id="join-room-password" placeholder="Senha (se tiver)" maxlength="20" class="lobby-input">
                     <button onclick="joinRoom()" class="main-btn secondary">ENTRAR</button>
                 </div>
 
+                <!-- LISTA DE SALAS -->
+                <div class="rooms-section">
+                    <div class="rooms-header">
+                        <h3>SALAS DISPONÍVEIS</h3>
+                        <button onclick="refreshRoomList()" class="refresh-btn">🔄</button>
+                    </div>
+                    <div id="room-list" class="room-list">
+                        <p class="no-rooms">Clique em 🔄 para atualizar</p>
+                    </div>
+                </div>
+
                 <button onclick="backToMenu()" class="back-btn">VOLTAR</button>
+            </div>
+        </div>
+
+        <!-- Modal de Senha -->
+        <div id="password-modal" class="hidden">
+            <div class="modal-content">
+                <h3>🔒 Sala Protegida</h3>
+                <input type="hidden" id="password-room-code">
+                <input type="password" id="join-password" placeholder="Digite a senha" class="lobby-input">
+                <div class="modal-buttons">
+                    <button onclick="submitPassword()" class="main-btn">ENTRAR</button>
+                    <button onclick="cancelPasswordModal()" class="main-btn secondary">CANCELAR</button>
+                </div>
             </div>
         </div>
 
@@ -156,6 +183,9 @@
                     <div id="mp-shell-chamber">?</div>
                 </div>
                 <div id="mp-turn-indicator">AGUARDANDO...</div>
+                <div id="mp-turn-timer" class="turn-timer">
+                    <span id="timer-display">2:00</span>
+                </div>
             </div>
 
             <!-- Botões de ação -->
@@ -172,6 +202,16 @@
                     <h3 id="target-select-title">Escolha o alvo:</h3>
                     <div id="target-options"></div>
                     <button onclick="cancelTargetSelection()" class="action-btn secondary">Cancelar</button>
+                </div>
+            </div>
+
+            <!-- Modal de Roubo de Item (Adrenalina) -->
+            <div id="item-steal-modal" class="hidden">
+                <div class="modal-content">
+                    <h3>💉 ROUBAR ITEM</h3>
+                    <p>Escolha um item de <span id="steal-target-name"></span>:</p>
+                    <div id="steal-item-options" class="steal-items-grid"></div>
+                    <button onclick="cancelItemSteal()" class="action-btn secondary">Cancelar</button>
                 </div>
             </div>
 
