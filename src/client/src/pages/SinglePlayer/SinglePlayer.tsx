@@ -1,5 +1,11 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  generateShells as generateShellsUtil,
+  getRandomHP,
+  ITEMS as SHARED_ITEMS,
+  getRandomItem as getRandomItemUtil,
+} from '../../../../shared';
 import './SinglePlayer.css';
 
 // ========================================
@@ -10,7 +16,7 @@ interface Item {
   id: string;
   emoji: string;
   name: string;
-  description: string;
+  description?: string;
 }
 
 interface Character {
@@ -47,42 +53,28 @@ interface Message {
 }
 
 // ========================================
-// ITEMS
+// ITEMS (usando shared/constants/items)
 // ========================================
 
-const ITEMS: Record<string, Item> = {
-  MAGNIFYING_GLASS: { id: 'magnifying_glass', emoji: '🔍', name: 'Lupa', description: 'Revela se o cartucho atual é LIVE ou BLANK' },
-  BEER: { id: 'beer', emoji: '🍺', name: 'Cerveja', description: 'Ejeta o cartucho atual sem disparar' },
-  CIGARETTES: { id: 'cigarettes', emoji: '🚬', name: 'Cigarro', description: 'Restaura 1 HP (não excede máximo)' },
-  HANDCUFFS: { id: 'handcuffs', emoji: '⛓️', name: 'Algemas', description: 'Pula o próximo turno do oponente' },
-  HAND_SAW: { id: 'hand_saw', emoji: '🪚', name: 'Serra', description: 'Próximo tiro causa 2x de dano' },
-  PHONE: { id: 'phone', emoji: '📱', name: 'Celular', description: 'Revela a posição de um cartucho na arma' },
-  INVERTER: { id: 'inverter', emoji: '🔄', name: 'Inversor', description: 'Inverte o cartucho atual (LIVE↔BLANK)' },
-  ADRENALINE: { id: 'adrenaline', emoji: '💉', name: 'Adrenalina', description: 'Rouba e usa um item do oponente' },
-  EXPIRED_MEDICINE: { id: 'expired_medicine', emoji: '💊', name: 'Remédio Vencido', description: '50% chance: +2 HP ou -1 HP' },
-  TURN_REVERSER: { id: 'turn_reverser', emoji: '↩️', name: 'Inversor de Ordem', description: 'Inverte a direção dos turnos (só multiplayer)' }
-};
+// Referência às definições compartilhadas
+const ITEMS = SHARED_ITEMS;
 
 // ========================================
-// HELPERS
+// HELPERS (usando shared/utils/gameUtils)
 // ========================================
 
-function shuffleArray<T>(array: T[]): T[] {
-  const newArray = [...array];
-  for (let i = newArray.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [newArray[i], newArray[j]] = [newArray[j], newArray[i]];
-  }
-  return newArray;
-}
+// generateShellsUtil é importado de shared/utils/gameUtils
 
+// Wrapper para getRandomItem que exclui turn_reverser no solo
 function getRandomItem(): Item {
-  const allItems = Object.values(ITEMS);
-  return { ...allItems[Math.floor(Math.random() * allItems.length)] };
+  // No modo solo, excluir turn_reverser (só funciona em multiplayer)
+  const item = getRandomItemUtil(['turn_reverser']);
+  return item;
 }
 
 function createInitialState(round: number): GameState {
-  const maxHp = Math.floor(Math.random() * 3) + 2; // 2-4
+  // Usar getRandomHP de shared/utils/gameUtils
+  const maxHp = getRandomHP();
 
   return {
     currentRound: round,
@@ -112,20 +104,8 @@ function createInitialState(round: number): GameState {
   };
 }
 
-function generateShells(): ('live' | 'blank')[] {
-  const totalShells = Math.floor(Math.random() * 7) + 2; // 2-8
-  const minLive = 1;
-  const minBlank = 1;
-  const remaining = totalShells - minLive - minBlank;
-  const extraLive = Math.floor(Math.random() * (remaining + 1));
-  const extraBlank = remaining - extraLive;
-
-  const shells: ('live' | 'blank')[] = [];
-  for (let i = 0; i < minLive + extraLive; i++) shells.push('live');
-  for (let i = 0; i < minBlank + extraBlank; i++) shells.push('blank');
-
-  return shuffleArray(shells);
-}
+// Usar generateShells de shared/utils/gameUtils
+const generateShells = generateShellsUtil;
 
 // ========================================
 // COMPONENT
@@ -229,19 +209,6 @@ export default function SinglePlayer() {
   // SHELL MANAGEMENT
   // ========================================
 
-  const ejectShell = useCallback(() => {
-    setGame(prev => {
-      const newIndex = prev.currentShellIndex + 1;
-      return {
-        ...prev,
-        currentShellIndex: newIndex,
-        revealedShell: null,
-        dealer: { ...prev.dealer, knownShell: null },
-      };
-    });
-    return currentShell;
-  }, [currentShell]);
-
   const reloadIfNeeded = useCallback(() => {
     setGame(prev => {
       if (prev.currentShellIndex >= prev.shells.length) {
@@ -338,31 +305,6 @@ export default function SinglePlayer() {
     setGameOverScreen(null);
     setGameStarted(false);
   }, []);
-
-  // ========================================
-  // TURN MANAGEMENT
-  // ========================================
-
-  const endTurn = useCallback((currentPlayer: 'player' | 'dealer') => {
-    const opponent = currentPlayer === 'player' ? 'dealer' : 'player';
-
-    setGame(prev => {
-      if (prev[opponent].handcuffed) {
-        // Opponent is handcuffed, skip their turn
-        return {
-          ...prev,
-          [opponent]: { ...prev[opponent], handcuffed: false },
-        };
-      } else {
-        return {
-          ...prev,
-          currentTurn: opponent,
-        };
-      }
-    });
-
-    reloadIfNeeded();
-  }, [reloadIfNeeded]);
 
   // ========================================
   // SHOOTING
@@ -688,7 +630,7 @@ export default function SinglePlayer() {
       actionInProgress: false,
       player: {
         ...prev.player,
-        items: [...prev.player.items, { ...ITEMS.ADRENALINE }],
+        items: [...prev.player.items, { ...ITEMS.adrenaline }],
       },
     }));
   }, []);
@@ -944,7 +886,7 @@ export default function SinglePlayer() {
           <div className="phone-modal">
             <div className="phone-header">📱 CELULAR - POSIÇÕES</div>
             <div className="phone-shells">
-              {game.shells.map((shell, i) => {
+              {game.shells.map((_, i) => {
                 const isUsed = i < game.currentShellIndex;
                 const isCurrent = i === game.currentShellIndex;
                 const isRevealed = i === phoneModal.position || (isCurrent && game.revealedShell);

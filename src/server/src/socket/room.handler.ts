@@ -144,7 +144,7 @@ export function registerRoomHandlers(
   // ==========================================
   // JOIN ROOM
   // ==========================================
-  socket.on('joinRoom', ({ code, playerName, password }) => {
+  socket.on('joinRoom', async ({ code, playerName, password }) => {
     try {
       const result = roomService.joinRoom(code.toUpperCase(), socket.id, playerName, password);
 
@@ -154,6 +154,17 @@ export function registerRoomHandlers(
       }
 
       socket.join(code.toUpperCase());
+
+      // Persistir participante no banco de dados
+      const userData = socketUserMap.get(socket.id);
+      const gameId = await gamePersistenceService.getGameId(code.toUpperCase());
+      if (gameId) {
+        gamePersistenceService.addParticipant({
+          gameId,
+          userId: userData?.odUserId,
+          guestName: userData ? undefined : playerName,
+        }).catch(err => console.error('[DB] Erro ao adicionar participante:', err));
+      }
 
       // Notificar quem entrou
       socket.emit('roomJoined', {
@@ -234,6 +245,15 @@ export function registerRoomHandlers(
       // Persistir no banco de dados
       gamePersistenceService.startGame(result.room.code)
         .catch(err => console.error('[DB] Erro ao iniciar jogo:', err));
+
+      // Salvar o primeiro round no banco
+      gamePersistenceService.saveRound({
+        roomCode: result.room.code,
+        roundNumber: roundData.round,
+        maxHp: roundData.maxHp,
+        shellsLive: roundData.shells.live,
+        shellsBlank: roundData.shells.blank,
+      }).catch(err => console.error('[DB] Erro ao salvar round:', err));
 
       // Emit to each player with their items and reconnect credentials
       result.room.players.forEach(player => {

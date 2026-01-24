@@ -2,7 +2,7 @@
 // MULTIPLAYER GAME PAGE
 // ==========================================
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSocket } from '../../../context/SocketContext';
 import {
@@ -70,10 +70,53 @@ export default function MultiplayerGame() {
     remainingTime: number;
   }[]>([]);
 
+  // Overlay queue system - prevents overlays from overlapping
+  interface PendingOverlay {
+    type: 'round' | 'shot' | 'reload';
+    data: unknown;
+    duration: number;
+  }
+  const [overlayQueue, setOverlayQueue] = useState<PendingOverlay[]>([]);
+
   // Get current player
   const myId = socket?.id || '';
   const isMyTurn = currentPlayerId === myId;
   const me = players.find(p => p.id === myId);
+
+  // Check if any overlay is active (blocks actions)
+  const hasActiveOverlay = useMemo(() => {
+    return roundAnnouncement !== null ||
+           lastShotResult !== null ||
+           gameOverData !== null ||
+           stealingFromPlayer !== null;
+  }, [roundAnnouncement, lastShotResult, gameOverData, stealingFromPlayer]);
+
+  // Ref to access current overlay state in socket handlers (avoids stale closures)
+  const hasActiveOverlayRef = useRef(hasActiveOverlay);
+  hasActiveOverlayRef.current = hasActiveOverlay;
+
+  // Process overlay queue when current overlay finishes
+  useEffect(() => {
+    if (!hasActiveOverlay && overlayQueue.length > 0) {
+      const [next, ...rest] = overlayQueue;
+      setOverlayQueue(rest);
+
+      // Atualizar ref IMEDIATAMENTE para evitar race condition
+      hasActiveOverlayRef.current = true;
+
+      switch (next.type) {
+        case 'round':
+        case 'reload':
+          setRoundAnnouncement(next.data as { round: number; live: number; blank: number; hp: number });
+          setTimeout(() => setRoundAnnouncement(null), next.duration);
+          break;
+        case 'shot':
+          setLastShotResult(next.data as { type: 'live' | 'blank'; shooter: string; target: string; damage: number });
+          setTimeout(() => setLastShotResult(null), next.duration);
+          break;
+      }
+    }
+  }, [hasActiveOverlay, overlayQueue]);
 
   // Initialize game state
   useEffect(() => {
@@ -106,17 +149,29 @@ export default function MultiplayerGame() {
       setRevealedShell(null);
       setSelectedTarget(null);
       setSelectedItem(null);
-      setLastShotResult(null);
       setPlayerLastShell({}); // Limpar balas gastas no início da rodada
 
-      // Mostrar anúncio de rodada em destaque (fica visível por 5 segundos)
-      setRoundAnnouncement({
+      const overlayData = {
         round: data.round,
         live: data.shells.live,
         blank: data.shells.blank,
         hp: data.maxHp,
-      });
-      setTimeout(() => setRoundAnnouncement(null), 5000);
+      };
+
+      // Se há overlay ativo (ex: resultado do tiro), enfileirar o anúncio
+      if (hasActiveOverlayRef.current) {
+        setOverlayQueue(prev => [...prev, {
+          type: 'round' as const,
+          data: overlayData,
+          duration: 5000,
+        }]);
+      } else {
+        // Atualizar ref IMEDIATAMENTE para evitar race condition
+        hasActiveOverlayRef.current = true;
+        // Mostrar anúncio de rodada em destaque (fica visível por 5 segundos)
+        setRoundAnnouncement(overlayData);
+        setTimeout(() => setRoundAnnouncement(null), 5000);
+      }
 
       setMessage('');
       setTurnTimer(GAME_RULES.TIMERS.TURN_DURATION_MS / 1000);
@@ -161,6 +216,10 @@ export default function MultiplayerGame() {
       // Mostrar resultado do tiro em destaque (fica visível por 3 segundos)
       const shooterName = data.shooter === myId ? 'Você' : data.shooterName;
       const targetName = data.target === myId ? 'você' : data.targetName;
+
+      // Atualizar ref IMEDIATAMENTE para evitar race condition com roundStarted
+      hasActiveOverlayRef.current = true;
+
       setLastShotResult({
         type: data.shell,
         shooter: shooterName,
@@ -277,14 +336,27 @@ export default function MultiplayerGame() {
       const myNewItems = itemsDistributed.find(d => d.playerId === myId)?.items || [];
       setMyItems(prev => [...prev, ...myNewItems].slice(0, GAME_RULES.ITEMS.MAX_PER_PLAYER));
 
-      // Mostrar anúncio de recarga com LIVE/BLANK igual ao início de rodada
-      setRoundAnnouncement({
+      const overlayData = {
         round: round,
         live: newShells.live,
         blank: newShells.blank,
         hp: me?.maxHp || 4,
-      });
-      setTimeout(() => setRoundAnnouncement(null), 4000);
+      };
+
+      // Se há overlay ativo, enfileirar
+      if (hasActiveOverlayRef.current) {
+        setOverlayQueue(prev => [...prev, {
+          type: 'reload' as const,
+          data: overlayData,
+          duration: 4000,
+        }]);
+      } else {
+        // Atualizar ref IMEDIATAMENTE para evitar race condition
+        hasActiveOverlayRef.current = true;
+        // Mostrar anúncio de recarga com LIVE/BLANK igual ao início de rodada
+        setRoundAnnouncement(overlayData);
+        setTimeout(() => setRoundAnnouncement(null), 4000);
+      }
     });
 
     // Player eliminated
@@ -343,8 +415,9 @@ export default function MultiplayerGame() {
     });
 
     // Player reconnected
-    socket.on('playerReconnected', ({ playerId, playerName }) => {
-      setDisconnectedPlayers(prev => prev.filter(p => p.playerId !== playerId));
+    socket.on('playerReconnected', ({ playerName }) => {
+      // Filtrar por playerName pois o playerId muda após reconexão (novo socket.id)
+      setDisconnectedPlayers(prev => prev.filter(p => p.playerName !== playerName));
       setMessage(`${playerName} reconectou!`);
     });
 
@@ -412,15 +485,15 @@ export default function MultiplayerGame() {
     return () => clearInterval(interval);
   }, [disconnectedPlayers.length]);
 
-  // Actions
+  // Actions - blocked when overlay is active
   const handleShoot = useCallback((targetId: string) => {
-    if (!socket || !isMyTurn) return;
+    if (!socket || !isMyTurn || hasActiveOverlay) return;
     socket.emit('shoot', { targetId });
     setSelectedTarget(null);
-  }, [socket, isMyTurn]);
+  }, [socket, isMyTurn, hasActiveOverlay]);
 
   const handleUseItem = useCallback((itemIndex: number) => {
-    if (!socket || !isMyTurn || itemIndex >= myItems.length) return;
+    if (!socket || !isMyTurn || hasActiveOverlay || itemIndex >= myItems.length) return;
 
     const item = myItems[itemIndex];
 
@@ -441,10 +514,10 @@ export default function MultiplayerGame() {
 
     setSelectedItem(null);
     setSelectedTarget(null);
-  }, [socket, isMyTurn, myItems, selectedTarget]);
+  }, [socket, isMyTurn, hasActiveOverlay, myItems, selectedTarget]);
 
   const handleSelectTarget = (playerId: string) => {
-    if (!isMyTurn || !socket) return;
+    if (!isMyTurn || !socket || hasActiveOverlay) return;
 
     if (selectedItem !== null) {
       const item = myItems[selectedItem];
@@ -516,13 +589,15 @@ export default function MultiplayerGame() {
           <div className="round-announcement">
             <h2>🎯 RODADA {roundAnnouncement.round}</h2>
             <div className="shell-distribution">
-              <div className="shell-type live">
-                <span className="shell-count">{roundAnnouncement.live}</span>
-                <span className="shell-label">LIVE</span>
+              {/* Shells visuais com cores */}
+              <div className="shells-visual-container">
+                {renderShellIcons(roundAnnouncement.live, roundAnnouncement.blank)}
               </div>
-              <div className="shell-type blank">
-                <span className="shell-count">{roundAnnouncement.blank}</span>
-                <span className="shell-label">BLANK</span>
+
+              {/* Legenda abaixo */}
+              <div className="shell-legend">
+                <span className="legend-item live">🔴 {roundAnnouncement.live} LIVE</span>
+                <span className="legend-item blank">🔵 {roundAnnouncement.blank} BLANK</span>
               </div>
             </div>
             <div className="hp-announcement">❤️ {roundAnnouncement.hp} HP cada</div>
@@ -611,7 +686,11 @@ export default function MultiplayerGame() {
         </div>
 
         {isMyTurn && selectedTarget && (
-          <button className="shoot-btn" onClick={() => handleShoot(selectedTarget)}>
+          <button
+            className={`shoot-btn ${hasActiveOverlay ? 'disabled' : ''}`}
+            onClick={() => handleShoot(selectedTarget)}
+            disabled={hasActiveOverlay}
+          >
             ATIRAR
           </button>
         )}
@@ -619,8 +698,9 @@ export default function MultiplayerGame() {
         {isMyTurn && !selectedTarget && (
           <div className="shoot-options">
             <button
-              className="shoot-self-btn"
+              className={`shoot-self-btn ${hasActiveOverlay ? 'disabled' : ''}`}
               onClick={() => handleShoot(myId)}
+              disabled={hasActiveOverlay}
             >
               Atirar em Si
             </button>
@@ -656,9 +736,9 @@ export default function MultiplayerGame() {
         {myItems.map((item, index) => (
           <button
             key={index}
-            className={`item-btn ${selectedItem === index ? 'selected' : ''}`}
+            className={`item-btn ${selectedItem === index ? 'selected' : ''} ${hasActiveOverlay ? 'disabled' : ''}`}
             onClick={() => isMyTurn && handleUseItem(index)}
-            disabled={!isMyTurn}
+            disabled={!isMyTurn || hasActiveOverlay}
             title={item.name}
           >
             {item.emoji}
@@ -741,13 +821,31 @@ export default function MultiplayerGame() {
                 <table className="stats-table">
                   <thead>
                     <tr>
-                      <th>Jogador</th>
-                      <th>🏆</th>
-                      <th>💥</th>
-                      <th>💔</th>
-                      <th>🤕</th>
-                      <th>🔫</th>
-                      <th>☠️</th>
+                      <th className="th-player">Jogador</th>
+                      <th className="th-stat" title="Rounds Vencidos">
+                        <span className="th-emoji">🏆</span>
+                        <span className="th-label">Rounds</span>
+                      </th>
+                      <th className="th-stat" title="Dano Causado">
+                        <span className="th-emoji">💥</span>
+                        <span className="th-label">Dano</span>
+                      </th>
+                      <th className="th-stat" title="Dano Sofrido">
+                        <span className="th-emoji">💔</span>
+                        <span className="th-label">Sofrido</span>
+                      </th>
+                      <th className="th-stat" title="Dano em Si Mesmo">
+                        <span className="th-emoji">🤕</span>
+                        <span className="th-label">Auto</span>
+                      </th>
+                      <th className="th-stat" title="Tiros Disparados">
+                        <span className="th-emoji">🔫</span>
+                        <span className="th-label">Tiros</span>
+                      </th>
+                      <th className="th-stat" title="Eliminações">
+                        <span className="th-emoji">☠️</span>
+                        <span className="th-label">Kills</span>
+                      </th>
                     </tr>
                   </thead>
                   <tbody>
@@ -764,14 +862,6 @@ export default function MultiplayerGame() {
                     ))}
                   </tbody>
                 </table>
-                <div className="stats-legend">
-                  <span>🏆 Rounds</span>
-                  <span>💥 Dano</span>
-                  <span>💔 Sofrido</span>
-                  <span>🤕 Auto</span>
-                  <span>🔫 Tiros</span>
-                  <span>☠️ Kills</span>
-                </div>
               </div>
             )}
 
@@ -828,4 +918,31 @@ function getAwardTitle(type: string): string {
     'most_kills': 'Exterminador',
   };
   return titles[type] || type;
+}
+
+// Renderiza shells visuais coloridas - em sequência (LIVE primeiro, BLANK depois)
+// NOTA: A ordem de disparo é aleatória (determinada pelo servidor), mas a visualização
+// mostra apenas a COMPOSIÇÃO do pente, não a ordem real
+function renderShellIcons(live: number, blank: number): JSX.Element {
+  const shells: JSX.Element[] = [];
+
+  // Primeiro todas as LIVE (vermelhas)
+  for (let i = 0; i < live; i++) {
+    shells.push(
+      <div key={`live-${i}`} className="shell-icon live" title="LIVE">
+        <div className="shell-tip"></div>
+      </div>
+    );
+  }
+
+  // Depois todas as BLANK (azuis)
+  for (let i = 0; i < blank; i++) {
+    shells.push(
+      <div key={`blank-${i}`} className="shell-icon blank" title="BLANK">
+        <div className="shell-tip"></div>
+      </div>
+    );
+  }
+
+  return <div className="shells-visual">{shells}</div>;
 }

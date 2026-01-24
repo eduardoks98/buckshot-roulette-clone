@@ -178,20 +178,47 @@ export function registerGameHandlers(
   socket.on('getPlayerItems', ({ targetId }) => {
     try {
       const roomData = roomService.getRoomByPlayer(socket.id);
-      if (!roomData) return;
+      if (!roomData) {
+        socket.emit('actionError', 'Voce nao esta em uma sala');
+        return;
+      }
 
       const { room } = roomData;
+
+      // Verificar se é o turno do jogador
+      const currentPlayer = room.players[room.currentPlayerIndex];
+      if (currentPlayer.id !== socket.id) {
+        socket.emit('actionError', 'Nao e seu turno');
+        return;
+      }
+
       const target = room.players.find(p => p.id === targetId);
 
-      if (!target || !target.alive) return;
+      if (!target) {
+        socket.emit('actionError', 'Jogador nao encontrado');
+        return;
+      }
+
+      if (!target.alive) {
+        socket.emit('actionError', 'Jogador esta eliminado');
+        return;
+      }
+
+      if (target.items.length === 0) {
+        socket.emit('actionError', 'Jogador nao tem itens');
+        return;
+      }
 
       socket.emit('playerItems', {
         targetId,
         targetName: target.name,
         items: target.items as Item[],
       });
+
+      console.log(`[Game] ${socket.id} solicitou itens de ${target.name}`);
     } catch (error) {
       console.error('[Game] Erro ao obter itens:', error);
+      socket.emit('actionError', 'Erro ao obter itens do jogador');
     }
   });
 }
@@ -324,6 +351,10 @@ function handleRoundEnd(
 
   const winner = room.players.find(p => p.id === winnerId);
 
+  // Finalizar round no banco de dados
+  gamePersistenceService.endRound(code, room.currentRound, winnerId || '')
+    .catch(err => console.error('[DB] Erro ao finalizar round:', err));
+
   // Emit round ended
   io.to(code).emit('roundEnded', {
     winnerId: winnerId || '',
@@ -383,6 +414,15 @@ function handleRoundEnd(
   setTimeout(() => {
     room.currentRound++;
     const roundData = gameService.startRound(room as never);
+
+    // Salvar novo round no banco de dados
+    gamePersistenceService.saveRound({
+      roomCode: code,
+      roundNumber: roundData.round,
+      maxHp: roundData.maxHp,
+      shellsLive: roundData.shells.live,
+      shellsBlank: roundData.shells.blank,
+    }).catch(err => console.error('[DB] Erro ao salvar round:', err));
 
     // Emit to each player with their items
     room.players.forEach(player => {

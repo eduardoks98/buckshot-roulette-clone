@@ -16,3 +16,10 @@ Thumbs.db
 # Environment
 .env
 .env.local
+
+# Build output
+dist/
+build/
+
+# Windows system files
+nul

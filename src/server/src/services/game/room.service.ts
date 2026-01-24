@@ -282,7 +282,8 @@ export class RoomService {
     room.started = true;
     room.currentRound = 1;
     room.turnDirection = 1;
-    room.currentPlayerIndex = 0;
+    // Escolher jogador inicial aleatório (não sempre o host)
+    room.currentPlayerIndex = Math.floor(Math.random() * room.players.length);
 
     // Gerar tokens de reconexão para todos os jogadores
     room.players.forEach(player => {

@@ -2,7 +2,7 @@
 // GAME SERVICE
 // ==========================================
 
-import { GAME_RULES, ITEMS_ARRAY, getRandomItem } from '../../../../shared/constants';
+import { GAME_RULES, getRandomItem } from '../../../../shared/constants';
 import {
   PlayerPublicState,
   Item,
@@ -10,6 +10,13 @@ import {
   ShellInfo,
   TurnDirection,
 } from '../../../../shared/types';
+import {
+  getRandomInRange,
+  getRandomHP,
+  generateShells,
+  getShellCounts,
+  calculateDamage,
+} from '../../../../shared/utils/gameUtils';
 
 // ==========================================
 // TYPES
@@ -135,8 +142,8 @@ export class GameService {
   // ==========================================
 
   startRound(room: Room): RoundStartResult {
-    // Determine HP for this round
-    const maxHp = this.getRandomHP();
+    // Determine HP for this round (usando shared/utils/gameUtils)
+    const maxHp = getRandomHP();
 
     // Reset all players
     room.players.forEach(player => {
@@ -169,13 +176,20 @@ export class GameService {
     // Distribute initial items
     const itemsDistributed = this.distributeItems(room);
 
-    // Set first player
-    room.currentPlayerIndex = 0;
+    // Set first player - aleatório no round 1, quem morreu primeiro nos rounds seguintes
+    if (room.currentRound === 1) {
+      // Round 1: jogador inicial aleatório
+      room.currentPlayerIndex = Math.floor(Math.random() * room.players.length);
+    } else if (room.firstToDie !== null) {
+      // Rounds 2+: quem morreu primeiro no round anterior começa
+      room.currentPlayerIndex = room.firstToDie;
+    }
+    // Se firstToDie é null (todos morreram ao mesmo tempo), mantém o índice atual
     room.revealedShell = null;
     room.firstToDie = null;
 
     // Get shell counts
-    const shellCounts = this.getShellCounts(room);
+    const shellCounts = this.getShellCountsForRoom(room);
 
     return {
       round: room.currentRound,
@@ -189,25 +203,8 @@ export class GameService {
   }
 
   private loadShells(room: Room): void {
-    const totalShells = this.getRandomInRange(
-      GAME_RULES.SHELLS.MIN_TOTAL,
-      GAME_RULES.SHELLS.MAX_TOTAL
-    );
-
-    const liveCount = this.getRandomInRange(
-      GAME_RULES.SHELLS.MIN_LIVE,
-      totalShells - GAME_RULES.SHELLS.MIN_BLANK
-    );
-    const blankCount = totalShells - liveCount;
-
-    // Create shells array
-    const shells: ('live' | 'blank')[] = [
-      ...Array(liveCount).fill('live'),
-      ...Array(blankCount).fill('blank'),
-    ];
-
-    // Shuffle
-    room.shells = this.shuffle(shells);
+    // Usando generateShells de shared/utils/gameUtils
+    room.shells = generateShells();
     room.currentShellIndex = 0;
   }
 
@@ -215,8 +212,8 @@ export class GameService {
     const distribution: { playerId: string; items: Item[] }[] = [];
 
     // REGRA OFICIAL: Todos os jogadores recebem a MESMA quantidade de itens
-    // A quantidade é aleatória, mas igual para todos
-    const itemCount = this.getRandomInRange(
+    // A quantidade é aleatória, mas igual para todos (usando shared/utils/gameUtils)
+    const itemCount = getRandomInRange(
       GAME_RULES.ITEMS.PER_RELOAD.MIN,
       GAME_RULES.ITEMS.PER_RELOAD.MAX
     );
@@ -280,12 +277,9 @@ export class GameService {
     // Clear revealed shell
     room.revealedShell = null;
 
-    // Calculate damage
-    let damage = 0;
+    // Calculate damage (usando calculateDamage de shared/utils/gameUtils)
     const sawedOff = shooter.sawedOff;
-    if (shell === 'live') {
-      damage = sawedOff ? GAME_RULES.DAMAGE.SAWED_OFF : GAME_RULES.DAMAGE.NORMAL;
-    }
+    const damage = calculateDamage(shell, sawedOff);
 
     // Apply damage
     target.hp -= damage;
@@ -354,7 +348,7 @@ export class GameService {
       sawedOff,
       targetSelf: shooterId === targetId,
       players: room.players.map(p => this.toPublicPlayer(p)),
-      shellsRemaining: this.getShellCounts(room),
+      shellsRemaining: this.getShellCountsForRoom(room),
       roundOver: roundCheck.ended,
       winner,
       reloaded,
@@ -470,19 +464,22 @@ export class GameService {
       }
 
       case 'phone': {
-        const remainingShells = room.shells.slice(room.currentShellIndex + 1);
-        // Verificar se há cartuchos além do atual
-        if (remainingShells.length === 0) {
-          return { error: 'Nao ha cartuchos alem do atual para revelar!' };
-        }
-        const randomIndex = Math.floor(Math.random() * remainingShells.length);
-        // POSIÇÃO ABSOLUTA na sequência original (1-indexed, como o jogo oficial)
-        // Se currentShellIndex=4 e randomIndex=0, absolutePosition = 4+0+2 = 6 (cartucho #6)
-        const absolutePosition = room.currentShellIndex + randomIndex + 2;
-        baseResult.phonePosition = absolutePosition;
-        baseResult.phoneShell = remainingShells[randomIndex];
-        const shellType = remainingShells[randomIndex] === 'live' ? '🔴 LIVE' : '🔵 BLANK';
-        baseResult.message = `Cartucho #${absolutePosition}: ${shellType}`;
+        // Revelar qualquer posição do pente COMPLETO (1 a N), incluindo já disparadas
+        // Comportamento igual ao jogo original Buckshot Roulette
+        const totalShells = room.shells.length;
+        const randomPosition = Math.floor(Math.random() * totalShells); // 0-indexed
+        const shellAtPosition = room.shells[randomPosition];
+        const displayPosition = randomPosition + 1; // 1-indexed para display
+
+        baseResult.phonePosition = displayPosition;
+        baseResult.phoneShell = shellAtPosition;
+        const shellType = shellAtPosition === 'live' ? '🔴 LIVE' : '🔵 BLANK';
+
+        // Indicar se já foi disparada ou se é a atual/futura
+        const alreadyFired = randomPosition < room.currentShellIndex;
+        const statusHint = alreadyFired ? ' (já disparada)' : '';
+
+        baseResult.message = `Cartucho #${displayPosition}: ${shellType}${statusHint}`;
         break;
       }
 
@@ -587,7 +584,7 @@ export class GameService {
     return {
       ...baseResult,
       players: room.players.map(p => this.toPublicPlayer(p)),
-      shellsRemaining: this.getShellCounts(room),
+      shellsRemaining: this.getShellCountsForRoom(room),
     } as ItemResult;
   }
 
@@ -603,8 +600,9 @@ export class GameService {
       return currentPlayer.id;
     }
 
-    // Remove handcuffs from current player
+    // Jogador atual completou seu turno - remover imunidade e algemas
     currentPlayer.handcuffed = false;
+    currentPlayer.handcuffImmune = false;
 
     // Find next alive player
     let nextIndex = room.currentPlayerIndex;
@@ -623,7 +621,8 @@ export class GameService {
     const nextPlayer = room.players[nextIndex];
     if (nextPlayer.handcuffed) {
       nextPlayer.handcuffed = false;
-      nextPlayer.handcuffImmune = false;
+      // NÃO resetar handcuffImmune aqui! O jogador ainda está imune até jogar um turno real.
+      // Isso impede que ele seja algemado novamente imediatamente.
 
       // Skip to next
       do {
@@ -648,7 +647,7 @@ export class GameService {
     const itemsDistributed = this.distributeItems(room);
 
     return {
-      shells: this.getShellCounts(room),
+      shells: this.getShellCountsForRoom(room),
       itemsDistributed,
     };
   }
@@ -705,29 +704,11 @@ export class GameService {
     };
   }
 
-  private getShellCounts(room: Room): ShellInfo {
-    const remaining = room.shells.slice(room.currentShellIndex);
-    return {
-      total: remaining.length,
-      live: remaining.filter(s => s === 'live').length,
-      blank: remaining.filter(s => s === 'blank').length,
-    };
+  private getShellCountsForRoom(room: Room): ShellInfo {
+    // Usando getShellCounts de shared/utils/gameUtils
+    return getShellCounts(room.shells, room.currentShellIndex);
   }
 
-  private getRandomHP(): number {
-    return this.getRandomInRange(GAME_RULES.HP.MIN, GAME_RULES.HP.MAX);
-  }
-
-  private getRandomInRange(min: number, max: number): number {
-    return Math.floor(Math.random() * (max - min + 1)) + min;
-  }
-
-  private shuffle<T>(array: T[]): T[] {
-    const result = [...array];
-    for (let i = result.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [result[i], result[j]] = [result[j], result[i]];
-    }
-    return result;
-  }
+  // NOTA: As funções utilitárias (getRandomHP, getRandomInRange, shuffle)
+  // foram movidas para shared/utils/gameUtils e são importadas diretamente
 }
