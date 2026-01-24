@@ -83,10 +83,6 @@ export default function Profile() {
             </svg>
             Entrar com Google
           </button>
-
-          <p className="guest-note">
-            Ou continue como convidado para jogar sem conta
-          </p>
         </div>
       </div>
     );
@@ -164,6 +160,9 @@ export default function Profile() {
 
       {/* Actions */}
       <div className="profile-actions">
+        <button className="action-btn history" onClick={() => navigate('/history')}>
+          Historico de Partidas
+        </button>
         <button className="action-btn leaderboard" onClick={() => navigate('/leaderboard')}>
           Ver Leaderboard
         </button>

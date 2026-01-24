@@ -5,6 +5,7 @@
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSocket } from '../../../context/SocketContext';
+import { useAuth } from '../../../context/AuthContext';
 import {
   PlayerPublicState,
   RoundStartedPayload,
@@ -33,8 +34,16 @@ export default function MultiplayerGame() {
   const navigate = useNavigate();
   const location = useLocation();
   const { socket, isConnected } = useSocket();
+  const { isAuthenticated, isLoading } = useAuth();
 
   const state = location.state as LocationState | null;
+
+  // Redirecionar se não autenticado
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      navigate('/');
+    }
+  }, [isLoading, isAuthenticated, navigate]);
 
   // Game state
   const [players, setPlayers] = useState<PlayerPublicState[]>([]);

@@ -1,0 +1,364 @@
+/* ==========================================
+   HISTORY STYLES
+   ========================================== */
+
+.history-container {
+  min-height: 100vh;
+  padding: 2rem;
+  max-width: 600px;
+  margin: 0 auto;
+}
+
+.history-container .back-btn {
+  position: absolute;
+  top: 1rem;
+  left: 1rem;
+}
+
+.history-container .page-title {
+  text-align: center;
+  font-size: 2.5rem;
+  margin-top: 2rem;
+  margin-bottom: 1.5rem;
+}
+
+/* Loading & Error */
+.loading-message,
+.error-message {
+  text-align: center;
+  padding: 2rem;
+  color: var(--text-dim);
+}
+
+.error-message {
+  color: var(--red-live);
+  background: rgba(230, 57, 70, 0.1);
+  border: 1px solid var(--red-live);
+  border-radius: 10px;
+}
+
+/* Login Required */
+.login-required {
+  text-align: center;
+  padding: 3rem 1rem;
+}
+
+.login-required p {
+  color: var(--text-dim);
+  margin-bottom: 1.5rem;
+}
+
+/* Empty State */
+.empty-state {
+  text-align: center;
+  padding: 3rem 1rem;
+}
+
+.empty-icon {
+  font-size: 4rem;
+  margin-bottom: 1rem;
+}
+
+.empty-state p {
+  color: var(--text-dim);
+  margin-bottom: 1.5rem;
+}
+
+/* Stats Summary */
+.stats-summary {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.form-display {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.form-label {
+  color: var(--text-dim);
+  font-size: 0.85rem;
+}
+
+.form-icons {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.form-icon {
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  font-size: 0.7rem;
+  font-weight: bold;
+}
+
+.form-icon.win {
+  background: rgba(74, 222, 128, 0.2);
+  color: #4ade80;
+  border: 1px solid rgba(74, 222, 128, 0.4);
+}
+
+.form-icon.loss {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.stats-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 0.5rem;
+}
+
+.mini-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.5rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+}
+
+.mini-value {
+  font-size: 1.2rem;
+  font-weight: bold;
+  color: var(--gold-accent);
+}
+
+.mini-label {
+  font-size: 0.65rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+}
+
+/* Games List */
+.games-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin-bottom: 1.5rem;
+}
+
+.game-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  padding: 1rem;
+  transition: all 0.2s;
+}
+
+.game-card:hover {
+  border-color: var(--gold-accent);
+  transform: translateY(-2px);
+}
+
+.game-card.win {
+  border-left: 4px solid #4ade80;
+}
+
+.game-card.loss {
+  border-left: 4px solid #ef4444;
+}
+
+.game-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.position-badge {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  font-size: 1rem;
+}
+
+.position-badge.winner {
+  background: linear-gradient(135deg, #ffd700 0%, #b8860b 100%);
+  color: #000;
+}
+
+.position-badge.last {
+  background: rgba(239, 68, 68, 0.2);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+}
+
+.position-badge.middle {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-dim);
+  border: 1px solid var(--border-color);
+}
+
+.game-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.game-date {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+}
+
+.game-players {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+.elo-change {
+  font-weight: bold;
+  font-size: 1rem;
+  padding: 0.25rem 0.75rem;
+  border-radius: 6px;
+}
+
+.elo-change.positive {
+  background: rgba(74, 222, 128, 0.15);
+  color: #4ade80;
+}
+
+.elo-change.negative {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.game-stats {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 0.75rem;
+  padding: 0.5rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+}
+
+.game-stats .stat {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.stat-icon {
+  font-size: 0.9rem;
+}
+
+.stat-num {
+  font-weight: bold;
+  color: var(--text-primary);
+}
+
+.game-opponents {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.opponents-label {
+  color: var(--text-dim);
+  font-size: 0.8rem;
+}
+
+.opponent-name {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  background: rgba(255, 255, 255, 0.05);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+}
+
+.more-opponents {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+/* Pagination */
+.pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 1rem;
+  padding: 1rem 0;
+}
+
+.page-btn {
+  padding: 0.5rem 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  color: var(--text-primary);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.page-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--gold-accent);
+}
+
+.page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.page-info {
+  color: var(--text-dim);
+  font-size: 0.9rem;
+}
+
+/* Action Button */
+.action-btn {
+  padding: 0.875rem 1.5rem;
+  border-radius: 10px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: none;
+}
+
+.action-btn.primary {
+  background: var(--gold-accent);
+  color: #000;
+}
+
+.action-btn.primary:hover {
+  background: #e8c84a;
+  transform: translateY(-2px);
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .history-container {
+    padding: 1rem;
+  }
+
+  .stats-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .game-stats {
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .form-display {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}

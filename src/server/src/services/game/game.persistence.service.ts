@@ -4,7 +4,11 @@
 
 import { PrismaClient, GameStatus } from '@prisma/client';
 import { leaderboardService } from '../leaderboard.service';
-import { calculateMultiplayerEloChange } from '../../../../shared/utils/eloCalculator';
+import {
+  calculatePerformanceBasedElo,
+  EloCalculationInput,
+  getRankFromElo,
+} from '../../../../shared/utils/eloCalculator';
 
 const prisma = new PrismaClient();
 
@@ -167,20 +171,54 @@ export class GamePersistenceService {
 
       // Coletar ELOs de todos os jogadores para cálculo
       const playersElos: number[] = game.participants.map(p =>
-        p.user?.eloRating || 1000 // Default 1000 para guests
+        p.user?.eloRating || 1000
       );
       const totalPlayers = game.participants.length;
 
+      // Calcular contexto do jogo para o cálculo de performance
+      const gameContext = {
+        totalPlayers,
+        totalKills: playerStats.reduce((sum, p) => sum + p.kills, 0),
+        totalDamage: playerStats.reduce((sum, p) => sum + p.damageDealt, 0),
+        totalRounds: game.currentRound,
+      };
+
       // Update each participant with their stats
       for (const stats of playerStats) {
-        // Find participant by guestName or odUserId
+        // Find participant by odUserId
         const participant = game.participants.find(
-          p => (stats.odUserId && p.userId === stats.odUserId) ||
-               (stats.guestName && p.guestName === stats.guestName)
+          p => stats.odUserId && p.userId === stats.odUserId
         );
 
-        if (participant) {
-          // Update participant stats
+        if (participant && participant.userId) {
+          const isWinner = participant.userId === winnerUserId;
+          const playerElo = participant.user?.eloRating || 1000;
+
+          // Preparar input para cálculo de ELO com performance
+          const eloInput: EloCalculationInput = {
+            playerElo,
+            allPlayersElo: playersElos,
+            playerPosition: stats.position,
+            totalPlayers,
+            performance: {
+              damageDealt: stats.damageDealt,
+              damageTaken: stats.damageTaken,
+              selfDamage: stats.selfDamage,
+              kills: stats.kills,
+              deaths: stats.deaths,
+              roundsWon: stats.roundsWon,
+              totalRounds: game.currentRound,
+              itemsUsed: stats.itemsUsed,
+              shotsFired: stats.shotsFired,
+            },
+            gameContext,
+          };
+
+          // Calcular ELO com performance
+          const eloResult = calculatePerformanceBasedElo(eloInput);
+          const eloChange = eloResult.totalChange;
+
+          // Update participant stats with eloChange
           await prisma.gameParticipant.update({
             where: { id: participant.id },
             data: {
@@ -193,44 +231,38 @@ export class GamePersistenceService {
               damageTaken: stats.damageTaken,
               selfDamage: stats.selfDamage,
               shotsFired: stats.shotsFired,
+              eloChange: eloChange,
             },
           });
 
-          // Update user stats if logged in
-          if (participant.userId) {
-            const isWinner = participant.userId === winnerUserId;
-            const playerElo = participant.user?.eloRating || 1000;
+          // Calcular novo ELO e rank
+          const newElo = playerElo + eloChange;
+          const newRank = getRankFromElo(newElo);
 
-            // Calcular mudança de ELO usando a fórmula oficial
-            const eloChange = calculateMultiplayerEloChange(
-              playerElo,
-              playersElos,
-              stats.position,
-              totalPlayers
-            );
+          // Atualizar User com ELO, rank e stats
+          await prisma.user.update({
+            where: { id: participant.userId },
+            data: {
+              gamesPlayed: { increment: 1 },
+              gamesWon: isWinner ? { increment: 1 } : undefined,
+              roundsPlayed: { increment: game.currentRound },
+              roundsWon: { increment: stats.roundsWon },
+              totalKills: { increment: stats.kills },
+              totalDeaths: { increment: stats.deaths },
+              eloRating: newElo,
+              rank: newRank,
+            },
+          });
 
-            // Atualizar User com ELO e stats
-            await prisma.user.update({
-              where: { id: participant.userId },
-              data: {
-                gamesPlayed: { increment: 1 },
-                gamesWon: isWinner ? { increment: 1 } : undefined,
-                roundsWon: { increment: stats.roundsWon },
-                totalKills: { increment: stats.kills },
-                totalDeaths: { increment: stats.deaths },
-                eloRating: { increment: eloChange }, // AGORA ATUALIZA O ELO!
-              },
-            });
+          // Atualizar leaderboard com ELO real
+          await leaderboardService.updatePlayerStats(participant.userId, {
+            gamesPlayed: 1,
+            gamesWon: isWinner ? 1 : 0,
+            eloChange: eloChange,
+          });
 
-            // Atualizar leaderboard com ELO real
-            await leaderboardService.updatePlayerStats(participant.userId, {
-              gamesPlayed: 1,
-              gamesWon: isWinner ? 1 : 0,
-              eloChange: eloChange, // ELO REAL calculado!
-            });
-
-            console.log(`[ELO] ${participant.user?.id}: ${playerElo} -> ${playerElo + eloChange} (${eloChange >= 0 ? '+' : ''}${eloChange})`);
-          }
+          // Log detalhado do cálculo de ELO
+          console.log(`[ELO] ${participant.userId}: ${playerElo} -> ${playerElo + eloChange} (base: ${eloResult.baseChange}, perf: ${eloResult.performanceModifier >= 0 ? '+' : ''}${eloResult.performanceModifier}, score: ${(eloResult.performanceScore * 100).toFixed(0)}%)`);
         }
       }
 

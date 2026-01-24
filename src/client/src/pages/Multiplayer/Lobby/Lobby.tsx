@@ -15,17 +15,18 @@ interface ReconnectData {
 export default function Lobby() {
   const navigate = useNavigate();
   const { socket, isConnected, connect } = useSocket();
-  const { user } = useAuth();
+  const { user, isAuthenticated, isLoading, login } = useAuth();
 
-  // Usar nome do usuário logado se disponível
-  const [playerName, setPlayerName] = useState(user?.displayName || '');
-
-  // Atualizar nome quando usuário logar
+  // Redirecionar para login se não autenticado
   useEffect(() => {
-    if (user?.displayName && !playerName) {
-      setPlayerName(user.displayName);
+    if (!isLoading && !isAuthenticated) {
+      // Usuário não logado - não pode acessar multiplayer
+      navigate('/');
     }
-  }, [user, playerName]);
+  }, [isLoading, isAuthenticated, navigate]);
+
+  // Nome do usuário logado (obrigatório agora)
+  const playerName = user?.displayName || '';
   const [roomCode, setRoomCode] = useState('');
   const [roomPassword, setRoomPassword] = useState('');
   const [joinPassword, setJoinPassword] = useState('');
@@ -34,12 +35,12 @@ export default function Lobby() {
   const [activeGame, setActiveGame] = useState<ReconnectData | null>(null);
   const [isReconnecting, setIsReconnecting] = useState(false);
 
-  // Conectar ao servidor ao montar
+  // Conectar ao servidor ao montar (apenas se autenticado)
   useEffect(() => {
-    if (!isConnected) {
+    if (!isConnected && isAuthenticated) {
       connect();
     }
-  }, []);
+  }, [isAuthenticated]);
 
   // Verificar se há jogo ativo para reconexão
   useEffect(() => {
@@ -143,30 +144,30 @@ export default function Lobby() {
   }, [socket, navigate]);
 
   const handleCreateRoom = () => {
-    if (!playerName.trim()) {
-      setError('Digite seu nome');
+    if (!user) {
+      setError('Voce precisa estar logado');
       return;
     }
 
     socket?.emit('createRoom', {
-      playerName: playerName.trim(),
+      playerName: playerName,
       password: roomPassword || undefined,
     });
   };
 
   const handleJoinRoom = () => {
-    if (!playerName.trim()) {
-      setError('Digite seu nome');
+    if (!user) {
+      setError('Voce precisa estar logado');
       return;
     }
     if (!roomCode.trim()) {
-      setError('Digite o código da sala');
+      setError('Digite o codigo da sala');
       return;
     }
 
     socket?.emit('joinRoom', {
       code: roomCode.toUpperCase(),
-      playerName: playerName.trim(),
+      playerName: playerName,
       password: joinPassword || undefined,
     });
   };
@@ -176,8 +177,8 @@ export default function Lobby() {
   };
 
   const handleJoinFromList = (code: string, hasPassword: boolean) => {
-    if (!playerName.trim()) {
-      setError('Digite seu nome primeiro');
+    if (!user) {
+      setError('Voce precisa estar logado');
       return;
     }
 
@@ -189,7 +190,7 @@ export default function Lobby() {
 
     socket?.emit('joinRoom', {
       code,
-      playerName: playerName.trim(),
+      playerName: playerName,
     });
   };
 
@@ -209,14 +210,41 @@ export default function Lobby() {
     setActiveGame(null);
   };
 
+  // Loading state
+  if (isLoading) {
+    return (
+      <div className="lobby-container">
+        <div className="loading-message">Carregando...</div>
+      </div>
+    );
+  }
+
+  // Se não autenticado, não renderizar (vai redirecionar)
+  if (!isAuthenticated || !user) {
+    return null;
+  }
+
   return (
     <div className="lobby-container">
       <button className="back-btn" onClick={() => navigate('/')}>
-        ← Voltar
+        Voltar
       </button>
 
       <h1 className="game-title">MULTIPLAYER</h1>
       <p className="subtitle">2-4 Jogadores Online</p>
+
+      {/* User Info */}
+      <div className="lobby-user-info">
+        <div className="lobby-avatar">
+          {user.avatarUrl ? (
+            <img src={user.avatarUrl} alt={user.displayName} />
+          ) : (
+            user.displayName.charAt(0).toUpperCase()
+          )}
+        </div>
+        <span className="lobby-username">{user.displayName}</span>
+        <span className="lobby-elo">{user.eloRating} ELO</span>
+      </div>
 
       {error && <div className="error-message">{error}</div>}
 
@@ -224,10 +252,10 @@ export default function Lobby() {
       {activeGame && (
         <div className="active-game-banner">
           <div className="active-game-info">
-            <span className="active-game-icon">⚠️</span>
+            <span className="active-game-icon">!</span>
             <div className="active-game-text">
               <strong>Partida em andamento!</strong>
-              <p>Sala: {activeGame.roomCode} • {activeGame.playerName}</p>
+              <p>Sala: {activeGame.roomCode} - {activeGame.playerName}</p>
             </div>
           </div>
           <div className="active-game-actions">
@@ -256,15 +284,6 @@ export default function Lobby() {
       )}
 
       <div className="lobby-form">
-        <input
-          type="text"
-          placeholder="Seu nome"
-          value={playerName}
-          onChange={(e) => setPlayerName(e.target.value)}
-          maxLength={15}
-          className="lobby-input"
-        />
-
         {/* Criar Sala */}
         <div className="create-section">
           <h3>Criar Sala</h3>

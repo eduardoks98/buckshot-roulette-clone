@@ -105,10 +105,6 @@
   height: 20px;
 }
 
-.guest-note {
-  color: var(--text-dim);
-  font-size: 0.9rem;
-}
 
 /* User Card */
 .user-card {
@@ -229,6 +225,16 @@
   font-weight: 500;
   cursor: pointer;
   transition: all 0.2s;
+}
+
+.action-btn.history {
+  background: transparent;
+  color: var(--gold-accent);
+  border: 1px solid var(--gold-accent);
+}
+
+.action-btn.history:hover {
+  background: rgba(212, 164, 24, 0.1);
 }
 
 .action-btn.leaderboard {

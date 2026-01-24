@@ -10,6 +10,7 @@ import passport from './config/passport.config';
 import { ENV } from './config/env.config';
 import authRoutes from './routes/auth.routes';
 import leaderboardRoutes from './routes/leaderboard.routes';
+import historyRoutes from './routes/history.routes';
 
 export function createServer(): { app: Express; httpServer: http.Server } {
   const app = express();
@@ -64,6 +65,9 @@ export function createServer(): { app: Express; httpServer: http.Server } {
 
   // Leaderboard routes
   app.use('/api/leaderboard', leaderboardRoutes);
+
+  // History routes
+  app.use('/api/history', historyRoutes);
 
   // ==========================================
   // ERROR HANDLING

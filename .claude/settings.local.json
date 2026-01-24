@@ -15,7 +15,8 @@
       "Bash(cd /d e:Cursorbuckshotcopysrcserver)",
       "Bash(npx tsc:*)",
       "Bash(taskkill:*)",
-      "Bash(cmd //c \"taskkill /PID 159524 /F\")"
+      "Bash(cmd //c \"taskkill /PID 159524 /F\")",
+      "Bash(git commit -m \"$\\(cat <<''EOF''\nfeat: sistema de ELO por performance, historico de partidas e landing page\n\n- ELO calculado com base em performance \\(40% posicao, 60% desempenho\\)\n  - Metricas: dano, kills, rounds ganhos, sobrevivencia\n  - Rank atualizado automaticamente \\(Bronze -> Grandmaster\\)\n\n- Nova pagina de historico de partidas \\(/history\\)\n  - API paginada com estatisticas detalhadas\n  - Stats de forma recente, streaks, medias\n\n- Landing page com leaderboard para visitantes\n  - Preview do top 5 jogadores\n  - Botao de login com Google\n\n- Multiplayer agora requer autenticacao\n  - Lobby, WaitingRoom e Game protegidos\n  - Removido sistema de guest\n\n- Correcoes:\n  - roundsPlayed agora incrementado corretamente\n  - Token exposto no AuthContext para API calls\n\nCo-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>\nEOF\n\\)\")"
     ]
   }
 }

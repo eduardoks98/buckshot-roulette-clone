@@ -6,6 +6,7 @@ import WaitingRoom from './pages/Multiplayer/WaitingRoom/WaitingRoom';
 import MultiplayerGame from './pages/Multiplayer/Game/MultiplayerGame';
 import Leaderboard from './pages/Leaderboard/Leaderboard';
 import Profile from './pages/Profile/Profile';
+import History from './pages/History/History';
 
 function App() {
   return (
@@ -18,6 +19,7 @@ function App() {
         <Route path="/multiplayer/game" element={<MultiplayerGame />} />
         <Route path="/leaderboard" element={<Leaderboard />} />
         <Route path="/profile" element={<Profile />} />
+        <Route path="/history" element={<History />} />
       </Routes>
     </div>
   );

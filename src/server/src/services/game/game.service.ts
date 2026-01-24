@@ -223,9 +223,17 @@ export class GameService {
     const maxHp = room.players[0]?.maxHp || 4;
     const excludeIds: ItemId[] = maxHp <= 2 ? ['hand_saw'] : [];
 
-    room.players.forEach(player => {
-      if (!player.alive) return;
+    // ========== LOG DE DISTRIBUICAO ==========
+    console.log(`[ITEMS] === Distribuindo itens (Sala: ${room.code}) ===`);
+    console.log(`[ITEMS] Sorteado: ${itemCount} itens | MaxHP: ${maxHp} | Excluindo: [${excludeIds.join(', ')}]`);
 
+    room.players.forEach(player => {
+      if (!player.alive) {
+        console.log(`[ITEMS] Player "${player.name}": ELIMINADO, nao recebe itens`);
+        return;
+      }
+
+      const previousItemCount = player.items.length;
       const newItems: Item[] = [];
 
       for (let i = 0; i < itemCount; i++) {
@@ -236,9 +244,14 @@ export class GameService {
         newItems.push(item);
       }
 
+      const limitReached = newItems.length < itemCount;
+      const limitMsg = limitReached ? ` (limite ${GAME_RULES.ITEMS.MAX_PER_PLAYER} atingido)` : '';
+      console.log(`[ITEMS] Player "${player.name}": tinha ${previousItemCount} itens, recebeu ${newItems.length}${limitMsg}, total: ${player.items.length}`);
+
       distribution.push({ playerId: player.id, items: newItems });
     });
 
+    console.log(`[ITEMS] === Fim da distribuicao ===`);
     return distribution;
   }
 

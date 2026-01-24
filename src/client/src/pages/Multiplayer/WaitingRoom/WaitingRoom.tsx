@@ -5,6 +5,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSocket } from '../../../context/SocketContext';
+import { useAuth } from '../../../context/AuthContext';
 import { PlayerPublicState } from '../../../../../shared/types';
 import { GAME_RULES } from '../../../../../shared/constants';
 import './WaitingRoom.css';
@@ -26,9 +27,17 @@ export default function WaitingRoom() {
   const navigate = useNavigate();
   const location = useLocation();
   const { socket, isConnected, connect } = useSocket();
+  const { isAuthenticated, isLoading } = useAuth();
 
   const state = location.state as LocationState | null;
   const reconnectAttempted = useRef(false);
+
+  // Redirecionar se não autenticado
+  useEffect(() => {
+    if (!isLoading && !isAuthenticated) {
+      navigate('/');
+    }
+  }, [isLoading, isAuthenticated, navigate]);
 
   const [roomCode, setRoomCode] = useState(state?.roomCode || '');
   const [isHost, setIsHost] = useState(state?.isHost || false);

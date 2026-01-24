@@ -24,6 +24,7 @@ const TOKEN_KEY = 'buckshot_auth_token';
 
 interface AuthContextType {
   user: User | null;
+  token: string | null;
   isAuthenticated: boolean;
   isLoading: boolean;
   login: () => void;
@@ -117,6 +118,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   const value: AuthContextType = {
     user,
+    token: getToken(),
     isAuthenticated: !!user,
     isLoading,
     login,
