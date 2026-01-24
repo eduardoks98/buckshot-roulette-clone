@@ -3,8 +3,8 @@
 // ==========================================
 
 import { useState, useCallback, useMemo } from 'react';
-import { PlayerPublicState, Item } from '../../../../shared/types';
-import { GAME_RULES } from '../../../../shared/constants';
+import { PlayerPublicState, Item } from '@shared/types';
+import { GAME_RULES } from '@shared/constants';
 
 interface ShellInfo {
   total: number;
