@@ -31,6 +31,7 @@ export default function WaitingRoom() {
 
   const state = location.state as LocationState | null;
   const reconnectAttempted = useRef(false);
+  const gameStarted = useRef(false);
 
   // Redirecionar se não autenticado
   useEffect(() => {
@@ -155,6 +156,7 @@ export default function WaitingRoom() {
 
     // Game started
     socket.on('roundStarted', (gameState) => {
+      gameStarted.current = true;
       navigate('/multiplayer/game', {
         state: {
           roomCode,
@@ -183,6 +185,17 @@ export default function WaitingRoom() {
       socket.off('leftRoom');
     };
   }, [socket, state, navigate, roomCode, players]);
+
+  // Cleanup: emit leaveRoom when component unmounts (navigation away)
+  // but NOT when game starts (we want to keep the connection)
+  useEffect(() => {
+    return () => {
+      if (!gameStarted.current && socket?.connected) {
+        localStorage.removeItem('buckshotSession');
+        socket.emit('leaveRoom');
+      }
+    };
+  }, [socket]);
 
   const handleStartGame = () => {
     if (!socket || !isHost) return;

@@ -5,6 +5,12 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { getLevelInfo } from '@shared/utils/xpCalculator';
+import { getTitleById } from '@shared/constants/achievements';
+import { PageLayout } from '../../components/layout/PageLayout';
+import { LoadingState } from '../../components/common/LoadingState';
+import { EmptyState } from '../../components/common/EmptyState';
+import { getRankIcon } from '../../utils/helpers';
 import './Leaderboard.css';
 
 type LeaderboardPeriod = 'daily' | 'weekly' | 'monthly' | 'all_time';
@@ -20,6 +26,8 @@ interface LeaderboardEntry {
   winRate: number;
   eloRating: number;
   eloGain?: number;
+  totalXp?: number;
+  activeTitleId?: string | null;
 }
 
 export default function Leaderboard() {
@@ -66,6 +74,7 @@ export default function Leaderboard() {
           winRate: 80,
           eloRating: 1850,
           eloGain: 150,
+          totalXp: 0,
         },
         {
           rank: 2,
@@ -77,6 +86,7 @@ export default function Leaderboard() {
           winRate: 70,
           eloRating: 1720,
           eloGain: 80,
+          totalXp: 0,
         },
         {
           rank: 3,
@@ -88,6 +98,7 @@ export default function Leaderboard() {
           winRate: 65,
           eloRating: 1650,
           eloGain: 50,
+          totalXp: 0,
         },
       ]);
     } finally {
@@ -112,97 +123,100 @@ export default function Leaderboard() {
     return '';
   };
 
-  const getRankIcon = (rank: number) => {
-    if (rank === 1) return '🥇';
-    if (rank === 2) return '🥈';
-    if (rank === 3) return '🥉';
-    return `#${rank}`;
-  };
-
   return (
-    <div className="leaderboard-container">
-      <button className="back-btn" onClick={() => navigate('/')}>
-        Voltar
-      </button>
+    <PageLayout>
+      <div className="leaderboard-content">
+        <h1 className="page-title">LEADERBOARD</h1>
 
-      <h1 className="page-title">LEADERBOARD</h1>
-
-      {/* Period Tabs */}
-      <div className="period-tabs">
-        {(['daily', 'weekly', 'monthly', 'all_time'] as LeaderboardPeriod[]).map(p => (
-          <button
-            key={p}
-            className={`period-tab ${period === p ? 'active' : ''}`}
-            onClick={() => setPeriod(p)}
-          >
-            {getPeriodLabel(p)}
-          </button>
-        ))}
-      </div>
-
-      {/* My Rank */}
-      {user && myRank && (
-        <div className="my-rank-card">
-          <span className="my-rank-label">Sua posicao</span>
-          <span className="my-rank-value">#{myRank}</span>
-        </div>
-      )}
-
-      {/* Leaderboard */}
-      {loading ? (
-        <div className="loading-message">Carregando...</div>
-      ) : error ? (
-        <div className="error-message">{error}</div>
-      ) : entries.length === 0 ? (
-        <div className="empty-message">
-          Nenhum jogador no ranking ainda.
-          <br />
-          Jogue partidas ranqueadas para aparecer!
-        </div>
-      ) : (
-        <div className="leaderboard-list">
-          {entries.map(entry => (
-            <div
-              key={entry.userId}
-              className={`leaderboard-entry ${getRankClass(entry.rank)} ${entry.userId === user?.id ? 'is-me' : ''}`}
+        {/* Period Tabs */}
+        <div className="period-tabs">
+          {(['daily', 'weekly', 'monthly', 'all_time'] as LeaderboardPeriod[]).map(p => (
+            <button
+              key={p}
+              className={`period-tab ${period === p ? 'active' : ''}`}
+              onClick={() => setPeriod(p)}
             >
-              <div className="entry-rank">{getRankIcon(entry.rank)}</div>
-
-              <div className="entry-avatar">
-                {entry.avatarUrl ? (
-                  <img src={entry.avatarUrl} alt={entry.displayName} />
-                ) : (
-                  entry.displayName.charAt(0).toUpperCase()
-                )}
-              </div>
-
-              <div className="entry-info">
-                <span className="entry-name">{entry.displayName}</span>
-                <span className="entry-stats">
-                  {entry.gamesWon}V / {entry.gamesPlayed - entry.gamesWon}D ({entry.winRate.toFixed(0)}%)
-                </span>
-              </div>
-
-              <div className="entry-elo">
-                <span className="elo-value">{entry.eloRating}</span>
-                {entry.eloGain !== undefined && entry.eloGain > 0 && (
-                  <span className="elo-gain">+{entry.eloGain}</span>
-                )}
-              </div>
-            </div>
+              {getPeriodLabel(p)}
+            </button>
           ))}
         </div>
-      )}
 
-      {/* Not logged in message */}
-      {!user && (
-        <div className="login-prompt">
-          <p>Faca login para aparecer no ranking!</p>
-          <button className="login-btn" onClick={() => navigate('/profile')}>
-            Entrar com Google
-          </button>
-        </div>
-      )}
-    </div>
+        {/* My Rank */}
+        {user && myRank && (
+          <div className="my-rank-card">
+            <span className="my-rank-label">Sua posicao</span>
+            <span className="my-rank-value">#{myRank}</span>
+          </div>
+        )}
+
+        {/* Leaderboard */}
+        {loading ? (
+          <LoadingState message="Carregando ranking..." />
+        ) : error ? (
+          <div className="error-message">{error}</div>
+        ) : entries.length === 0 ? (
+          <EmptyState
+            icon="🏆"
+            title="Nenhum jogador no ranking"
+            description="Jogue partidas ranqueadas para aparecer!"
+            action={{ label: 'Jogar Agora', onClick: () => navigate('/multiplayer') }}
+          />
+        ) : (
+          <div className="leaderboard-list">
+            {entries.map(entry => (
+              <div
+                key={entry.userId}
+                className={`leaderboard-entry ${getRankClass(entry.rank)} ${entry.userId === user?.id ? 'is-me' : ''}`}
+              >
+                <div className="entry-rank">{getRankIcon(entry.rank)}</div>
+
+                <div className="entry-avatar">
+                  {entry.avatarUrl ? (
+                    <img src={entry.avatarUrl} alt={entry.displayName} />
+                  ) : (
+                    entry.displayName.charAt(0).toUpperCase()
+                  )}
+                </div>
+
+                <div className="entry-info">
+                  <span className="entry-name">
+                    {entry.displayName}
+                    {entry.totalXp !== undefined && (
+                      <span className="entry-level">Nv.{getLevelInfo(entry.totalXp).displayLevel}</span>
+                    )}
+                    {entry.activeTitleId && (() => {
+                      const titleDef = getTitleById(entry.activeTitleId!);
+                      return titleDef ? (
+                        <span className="entry-title">{titleDef.icon} {titleDef.name}</span>
+                      ) : null;
+                    })()}
+                  </span>
+                  <span className="entry-stats">
+                    {entry.gamesWon}V / {entry.gamesPlayed - entry.gamesWon}D ({entry.winRate.toFixed(0)}%)
+                  </span>
+                </div>
+
+                <div className="entry-elo">
+                  <span className="elo-value">{entry.eloRating}</span>
+                  {entry.eloGain !== undefined && entry.eloGain > 0 && (
+                    <span className="elo-gain">+{entry.eloGain}</span>
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Not logged in message */}
+        {!user && (
+          <div className="login-prompt">
+            <p>Faca login para aparecer no ranking!</p>
+            <button className="login-btn" onClick={() => navigate('/profile')}>
+              Entrar com Google
+            </button>
+          </div>
+        )}
+      </div>
+    </PageLayout>
   );
 }

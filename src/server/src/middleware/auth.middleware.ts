@@ -65,7 +65,7 @@ export async function adminMiddleware(
       return;
     }
 
-    if (!req.user.isAdmin) {
+    if (!req.user.is_admin) {
       res.status(403).json({ error: 'Acesso negado. Permissão de administrador necessária.' });
       return;
     }

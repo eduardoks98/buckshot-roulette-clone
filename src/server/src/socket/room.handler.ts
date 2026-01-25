@@ -6,6 +6,7 @@ import { TypedIOServer, TypedSocket, socketUserMap } from '../socket';
 import { RoomService, Player } from '../services/game/room.service';
 import { GameService } from '../services/game/game.service';
 import { gamePersistenceService } from '../services/game/game.persistence.service';
+import { achievementService, PlayerEndGameStats } from '../services/achievement.service';
 import { startTurnTimer, RoomWithTimer, calculateAwards } from './game.handler';
 import { Item, PlayerPublicState } from '../../../shared/types';
 
@@ -45,7 +46,7 @@ export function setupRoomCallbacks(
   };
 
   // Callback quando jogador vence por WO
-  roomService.onPlayerWonByDefault = (roomCode: string, player: Player) => {
+  roomService.onPlayerWonByDefault = async (roomCode: string, player: Player) => {
     const room = roomService.getRoom(roomCode);
     if (!room) return;
 
@@ -72,21 +73,108 @@ export function setupRoomCallbacks(
     // Calculate awards
     const awards = calculateAwards(room.players as never);
 
-    io.to(roomCode).emit('gameOver', {
-      winner: toPublicPlayer(player),
-      reason: 'Ultimo jogador restante',
-      stats: playerStats,
-      awards,
-    });
-
-    // Salvar no banco
+    // Persistir no banco (await para obter xpResults)
     const userData = socketUserMap.get(player.id);
-    gamePersistenceService.endGame({
-      roomCode,
-      winnerId: player.id,
-      winnerUserId: userData?.odUserId,
-      playerStats,
-    }).catch(err => console.error('[DB] Erro ao finalizar jogo:', err));
+    try {
+      const endResult = await gamePersistenceService.endGame({
+        roomCode,
+        winnerId: player.id,
+        winnerUserId: userData?.odUserId,
+        playerStats,
+      });
+
+      if (endResult) {
+        try {
+          // Build extended stats for achievement service
+          const extendedStats: PlayerEndGameStats[] = sortedPlayers.map((p, index) => {
+            const uData = socketUserMap.get(p.id);
+            return {
+              odId: p.id,
+              odUserId: uData?.odUserId,
+              playerName: p.name,
+              position: p.id === player.id ? 1 : index + 1,
+              roundsWon: p.roundWins,
+              totalRounds: room.currentRound,
+              totalPlayers: room.players.length,
+              damageDealt: p.stats.damageDealt,
+              damageTaken: p.stats.damageTaken,
+              selfDamage: p.stats.selfDamage,
+              shotsFired: p.stats.shotsFired,
+              itemsUsed: p.stats.itemsUsed,
+              kills: p.stats.kills,
+              deaths: p.stats.deaths,
+              sawedShots: p.stats.sawedShots,
+              liveHits: p.stats.liveHits,
+              expiredMedicineSurvived: p.stats.expiredMedicineSurvived,
+              adrenalineUses: p.stats.adrenalineUses,
+              handcuffUses: p.stats.handcuffUses,
+              infoItemUses: p.stats.infoItemUses,
+              itemsUsedBitmask: p.stats.itemsUsedBitmask,
+              firstBloodInGame: p.stats.firstBloodInGame,
+              maxConsecutiveTurnsAt1Hp: p.stats.maxConsecutiveTurnsAt1Hp,
+              killsPerRound: p.stats.killsPerRound,
+              roundsSurvivedAsLast: p.stats.roundsSurvivedAsLast,
+              wonRoundWithZeroShots: p.stats.wonRoundWithZeroShots,
+              wonRoundWithZeroItems: p.stats.wonRoundWithZeroItems,
+              finalHp: p.stats.finalHp,
+              uniqueItemsUsedInGame: p.stats.uniqueItemsUsedInGame,
+              adrenalineUsesInGame: p.stats.adrenalineUsesInGame,
+              expiredMedicineSurvivedInGame: p.stats.expiredMedicineSurvivedInGame,
+              liveHitsInGame: p.stats.liveHitsInGame,
+              allShotsLiveInGame: p.stats.allShotsLiveInGame,
+              lostEarlyRounds: p.stats.lostEarlyRounds,
+              isWinner: p.id === player.id,
+              lowestEloInGame: false,
+            };
+          });
+
+          const achievementResult = await achievementService.processGameEnd(endResult.gameId, extendedStats);
+
+          // Emit achievementsUnlocked individually to each player
+          for (const [odId, achievements] of achievementResult.newAchievements) {
+            if (achievements.length > 0) {
+              const playerSocket = io.sockets.sockets.get(odId);
+              if (playerSocket) {
+                playerSocket.emit('achievementsUnlocked', achievements);
+              }
+            }
+          }
+
+          io.to(roomCode).emit('gameOver', {
+            winner: toPublicPlayer(player),
+            reason: 'Ultimo jogador restante',
+            stats: playerStats,
+            awards,
+            xpResults: endResult.xpResults || undefined,
+            badges: achievementResult.badges.length > 0 ? achievementResult.badges : undefined,
+          });
+        } catch (achievementError) {
+          console.error('[Achievement] Erro ao processar achievements (WO):', achievementError);
+          io.to(roomCode).emit('gameOver', {
+            winner: toPublicPlayer(player),
+            reason: 'Ultimo jogador restante',
+            stats: playerStats,
+            awards,
+            xpResults: endResult.xpResults || undefined,
+          });
+        }
+      } else {
+        io.to(roomCode).emit('gameOver', {
+          winner: toPublicPlayer(player),
+          reason: 'Ultimo jogador restante',
+          stats: playerStats,
+          awards,
+        });
+      }
+    } catch (err) {
+      console.error('[DB] Erro ao finalizar jogo (WO):', err);
+      io.to(roomCode).emit('gameOver', {
+        winner: toPublicPlayer(player),
+        reason: 'Ultimo jogador restante',
+        stats: playerStats,
+        awards,
+      });
+    }
 
     console.log(`[Room] ${player.name} venceu por WO na sala ${roomCode}`);
   };
@@ -99,6 +187,12 @@ export function setupRoomCallbacks(
       reason: 'Timeout de reconexao',
     });
     console.log(`[Room] ${player.name} eliminado por timeout na sala ${roomCode}`);
+  };
+
+  // Callback quando sala é deletada após grace period
+  roomService.onRoomDeleted = (roomCode: string) => {
+    gamePersistenceService.deleteGame(roomCode)
+      .catch(err => console.error('[DB] Erro ao deletar jogo após grace period:', err));
   };
 
   console.log('[Room] Callbacks do room service configurados');

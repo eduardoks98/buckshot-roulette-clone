@@ -1,0 +1,176 @@
+/* ==========================================
+   XP BAR COMPONENT
+   Dark-themed XP progress bar with gold accent
+   ========================================== */
+
+/* --- CSS Variables (scoped) --- */
+.xp-bar {
+  --gold-accent: #d4a418;
+  --gold-light: #e8c84a;
+  --bg-dark: #0a0a0a;
+  --card-bg: rgba(255, 255, 255, 0.03);
+  --text-primary: #ffffff;
+  --text-secondary: #e0e0e0;
+  --text-dim: #888888;
+  --border-color: rgba(255, 255, 255, 0.1);
+  --shadow-glow-gold: 0 0 20px rgba(212, 164, 24, 0.4);
+
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Courier New', Courier, monospace;
+  user-select: none;
+}
+
+/* ==========================================
+   LEVEL BADGE
+   ========================================== */
+
+.xp-bar__level {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--gold-accent);
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.xp-bar__level-number {
+  color: var(--text-primary);
+}
+
+.xp-bar__prestige {
+  color: var(--gold-light);
+  letter-spacing: 1px;
+  margin-left: 2px;
+}
+
+/* ==========================================
+   PROGRESS TRACK
+   ========================================== */
+
+.xp-bar__track {
+  flex: 1;
+  min-width: 60px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  overflow: hidden;
+  position: relative;
+}
+
+.xp-bar__fill {
+  height: 100%;
+  min-width: 0;
+  background: linear-gradient(90deg, var(--gold-accent), var(--gold-light));
+  border-radius: 3px;
+  transition: width 0.4s ease;
+  position: relative;
+}
+
+/* Animated glow effect */
+.xp-bar--animated .xp-bar__fill {
+  box-shadow: var(--shadow-glow-gold);
+}
+
+.xp-bar--animated .xp-bar__fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.2) 50%,
+    transparent 100%
+  );
+  animation: xp-bar-shimmer 2s ease-in-out infinite;
+}
+
+@keyframes xp-bar-shimmer {
+  0% {
+    transform: translateX(-100%);
+  }
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* ==========================================
+   XP TEXT
+   ========================================== */
+
+.xp-bar__text {
+  color: var(--text-dim);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.xp-bar__text-current {
+  color: var(--text-secondary);
+}
+
+.xp-bar__text-separator {
+  color: var(--text-dim);
+}
+
+.xp-bar__text-required {
+  color: var(--text-dim);
+}
+
+.xp-bar__text-label {
+  color: var(--text-dim);
+  margin-left: 2px;
+}
+
+/* ==========================================
+   SIZE VARIANTS
+   ========================================== */
+
+/* --- Small --- */
+.xp-bar--sm {
+  gap: 6px;
+  font-size: 11px;
+}
+
+.xp-bar--sm .xp-bar__track {
+  height: 6px;
+  border-radius: 3px;
+}
+
+.xp-bar--sm .xp-bar__fill {
+  border-radius: 2px;
+}
+
+/* --- Medium (default) --- */
+.xp-bar--md {
+  gap: 8px;
+  font-size: 13px;
+}
+
+.xp-bar--md .xp-bar__track {
+  height: 10px;
+  border-radius: 4px;
+}
+
+.xp-bar--md .xp-bar__fill {
+  border-radius: 3px;
+}
+
+/* --- Large --- */
+.xp-bar--lg {
+  gap: 10px;
+  font-size: 16px;
+}
+
+.xp-bar--lg .xp-bar__track {
+  height: 16px;
+  border-radius: 6px;
+}
+
+.xp-bar--lg .xp-bar__fill {
+  border-radius: 5px;
+}

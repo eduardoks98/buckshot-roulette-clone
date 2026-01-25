@@ -79,17 +79,63 @@ export const ITEMS_REQUIRING_TARGET: ItemId[] = ['handcuffs', 'adrenaline'];
 // Itens que não podem ser roubados com Adrenalina
 export const NON_STEALABLE_ITEMS: ItemId[] = ['adrenaline'];
 
-// Função para obter item aleatório
-// excludeIds: array de ItemIds que NÃO devem ser sorteados
-export function getRandomItem(excludeIds?: ItemId[]): Item {
-  let availableItems = ITEMS_ARRAY;
+// ==========================================
+// SISTEMA DE RARIDADE / PESOS
+// ==========================================
+// Peso maior = mais chance de aparecer
+// Itens mais fortes tem peso menor (mais raros)
 
-  if (excludeIds && excludeIds.length > 0) {
-    availableItems = ITEMS_ARRAY.filter(item => !excludeIds.includes(item.id));
+export const ITEM_WEIGHTS: Record<ItemId, number> = {
+  magnifying_glass: 15,   // Comum - informacao basica
+  beer:             15,   // Comum - ejeta cartucho
+  phone:            12,   // Comum - informacao aleatoria
+  inverter:         10,   // Medio - inverte cartucho
+  turn_reverser:    10,   // Medio - inverte ordem
+  expired_medicine:  8,   // Medio - risco/recompensa
+  handcuffs:         8,   // Raro - skip turn do oponente
+  cigarettes:        8,   // Raro - cura HP
+  hand_saw:          7,   // Raro - dano dobrado
+  adrenaline:        7,   // Raro - roubar item
+};
+
+// Peso total para calculo de probabilidade
+function getTotalWeight(excludeIds?: ItemId[]): { items: Item[]; weights: number[]; totalWeight: number } {
+  const items: Item[] = [];
+  const weights: number[] = [];
+  let totalWeight = 0;
+
+  for (const item of ITEMS_ARRAY) {
+    if (excludeIds && excludeIds.includes(item.id)) continue;
+    items.push(item);
+    const weight = ITEM_WEIGHTS[item.id];
+    weights.push(weight);
+    totalWeight += weight;
   }
 
-  const randomIndex = Math.floor(Math.random() * availableItems.length);
-  return { ...availableItems[randomIndex] };
+  return { items, weights, totalWeight };
+}
+
+// Função para obter item aleatório COM PESOS
+// excludeIds: array de ItemIds que NÃO devem ser sorteados
+export function getRandomItem(excludeIds?: ItemId[]): Item {
+  const { items, weights, totalWeight } = getTotalWeight(excludeIds);
+
+  if (items.length === 0) {
+    // Fallback: retorna qualquer item
+    return { ...ITEMS_ARRAY[Math.floor(Math.random() * ITEMS_ARRAY.length)] };
+  }
+
+  // Weighted random selection
+  let random = Math.random() * totalWeight;
+  for (let i = 0; i < items.length; i++) {
+    random -= weights[i];
+    if (random <= 0) {
+      return { ...items[i] };
+    }
+  }
+
+  // Fallback (rounding errors)
+  return { ...items[items.length - 1] };
 }
 
 // Função para obter item por ID

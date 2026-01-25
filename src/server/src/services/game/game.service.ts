@@ -2,7 +2,7 @@
 // GAME SERVICE
 // ==========================================
 
-import { GAME_RULES, getRandomItem } from '../../../../shared/constants';
+import { GAME_RULES, getRandomItem, ITEM_BITMASK } from '../../../../shared/constants';
 import {
   PlayerPublicState,
   Item,
@@ -31,6 +31,32 @@ interface PlayerStats {
   itemsUsed: number;
   kills: number;
   deaths: number;
+
+  // Extended tracking for achievements/badges
+  sawedShots: number;
+  liveHits: number;
+  expiredMedicineSurvived: number;
+  adrenalineUses: number;
+  handcuffUses: number;
+  infoItemUses: number;
+  itemsUsedBitmask: number;
+  firstBloodInGame: boolean;
+  turnsAt1Hp: number;
+  maxConsecutiveTurnsAt1Hp: number;
+  killsPerRound: number[];
+  roundsSurvivedAsLast: number;
+  wonRoundWithZeroShots: boolean;
+  wonRoundWithZeroItems: boolean;
+  finalHp: number;
+  uniqueItemsUsedInGame: number;
+  adrenalineUsesInGame: number;
+  expiredMedicineSurvivedInGame: number;
+  liveHitsInGame: number;
+  allShotsLiveInGame: boolean;
+  lostEarlyRounds: boolean;
+  shotsInCurrentRound: number;
+  itemsInCurrentRound: number;
+  killsInCurrentRound: number;
 }
 
 interface Player {
@@ -166,8 +192,38 @@ export class GameService {
           itemsUsed: 0,
           kills: 0,
           deaths: 0,
+          // Extended tracking
+          sawedShots: 0,
+          liveHits: 0,
+          expiredMedicineSurvived: 0,
+          adrenalineUses: 0,
+          handcuffUses: 0,
+          infoItemUses: 0,
+          itemsUsedBitmask: 0,
+          firstBloodInGame: false,
+          turnsAt1Hp: 0,
+          maxConsecutiveTurnsAt1Hp: 0,
+          killsPerRound: [],
+          roundsSurvivedAsLast: 0,
+          wonRoundWithZeroShots: false,
+          wonRoundWithZeroItems: false,
+          finalHp: 0,
+          uniqueItemsUsedInGame: 0,
+          adrenalineUsesInGame: 0,
+          expiredMedicineSurvivedInGame: 0,
+          liveHitsInGame: 0,
+          allShotsLiveInGame: true,
+          lostEarlyRounds: false,
+          shotsInCurrentRound: 0,
+          itemsInCurrentRound: 0,
+          killsInCurrentRound: 0,
         };
       }
+
+      // Reset per-round counters at start of each round
+      player.stats.shotsInCurrentRound = 0;
+      player.stats.itemsInCurrentRound = 0;
+      player.stats.killsInCurrentRound = 0;
     });
 
     // Load shells
@@ -299,15 +355,29 @@ export class GameService {
 
     // ========== TRACK STATS ==========
     shooter.stats.shotsFired++;
+    shooter.stats.shotsInCurrentRound++;
 
-    if (shell === 'live' && damage > 0) {
-      shooter.stats.damageDealt += damage;
-      target.stats.damageTaken += damage;
+    if (shell === 'live') {
+      shooter.stats.liveHits++;
+      shooter.stats.liveHitsInGame++;
 
-      // Self damage
-      if (shooterId === targetId) {
-        shooter.stats.selfDamage += damage;
+      if (damage > 0) {
+        shooter.stats.damageDealt += damage;
+        target.stats.damageTaken += damage;
+
+        // Self damage
+        if (shooterId === targetId) {
+          shooter.stats.selfDamage += damage;
+        }
       }
+
+      // Track sawed-off shots with live shells
+      if (sawedOff) {
+        shooter.stats.sawedShots++;
+      }
+    } else {
+      // Blank shell - track that not all shots were live
+      shooter.stats.allShotsLiveInGame = false;
     }
 
     if (target.hp <= 0) {
@@ -318,6 +388,12 @@ export class GameService {
       // Kill tracking (only if not self)
       if (shooterId !== targetId) {
         shooter.stats.kills++;
+        shooter.stats.killsInCurrentRound++;
+
+        // Track first blood (first kill in the entire game)
+        if (room.firstToDie === null) {
+          shooter.stats.firstBloodInGame = true;
+        }
       }
 
       // Track first to die for turn order
@@ -416,6 +492,7 @@ export class GameService {
         room.revealedShell = currentShell;
         baseResult.revealedShell = currentShell;
         baseResult.message = `Cartucho atual: ${currentShell === 'live' ? 'LIVE' : 'BLANK'}`;
+        user.stats.infoItemUses++;
         break;
       }
 
@@ -463,6 +540,7 @@ export class GameService {
         baseResult.targetId = targetId;
         baseResult.targetName = target.name;
         baseResult.message = `${target.name} foi algemado!`;
+        user.stats.handcuffUses++;
         break;
       }
 
@@ -493,6 +571,7 @@ export class GameService {
         const statusHint = alreadyFired ? ' (já disparada)' : '';
 
         baseResult.message = `Cartucho #${displayPosition}: ${shellType}${statusHint}`;
+        user.stats.infoItemUses++;
         break;
       }
 
@@ -544,6 +623,8 @@ export class GameService {
         // USAR O ITEM IMEDIATAMENTE (regra oficial)
         // O item roubado sera processado e o resultado combinado
         baseResult.usedImmediately = true;
+        user.stats.adrenalineUses++;
+        user.stats.adrenalineUsesInGame++;
         break;
       }
 
@@ -559,6 +640,11 @@ export class GameService {
           baseResult.damagedAmount = 1;
           baseResult.failed = true;
           baseResult.failReason = 'Remedio vencido causou dano!';
+          // Track survived expired medicine (only if still alive after taking damage)
+          if (user.hp > 0) {
+            user.stats.expiredMedicineSurvived++;
+            user.stats.expiredMedicineSurvivedInGame++;
+          }
           if (user.hp <= 0) {
             user.hp = 0;
             user.alive = false;
@@ -586,6 +672,16 @@ export class GameService {
 
     // Track item usage
     user.stats.itemsUsed++;
+    user.stats.itemsInCurrentRound++;
+
+    // Track bitmask of unique items used (for collector achievement)
+    const bitValue = ITEM_BITMASK[itemId];
+    if (bitValue !== undefined) {
+      if (!(user.stats.itemsUsedBitmask & bitValue)) {
+        user.stats.uniqueItemsUsedInGame++;
+      }
+      user.stats.itemsUsedBitmask |= bitValue;
+    }
 
     // Check if need to reload
     if (this.shouldReload(room)) {
@@ -613,39 +709,46 @@ export class GameService {
       return currentPlayer.id;
     }
 
+    // Track consecutive turns at 1 HP for the player who just completed a turn
+    if (currentPlayer.alive && currentPlayer.hp === 1) {
+      currentPlayer.stats.turnsAt1Hp++;
+      if (currentPlayer.stats.turnsAt1Hp > currentPlayer.stats.maxConsecutiveTurnsAt1Hp) {
+        currentPlayer.stats.maxConsecutiveTurnsAt1Hp = currentPlayer.stats.turnsAt1Hp;
+      }
+    } else {
+      currentPlayer.stats.turnsAt1Hp = 0;
+    }
+
     // Jogador atual completou seu turno - remover imunidade e algemas
     currentPlayer.handcuffed = false;
     currentPlayer.handcuffImmune = false;
 
-    // Find next alive player
+    // Find next alive player, skipping all handcuffed players
     let nextIndex = room.currentPlayerIndex;
     let attempts = 0;
-    const maxAttempts = room.players.length;
+    const maxAttempts = room.players.length * 2; // Extra margin for handcuff skips
 
+    // Keep advancing until we find an alive, non-disconnected, non-handcuffed player
     do {
       nextIndex = (nextIndex + room.turnDirection + room.players.length) % room.players.length;
       attempts++;
-    } while (
-      (!room.players[nextIndex].alive || room.players[nextIndex].disconnected) &&
-      attempts < maxAttempts
-    );
 
-    // Check if next player is handcuffed
-    const nextPlayer = room.players[nextIndex];
-    if (nextPlayer.handcuffed) {
-      nextPlayer.handcuffed = false;
-      // NÃO resetar handcuffImmune aqui! O jogador ainda está imune até jogar um turno real.
-      // Isso impede que ele seja algemado novamente imediatamente.
+      // Skip dead or disconnected players
+      if (!room.players[nextIndex].alive || room.players[nextIndex].disconnected) {
+        continue;
+      }
 
-      // Skip to next
-      do {
-        nextIndex = (nextIndex + room.turnDirection + room.players.length) % room.players.length;
-        attempts++;
-      } while (
-        (!room.players[nextIndex].alive || room.players[nextIndex].disconnected) &&
-        attempts < maxAttempts
-      );
-    }
+      // Check if this player is handcuffed
+      if (room.players[nextIndex].handcuffed) {
+        room.players[nextIndex].handcuffed = false;
+        // NÃO resetar handcuffImmune aqui! O jogador ainda está imune até jogar um turno real.
+        // Isso impede que ele seja algemado novamente imediatamente.
+        continue;
+      }
+
+      // Found a valid player
+      break;
+    } while (attempts < maxAttempts);
 
     room.currentPlayerIndex = nextIndex;
     return room.players[nextIndex].id;
@@ -674,8 +777,27 @@ export class GameService {
 
     if (alivePlayers.length <= 1) {
       const winner = alivePlayers[0];
+
+      // Track per-round stats for all players before returning
+      room.players.forEach(p => {
+        // Save kills this round to killsPerRound array
+        p.stats.killsPerRound.push(p.stats.killsInCurrentRound);
+      });
+
       if (winner) {
         winner.roundWins++;
+
+        // Track round-specific badges for the winner
+        if (winner.stats.shotsInCurrentRound === 0) {
+          winner.stats.wonRoundWithZeroShots = true;
+        }
+        if (winner.stats.itemsInCurrentRound === 0) {
+          winner.stats.wonRoundWithZeroItems = true;
+        }
+
+        // Track last-alive survivor: winner is always the last survivor
+        winner.stats.roundsSurvivedAsLast++;
+
         return { ended: true, winnerId: winner.id };
       }
       return { ended: true };
@@ -693,6 +815,22 @@ export class GameService {
     // Após 3 rounds, determinar vencedor pelo maior número de vitórias
     const sortedPlayers = [...room.players].sort((a, b) => b.roundWins - a.roundWins);
     const winner = sortedPlayers[0];
+
+    // Track final stats for all players
+    room.players.forEach(p => {
+      p.stats.finalHp = p.hp;
+    });
+
+    // Track lostEarlyRounds for comeback badge
+    // If the winner lost at least one round, they made a comeback
+    if (winner) {
+      const totalRoundsPlayed = room.currentRound;
+      const winnerRoundWins = winner.roundWins;
+      if (winnerRoundWins < totalRoundsPlayed && winnerRoundWins > 0) {
+        // Winner lost some rounds but still won overall
+        winner.stats.lostEarlyRounds = true;
+      }
+    }
 
     return { ended: true, winnerId: winner.id };
   }

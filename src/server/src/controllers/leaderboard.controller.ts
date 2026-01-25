@@ -38,8 +38,9 @@ export const getLeaderboard = async (req: Request, res: Response) => {
 
     res.json({ entries, myRank });
   } catch (error) {
-    console.error('[Leaderboard] Erro ao obter leaderboard:', error);
-    res.status(500).json({ error: 'Erro interno' });
+    console.error('[Leaderboard] Erro ao obter leaderboard:', error instanceof Error ? error.message : error);
+    console.error('[Leaderboard] Stack:', error instanceof Error ? error.stack : '');
+    res.status(500).json({ error: 'Erro interno do servidor' });
   }
 };
 

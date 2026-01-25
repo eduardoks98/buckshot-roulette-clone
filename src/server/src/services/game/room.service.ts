@@ -40,6 +40,32 @@ interface PlayerStats {
   itemsUsed: number;
   kills: number;
   deaths: number;
+
+  // Extended tracking for achievements/badges
+  sawedShots: number;
+  liveHits: number;
+  expiredMedicineSurvived: number;
+  adrenalineUses: number;
+  handcuffUses: number;
+  infoItemUses: number;
+  itemsUsedBitmask: number;         // Bitmask of unique items used (10 items = 10 bits)
+  firstBloodInGame: boolean;        // Was this player the first killer in the game?
+  turnsAt1Hp: number;               // Consecutive turns at 1 HP (current streak)
+  maxConsecutiveTurnsAt1Hp: number; // Best streak of consecutive turns at 1 HP
+  killsPerRound: number[];          // Kills per round [round1, round2, round3]
+  roundsSurvivedAsLast: number;     // Rounds where player was last alive
+  wonRoundWithZeroShots: boolean;   // Won a round without firing
+  wonRoundWithZeroItems: boolean;   // Won a round without using items
+  finalHp: number;                  // HP at end of game
+  uniqueItemsUsedInGame: number;    // Count of distinct item types used in game
+  adrenalineUsesInGame: number;     // Adrenaline uses this game (for badge)
+  expiredMedicineSurvivedInGame: number; // Expired medicine survived this game
+  liveHitsInGame: number;           // Live shell hits this game
+  allShotsLiveInGame: boolean;      // Whether all shots fired were live hits
+  lostEarlyRounds: boolean;         // Lost rounds before winning the game
+  shotsInCurrentRound: number;      // Shots fired in current round (resets per round)
+  itemsInCurrentRound: number;      // Items used in current round (resets per round)
+  killsInCurrentRound: number;      // Kills in current round (resets per round)
 }
 
 export interface Player {
@@ -72,6 +98,7 @@ export class RoomService {
   onGameCancelled?: (roomCode: string) => void;
   onPlayerWonByDefault?: (roomCode: string, player: Player) => void;
   onPlayerEliminated?: (roomCode: string, player: Player) => void;
+  onRoomDeleted?: (roomCode: string) => void;
 
   // ==========================================
   // HELPERS
@@ -116,6 +143,31 @@ export class RoomService {
         itemsUsed: 0,
         kills: 0,
         deaths: 0,
+        // Extended tracking
+        sawedShots: 0,
+        liveHits: 0,
+        expiredMedicineSurvived: 0,
+        adrenalineUses: 0,
+        handcuffUses: 0,
+        infoItemUses: 0,
+        itemsUsedBitmask: 0,
+        firstBloodInGame: false,
+        turnsAt1Hp: 0,
+        maxConsecutiveTurnsAt1Hp: 0,
+        killsPerRound: [],
+        roundsSurvivedAsLast: 0,
+        wonRoundWithZeroShots: false,
+        wonRoundWithZeroItems: false,
+        finalHp: 0,
+        uniqueItemsUsedInGame: 0,
+        adrenalineUsesInGame: 0,
+        expiredMedicineSurvivedInGame: 0,
+        liveHitsInGame: 0,
+        allShotsLiveInGame: true,
+        lostEarlyRounds: false,
+        shotsInCurrentRound: 0,
+        itemsInCurrentRound: 0,
+        killsInCurrentRound: 0,
       },
     };
   }
@@ -313,7 +365,7 @@ export class RoomService {
     const playerName = player.name;
     let newHost: string | undefined;
 
-    // Se jogo não começou, remover normalmente
+    // Se jogo não começou, remover jogador normalmente
     if (!room.started) {
       const result = this.leaveRoom(socketId);
       if (!result) return null;

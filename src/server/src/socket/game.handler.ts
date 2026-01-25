@@ -6,6 +6,7 @@ import { TypedIOServer, TypedSocket, socketUserMap } from '../socket';
 import { GameService } from '../services/game/game.service';
 import { RoomService } from '../services/game/room.service';
 import { gamePersistenceService } from '../services/game/game.persistence.service';
+import { achievementService, PlayerEndGameStats } from '../services/achievement.service';
 import { GAME_RULES } from '../../../shared/constants';
 import { Item, ItemId, GameAward } from '../../../shared/types';
 
@@ -117,35 +118,61 @@ export function registerGameHandlers(
       io.to(code).emit('itemUsed', result);
 
       // Adrenalina - processar o item roubado imediatamente
+      // EXCETO itens que precisam de alvo (handcuffs, adrenaline) - ficam no inventário
       if (itemId === 'adrenaline' && result.usedImmediately && result.stolenItem) {
         const stolenItemId = result.stolenItem.id as ItemId;
+        const needsTarget = stolenItemId === 'handcuffs' || stolenItemId === 'adrenaline';
 
-        // Processar o item roubado (já está no inventário do jogador)
-        const stolenResult = gameService.processItem(room, socket.id, stolenItemId, targetId);
+        if (needsTarget) {
+          // Item que precisa de alvo: NÃO usar automaticamente, fica no inventário
+          // O jogador usará manualmente na sua vez
+          console.log(`[Game] ${socket.id} roubou ${stolenItemId} via Adrenalina - item adicionado ao inventário para uso manual`);
+        } else {
+          // Processar o item roubado automaticamente (já está no inventário do jogador)
+          const stolenResult = gameService.processItem(room, socket.id, stolenItemId, targetId);
 
-        if (!('error' in stolenResult)) {
-          // Emit o uso do item roubado
-          io.to(code).emit('itemUsed', stolenResult);
+          if (!('error' in stolenResult)) {
+            // Emit o uso do item roubado
+            io.to(code).emit('itemUsed', stolenResult);
 
-          // Se o item roubado foi expired_medicine e eliminou o jogador
-          if (stolenItemId === 'expired_medicine' && stolenResult.eliminated) {
-            const user = room.players.find(p => p.id === socket.id);
-            if (user) {
-              io.to(code).emit('playerEliminated', {
-                playerId: socket.id,
-                playerName: user.name,
-                reason: 'Remedio vencido (roubado)',
-              });
+            // Se o item roubado foi expired_medicine e eliminou o jogador
+            if (stolenItemId === 'expired_medicine' && stolenResult.eliminated) {
+              const user = room.players.find(p => p.id === socket.id);
+              if (user) {
+                io.to(code).emit('playerEliminated', {
+                  playerId: socket.id,
+                  playerName: user.name,
+                  reason: 'Remedio vencido (roubado)',
+                });
 
-              const roundEnd = gameService.checkRoundEnd(room);
-              if (roundEnd.ended) {
-                handleRoundEnd(io, room, code, roundEnd.winnerId);
+                const roundEnd = gameService.checkRoundEnd(room);
+                if (roundEnd.ended) {
+                  handleRoundEnd(io, room, code, roundEnd.winnerId);
+                } else {
+                  // Jogador morreu mas a rodada continua - avançar turno
+                  const nextPlayerId = gameService.advanceTurn(room, false, false);
+
+                  // Reset turn timer
+                  if (room.turnTimeout) {
+                    clearTimeout(room.turnTimeout);
+                  }
+                  room.turnStartTime = Date.now();
+                  room.turnTimeout = setTimeout(() => {
+                    handleTurnTimeout(io, room, code, roomService);
+                  }, GAME_RULES.TIMERS.TURN_DURATION_MS);
+
+                  io.to(code).emit('turnChanged', {
+                    currentPlayer: nextPlayerId,
+                    reason: 'elimination',
+                    players: room.players.map(p => gameService.toPublicPlayer(p)),
+                  });
+                }
               }
             }
           }
-        }
 
-        console.log(`[Game] ${socket.id} usou item roubado ${stolenItemId} via Adrenalina`);
+          console.log(`[Game] ${socket.id} usou item roubado ${stolenItemId} via Adrenalina`);
+        }
       }
 
       // Check for elimination by expired medicine
@@ -161,6 +188,24 @@ export function registerGameHandlers(
           const roundEnd = gameService.checkRoundEnd(room);
           if (roundEnd.ended) {
             handleRoundEnd(io, room, code, roundEnd.winnerId);
+          } else {
+            // Jogador morreu mas a rodada continua - avançar turno
+            const nextPlayerId = gameService.advanceTurn(room, false, false);
+
+            // Reset turn timer
+            if (room.turnTimeout) {
+              clearTimeout(room.turnTimeout);
+            }
+            room.turnStartTime = Date.now();
+            room.turnTimeout = setTimeout(() => {
+              handleTurnTimeout(io, room, code, roomService);
+            }, GAME_RULES.TIMERS.TURN_DURATION_MS);
+
+            io.to(code).emit('turnChanged', {
+              currentPlayer: nextPlayerId,
+              reason: 'elimination',
+              players: room.players.map(p => gameService.toPublicPlayer(p)),
+            });
           }
         }
       }
@@ -235,6 +280,32 @@ interface PlayerStats {
   itemsUsed: number;
   kills: number;
   deaths: number;
+
+  // Extended tracking for achievements/badges
+  sawedShots: number;
+  liveHits: number;
+  expiredMedicineSurvived: number;
+  adrenalineUses: number;
+  handcuffUses: number;
+  infoItemUses: number;
+  itemsUsedBitmask: number;
+  firstBloodInGame: boolean;
+  turnsAt1Hp: number;
+  maxConsecutiveTurnsAt1Hp: number;
+  killsPerRound: number[];
+  roundsSurvivedAsLast: number;
+  wonRoundWithZeroShots: boolean;
+  wonRoundWithZeroItems: boolean;
+  finalHp: number;
+  uniqueItemsUsedInGame: number;
+  adrenalineUsesInGame: number;
+  expiredMedicineSurvivedInGame: number;
+  liveHitsInGame: number;
+  allShotsLiveInGame: boolean;
+  lostEarlyRounds: boolean;
+  shotsInCurrentRound: number;
+  itemsInCurrentRound: number;
+  killsInCurrentRound: number;
 }
 
 interface RoomWithTimer {
@@ -337,12 +408,12 @@ export function calculateAwards(players: RoomWithTimer['players']): GameAward[] 
   return awards;
 }
 
-function handleRoundEnd(
+async function handleRoundEnd(
   io: TypedIOServer,
   room: RoomWithTimer,
   code: string,
   winnerId?: string
-): void {
+): Promise<void> {
   // Clear turn timeout
   if (room.turnTimeout) {
     clearTimeout(room.turnTimeout);
@@ -389,24 +460,124 @@ function handleRoundEnd(
       };
     });
 
-    // Persistir no banco de dados
-    const winnerUserData = gameWinner ? socketUserMap.get(gameWinner.id) : null;
-    gamePersistenceService.endGame({
-      roomCode: code,
-      winnerId: gameEnd.winnerId,
-      winnerUserId: winnerUserData?.odUserId,
-      playerStats,
-    }).catch(err => console.error('[DB] Erro ao finalizar jogo:', err));
-
     // Calculate awards
     const awards = calculateAwards(room.players);
 
-    io.to(code).emit('gameOver', {
-      winner: gameWinner ? gameService.toPublicPlayer(gameWinner as never) : null,
-      reason: 'Todos os rounds foram jogados',
-      stats: playerStats,
-      awards,
-    });
+    // Persistir no banco de dados (await para obter xpResults)
+    const winnerUserData = gameWinner ? socketUserMap.get(gameWinner.id) : null;
+    let xpResults;
+    try {
+      const endResult = await gamePersistenceService.endGame({
+        roomCode: code,
+        winnerId: gameEnd.winnerId,
+        winnerUserId: winnerUserData?.odUserId,
+        playerStats,
+      });
+      xpResults = endResult?.xpResults;
+
+      // Process achievements and badges if game was persisted
+      if (endResult) {
+        try {
+          // Build extended stats for achievement service
+          const extendedStats: PlayerEndGameStats[] = sortedPlayers.map((p, index) => {
+            const uData = socketUserMap.get(p.id);
+            return {
+              odId: p.id,
+              odUserId: uData?.odUserId,
+              playerName: p.name,
+              position: index + 1,
+              roundsWon: p.roundWins,
+              totalRounds: room.currentRound,
+              totalPlayers: room.players.length,
+
+              // Standard stats
+              damageDealt: p.stats.damageDealt,
+              damageTaken: p.stats.damageTaken,
+              selfDamage: p.stats.selfDamage,
+              shotsFired: p.stats.shotsFired,
+              itemsUsed: p.stats.itemsUsed,
+              kills: p.stats.kills,
+              deaths: p.stats.deaths,
+
+              // Extended tracking
+              sawedShots: p.stats.sawedShots,
+              liveHits: p.stats.liveHits,
+              expiredMedicineSurvived: p.stats.expiredMedicineSurvived,
+              adrenalineUses: p.stats.adrenalineUses,
+              handcuffUses: p.stats.handcuffUses,
+              infoItemUses: p.stats.infoItemUses,
+              itemsUsedBitmask: p.stats.itemsUsedBitmask,
+              firstBloodInGame: p.stats.firstBloodInGame,
+              maxConsecutiveTurnsAt1Hp: p.stats.maxConsecutiveTurnsAt1Hp,
+              killsPerRound: p.stats.killsPerRound,
+              roundsSurvivedAsLast: p.stats.roundsSurvivedAsLast,
+              wonRoundWithZeroShots: p.stats.wonRoundWithZeroShots,
+              wonRoundWithZeroItems: p.stats.wonRoundWithZeroItems,
+              finalHp: p.stats.finalHp,
+              uniqueItemsUsedInGame: p.stats.uniqueItemsUsedInGame,
+              adrenalineUsesInGame: p.stats.adrenalineUsesInGame,
+              expiredMedicineSurvivedInGame: p.stats.expiredMedicineSurvivedInGame,
+              liveHitsInGame: p.stats.liveHitsInGame,
+              allShotsLiveInGame: p.stats.allShotsLiveInGame,
+              lostEarlyRounds: p.stats.lostEarlyRounds,
+
+              // Context - ELO data determined by achievement service from DB
+              isWinner: p.id === gameEnd.winnerId,
+              lowestEloInGame: false, // Will be determined by achievement service if needed
+            };
+          });
+
+          const achievementResult = await achievementService.processGameEnd(endResult.gameId, extendedStats);
+
+          // Emit achievementsUnlocked individually to each player
+          for (const [odId, achievements] of achievementResult.newAchievements) {
+            if (achievements.length > 0) {
+              const playerSocket = io.sockets.sockets.get(odId);
+              if (playerSocket) {
+                playerSocket.emit('achievementsUnlocked', achievements);
+              }
+            }
+          }
+
+          // Include badges in game over
+          io.to(code).emit('gameOver', {
+            winner: gameWinner ? gameService.toPublicPlayer(gameWinner as never) : null,
+            reason: 'Todos os rounds foram jogados',
+            stats: playerStats,
+            awards,
+            xpResults: xpResults || undefined,
+            badges: achievementResult.badges.length > 0 ? achievementResult.badges : undefined,
+          });
+        } catch (achievementError) {
+          console.error('[Achievement] Erro ao processar achievements:', achievementError);
+          // Emit game over without achievement data
+          io.to(code).emit('gameOver', {
+            winner: gameWinner ? gameService.toPublicPlayer(gameWinner as never) : null,
+            reason: 'Todos os rounds foram jogados',
+            stats: playerStats,
+            awards,
+            xpResults: xpResults || undefined,
+          });
+        }
+      } else {
+        // endGame returned null - emit without xp/achievements
+        io.to(code).emit('gameOver', {
+          winner: gameWinner ? gameService.toPublicPlayer(gameWinner as never) : null,
+          reason: 'Todos os rounds foram jogados',
+          stats: playerStats,
+          awards,
+        });
+      }
+    } catch (err) {
+      console.error('[DB] Erro ao finalizar jogo:', err);
+      // Still emit game over even if persistence failed
+      io.to(code).emit('gameOver', {
+        winner: gameWinner ? gameService.toPublicPlayer(gameWinner as never) : null,
+        reason: 'Todos os rounds foram jogados',
+        stats: playerStats,
+        awards,
+      });
+    }
     return;
   }
 

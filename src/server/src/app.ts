@@ -8,10 +8,12 @@ import http from 'http';
 import path from 'path';
 import passport from './config/passport.config';
 import { ENV } from './config/env.config';
+import { getOnlineCount } from './socket';
 import authRoutes from './routes/auth.routes';
 import leaderboardRoutes from './routes/leaderboard.routes';
 import historyRoutes from './routes/history.routes';
 import bugRoutes from './routes/bug.routes';
+import achievementRoutes from './routes/achievement.routes';
 
 export function createServer(): { app: Express; httpServer: http.Server } {
   const app = express();
@@ -58,6 +60,16 @@ export function createServer(): { app: Express; httpServer: http.Server } {
     });
   });
 
+  // ads.txt para Google AdSense
+  app.get('/ads.txt', (_req: Request, res: Response) => {
+    res.type('text/plain').send('google.com, pub-5292148168457268, DIRECT, f08c47fec0942fa0');
+  });
+
+  // Online count
+  app.get('/api/online', (_req: Request, res: Response) => {
+    res.json(getOnlineCount());
+  });
+
   // Auth routes
   app.use('/api/auth', authRoutes);
 
@@ -72,6 +84,9 @@ export function createServer(): { app: Express; httpServer: http.Server } {
 
   // Bug report routes
   app.use('/api/bugs', bugRoutes);
+
+  // Achievement routes
+  app.use('/api/achievements', achievementRoutes);
 
   // ==========================================
   // ERROR HANDLING

@@ -1,0 +1,116 @@
+/* ==========================================
+   CHANGELOG - Ultimas atualizacoes
+   ========================================== */
+
+.changelog {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 16px;
+  padding: 1.25rem;
+}
+
+.changelog__title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--gold-accent, #d4a418);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin: 0 0 1rem;
+}
+
+.changelog__title svg {
+  opacity: 0.8;
+}
+
+/* Changelog List */
+.changelog__list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Changelog Entry */
+.changelog-entry {
+  padding: 1rem;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 10px;
+  border-left: 3px solid var(--gold-accent, #d4a418);
+}
+
+.changelog-entry__header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.changelog-entry__version {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--gold-accent, #d4a418);
+  background: rgba(212, 164, 24, 0.15);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+}
+
+.changelog-entry__date {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.4);
+}
+
+.changelog-entry__title {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #fff;
+  margin: 0 0 0.5rem;
+}
+
+.changelog-entry__changes {
+  margin: 0;
+  padding-left: 1.25rem;
+  list-style: none;
+}
+
+.changelog-entry__changes li {
+  position: relative;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.5;
+  margin-bottom: 0.25rem;
+}
+
+.changelog-entry__changes li::before {
+  content: '•';
+  position: absolute;
+  left: -1rem;
+  color: var(--gold-accent, #d4a418);
+}
+
+.changelog-entry__changes li:last-child {
+  margin-bottom: 0;
+}
+
+/* ==========================================
+   RESPONSIVE
+   ========================================== */
+
+@media (max-width: 480px) {
+  .changelog {
+    padding: 1rem;
+  }
+
+  .changelog-entry {
+    padding: 0.875rem;
+  }
+
+  .changelog-entry__title {
+    font-size: 0.9rem;
+  }
+
+  .changelog-entry__changes li {
+    font-size: 0.8rem;
+  }
+}

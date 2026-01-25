@@ -2,12 +2,11 @@
 // AUTH SERVICE
 // ==========================================
 
-import { PrismaClient, User, Session } from '@prisma/client';
+import { User, Session } from '@prisma/client';
 import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { env } from '../config/env.config';
-
-const prisma = new PrismaClient();
+import prisma from '../lib/prisma';
 
 // ==========================================
 // TYPES
@@ -22,17 +21,19 @@ interface UserProfile {
   id: string;
   email: string;
   username: string;
-  displayName: string;
-  avatarUrl: string | null;
-  gamesPlayed: number;
-  gamesWon: number;
-  roundsPlayed: number;
-  roundsWon: number;
-  totalKills: number;
-  totalDeaths: number;
-  eloRating: number;
+  display_name: string;
+  avatar_url: string | null;
+  games_played: number;
+  games_won: number;
+  rounds_played: number;
+  rounds_won: number;
+  total_kills: number;
+  total_deaths: number;
+  elo_rating: number;
   rank: string;
-  isAdmin: boolean;
+  total_xp: number;
+  is_admin: boolean;
+  active_title_id: string | null;
 }
 
 // ==========================================
@@ -49,15 +50,15 @@ export class AuthService {
     const sessionToken = crypto.randomBytes(32).toString('hex');
 
     // Calculate expiration (7 days)
-    const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 7);
+    const expires_at = new Date();
+    expires_at.setDate(expires_at.getDate() + 7);
 
     // Create session in database
     const session = await prisma.session.create({
       data: {
-        userId,
+        user_id: userId,
         token: sessionToken,
-        expiresAt,
+        expires_at,
       },
     });
 
@@ -84,7 +85,7 @@ export class AuthService {
         include: { user: true },
       });
 
-      if (!session || session.expiresAt < new Date()) {
+      if (!session || session.expires_at < new Date()) {
         return null;
       }
 
@@ -104,7 +105,7 @@ export class AuthService {
 
   async invalidateAllSessions(userId: string): Promise<void> {
     await prisma.session.deleteMany({
-      where: { userId },
+      where: { user_id: userId },
     });
   }
 
@@ -129,48 +130,50 @@ export class AuthService {
       id: user.id,
       email: user.email,
       username: user.username,
-      displayName: user.displayName,
-      avatarUrl: user.avatarUrl,
-      gamesPlayed: user.gamesPlayed,
-      gamesWon: user.gamesWon,
-      roundsPlayed: user.roundsPlayed,
-      roundsWon: user.roundsWon,
-      totalKills: user.totalKills,
-      totalDeaths: user.totalDeaths,
-      eloRating: user.eloRating,
+      display_name: user.display_name,
+      avatar_url: user.avatar_url,
+      games_played: user.games_played,
+      games_won: user.games_won,
+      rounds_played: user.rounds_played,
+      rounds_won: user.rounds_won,
+      total_kills: user.total_kills,
+      total_deaths: user.total_deaths,
+      elo_rating: user.elo_rating,
       rank: user.rank,
-      isAdmin: user.isAdmin,
+      total_xp: user.total_xp,
+      is_admin: user.is_admin,
+      active_title_id: user.active_title_id,
     };
   }
 
   async updateUserStats(
     userId: string,
     stats: {
-      gamesPlayed?: number;
-      gamesWon?: number;
-      roundsPlayed?: number;
-      roundsWon?: number;
-      totalKills?: number;
-      totalDeaths?: number;
-      eloChange?: number;
+      games_played?: number;
+      games_won?: number;
+      rounds_played?: number;
+      rounds_won?: number;
+      total_kills?: number;
+      total_deaths?: number;
+      elo_change?: number;
     }
   ): Promise<User> {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new Error('Usuario nao encontrado');
 
-    const newElo = (user.eloRating || 1000) + (stats.eloChange || 0);
+    const newElo = (user.elo_rating || 1000) + (stats.elo_change || 0);
     const newRank = this.calculateRank(newElo);
 
     return prisma.user.update({
       where: { id: userId },
       data: {
-        gamesPlayed: { increment: stats.gamesPlayed || 0 },
-        gamesWon: { increment: stats.gamesWon || 0 },
-        roundsPlayed: { increment: stats.roundsPlayed || 0 },
-        roundsWon: { increment: stats.roundsWon || 0 },
-        totalKills: { increment: stats.totalKills || 0 },
-        totalDeaths: { increment: stats.totalDeaths || 0 },
-        eloRating: newElo,
+        games_played: { increment: stats.games_played || 0 },
+        games_won: { increment: stats.games_won || 0 },
+        rounds_played: { increment: stats.rounds_played || 0 },
+        rounds_won: { increment: stats.rounds_won || 0 },
+        total_kills: { increment: stats.total_kills || 0 },
+        total_deaths: { increment: stats.total_deaths || 0 },
+        elo_rating: newElo,
         rank: newRank,
       },
     });
@@ -208,7 +211,7 @@ export class AuthService {
   async cleanupExpiredSessions(): Promise<number> {
     const result = await prisma.session.deleteMany({
       where: {
-        expiresAt: {
+        expires_at: {
           lt: new Date(),
         },
       },

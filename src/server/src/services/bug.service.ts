@@ -2,31 +2,35 @@
 // BUG REPORT SERVICE
 // ==========================================
 
-import { PrismaClient, BugCategory, BugPriority, BugStatus } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { BugCategory, BugPriority, BugStatus } from '@prisma/client';
+import prisma from '../lib/prisma';
 
 // ==========================================
 // TYPES
 // ==========================================
 
 interface CreateBugReportParams {
-  userId?: string;
+  user_id?: string;
   title: string;
   description: string;
   category: BugCategory;
   priority?: BugPriority;
-  gameRoomCode?: string;
-  gameRound?: number;
-  gameState?: string; // JSON stringified
+  game_room_code?: string;
+  game_round?: number;
+  game_state?: string; // JSON stringified
   screenshot?: string; // base64
 }
 
 interface UpdateBugReportParams {
   status?: BugStatus;
   priority?: BugPriority;
-  adminNotes?: string;
-  resolvedBy?: string;
+  admin_notes?: string;
+  resolved_by?: string;
+  assigned_to_id?: string;
+  assigned_to_name?: string;
+  git_issue_url?: string;
+  git_issue_number?: number;
+  git_issue_state?: string;
 }
 
 interface BugReportFilters {
@@ -46,21 +50,21 @@ class BugService {
     try {
       const report = await prisma.bugReport.create({
         data: {
-          userId: params.userId || null,
+          user_id: params.user_id || null,
           title: params.title,
           description: params.description,
           category: params.category,
           priority: params.priority || BugPriority.MEDIUM,
-          gameRoomCode: params.gameRoomCode || null,
-          gameRound: params.gameRound || null,
-          gameState: params.gameState || null,
+          game_room_code: params.game_room_code || null,
+          game_round: params.game_round || null,
+          game_state: params.game_state || null,
           screenshot: params.screenshot || null,
         },
         include: {
           user: {
             select: {
               id: true,
-              displayName: true,
+              display_name: true,
               email: true,
             },
           },
@@ -83,7 +87,7 @@ class BugService {
       if (filters.status) where.status = filters.status;
       if (filters.category) where.category = filters.category;
       if (filters.priority) where.priority = filters.priority;
-      if (filters.userId) where.userId = filters.userId;
+      if (filters.userId) where.user_id = filters.userId;
 
       const [reports, total] = await Promise.all([
         prisma.bugReport.findMany({
@@ -92,12 +96,12 @@ class BugService {
             user: {
               select: {
                 id: true,
-                displayName: true,
+                display_name: true,
                 email: true,
               },
             },
           },
-          orderBy: { createdAt: 'desc' },
+          orderBy: { created_at: 'desc' },
           skip: (page - 1) * limit,
           take: limit,
         }),
@@ -128,7 +132,7 @@ class BugService {
           user: {
             select: {
               id: true,
-              displayName: true,
+              display_name: true,
               email: true,
             },
           },
@@ -150,12 +154,24 @@ class BugService {
       if (params.status) {
         data.status = params.status;
         if (params.status === BugStatus.RESOLVED) {
-          data.resolvedAt = new Date();
-          data.resolvedBy = params.resolvedBy;
+          data.resolved_at = new Date();
+          data.resolved_by = params.resolved_by;
         }
       }
       if (params.priority) data.priority = params.priority;
-      if (params.adminNotes !== undefined) data.adminNotes = params.adminNotes;
+      if (params.admin_notes !== undefined) data.admin_notes = params.admin_notes;
+
+      // Assignee fields
+      if (params.assigned_to_id !== undefined) {
+        data.assigned_to_id = params.assigned_to_id;
+        data.assigned_to_name = params.assigned_to_name;
+        data.assigned_at = params.assigned_to_id ? new Date() : null;
+      }
+
+      // GitHub integration fields
+      if (params.git_issue_url !== undefined) data.git_issue_url = params.git_issue_url;
+      if (params.git_issue_number !== undefined) data.git_issue_number = params.git_issue_number;
+      if (params.git_issue_state !== undefined) data.git_issue_state = params.git_issue_state;
 
       const report = await prisma.bugReport.update({
         where: { id },
@@ -164,7 +180,7 @@ class BugService {
           user: {
             select: {
               id: true,
-              displayName: true,
+              display_name: true,
               email: true,
             },
           },

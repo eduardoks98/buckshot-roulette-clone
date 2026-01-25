@@ -53,8 +53,8 @@ export default function BugReportModal({ isOpen, onClose, gameState }: BugReport
   const handleScreenshotChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        setErrorMessage('Screenshot muito grande (max 5MB)');
+      if (file.size > 2 * 1024 * 1024) {
+        setErrorMessage('Screenshot muito grande (max 2MB)');
         return;
       }
 
@@ -106,8 +106,18 @@ export default function BugReportModal({ isOpen, onClose, gameState }: BugReport
       });
 
       if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Erro ao enviar report');
+        // Tratar erro de payload muito grande
+        if (response.status === 413) {
+          throw new Error('Imagem muito grande. Tente uma imagem menor (max 2MB).');
+        }
+
+        // Tentar ler mensagem de erro do servidor
+        try {
+          const data = await response.json();
+          throw new Error(data.error || data.message || 'Erro ao enviar report');
+        } catch {
+          throw new Error(`Erro ao enviar report (${response.status})`);
+        }
       }
 
       setSubmitStatus('success');

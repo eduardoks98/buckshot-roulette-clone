@@ -1,0 +1,108 @@
+/* ==========================================
+   LEVEL BADGE COMPONENT
+   Circular badge with level number and prestige stars
+   ========================================== */
+
+/* --- CSS Variables (scoped) --- */
+.level-badge {
+  --gold-accent: #d4a418;
+  --gold-light: #e8c84a;
+  --bg-dark: #0a0a0a;
+  --text-primary: #ffffff;
+  --text-dim: #888888;
+  --border-color: rgba(255, 255, 255, 0.1);
+  --shadow-glow-gold: 0 0 20px rgba(212, 164, 24, 0.4);
+
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-family: 'Courier New', Courier, monospace;
+  user-select: none;
+}
+
+/* ==========================================
+   CIRCLE
+   ========================================== */
+
+.level-badge__circle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--bg-dark);
+  border: 2px solid var(--gold-accent);
+  box-shadow: var(--shadow-glow-gold);
+}
+
+/* ==========================================
+   LEVEL NUMBER
+   ========================================== */
+
+.level-badge__number {
+  color: var(--text-primary);
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* ==========================================
+   PRESTIGE STARS
+   ========================================== */
+
+.level-badge__prestige {
+  color: var(--gold-light);
+  letter-spacing: 1px;
+  line-height: 1;
+  text-align: center;
+}
+
+/* ==========================================
+   SIZE VARIANTS
+   ========================================== */
+
+/* --- Small (28px) --- */
+.level-badge--sm .level-badge__circle {
+  width: 28px;
+  height: 28px;
+  border-width: 1.5px;
+}
+
+.level-badge--sm .level-badge__number {
+  font-size: 11px;
+}
+
+.level-badge--sm .level-badge__prestige {
+  font-size: 8px;
+  letter-spacing: 0px;
+}
+
+/* --- Medium (40px, default) --- */
+.level-badge--md .level-badge__circle {
+  width: 40px;
+  height: 40px;
+  border-width: 2px;
+}
+
+.level-badge--md .level-badge__number {
+  font-size: 15px;
+}
+
+.level-badge--md .level-badge__prestige {
+  font-size: 10px;
+}
+
+/* --- Large (56px) --- */
+.level-badge--lg .level-badge__circle {
+  width: 56px;
+  height: 56px;
+  border-width: 2.5px;
+}
+
+.level-badge--lg .level-badge__number {
+  font-size: 20px;
+}
+
+.level-badge--lg .level-badge__prestige {
+  font-size: 13px;
+  letter-spacing: 2px;
+}

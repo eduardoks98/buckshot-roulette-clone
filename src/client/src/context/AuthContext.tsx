@@ -18,7 +18,9 @@ interface User {
   totalDeaths: number;
   eloRating: number;
   rank: string;
+  totalXp: number;
   isAdmin: boolean;
+  activeTitleId: string | null;
 }
 
 const TOKEN_KEY = 'buckshot_auth_token';
@@ -29,8 +31,10 @@ interface AuthContextType {
   isAuthenticated: boolean;
   isAdmin: boolean;
   isLoading: boolean;
+  authError: string | null;
   login: () => void;
   logout: () => void;
+  clearAuthError: () => void;
 }
 
 // ==========================================
@@ -47,18 +51,35 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
+function getAuthErrorMessage(errorCode: string): string {
+  const messages: Record<string, string> = {
+    auth_failed: 'Falha na autenticacao com Google. Tente novamente.',
+    no_user: 'Nao foi possivel obter dados do usuario.',
+    session_failed: 'Erro ao criar sessao. Tente novamente.',
+  };
+  return messages[errorCode] || 'Erro de autenticacao. Tente novamente.';
+}
+
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [authError, setAuthError] = useState<string | null>(null);
 
   // Verificar autenticação ao carregar
   useEffect(() => {
     // Check for token in URL (after Google OAuth callback)
     const urlParams = new URLSearchParams(window.location.search);
     const tokenFromUrl = urlParams.get('token');
+    const errorFromUrl = urlParams.get('error');
 
     if (tokenFromUrl) {
       localStorage.setItem(TOKEN_KEY, tokenFromUrl);
+      // Clean URL
+      window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    if (errorFromUrl) {
+      setAuthError(getAuthErrorMessage(errorFromUrl));
       // Clean URL
       window.history.replaceState({}, document.title, window.location.pathname);
     }
@@ -118,14 +139,18 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
+  const clearAuthError = () => setAuthError(null);
+
   const value: AuthContextType = {
     user,
     token: getToken(),
     isAuthenticated: !!user,
     isAdmin: user?.isAdmin ?? false,
     isLoading,
+    authError,
     login,
     logout,
+    clearAuthError,
   };
 
   return (

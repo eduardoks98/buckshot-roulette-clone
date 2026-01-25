@@ -1,5 +1,5 @@
 // ==========================================
-// PRISMA SCHEMA - BUCKSHOT ROULETTE
+// PRISMA SCHEMA - BANG SHOT
 // ==========================================
 
 generator client {
@@ -16,56 +16,79 @@ datasource db {
 // ==========================================
 
 model User {
-  id          String   @id @default(uuid())
-  email       String   @unique
-  username    String   @unique
-  displayName String
-  avatarUrl   String?
+  id           String   @id @default(uuid())
+  email        String   @unique
+  username     String   @unique
+  display_name String
+  avatar_url   String?
 
   // OAuth
-  googleId String? @unique
+  google_id String? @unique
 
   // Admin
-  isAdmin Boolean @default(false)
+  is_admin Boolean @default(false)
 
   // Stats
-  gamesPlayed  Int @default(0)
-  gamesWon     Int @default(0)
-  roundsPlayed Int @default(0)
-  roundsWon    Int @default(0)
-  totalKills   Int @default(0)
-  totalDeaths  Int @default(0)
+  games_played  Int @default(0)
+  games_won     Int @default(0)
+  rounds_played Int @default(0)
+  rounds_won    Int @default(0)
+  total_kills   Int @default(0)
+  total_deaths  Int @default(0)
 
   // Ranking
-  eloRating Int    @default(1000)
-  rank      String @default("Bronze")
+  elo_rating Int    @default(1000)
+  rank       String @default("Bronze")
+
+  // XP / Level / Prestige
+  total_xp Int @default(0)
+
+  // Achievement tracking
+  total_sawed_shots          Int @default(0)
+  total_live_hits            Int @default(0)
+  total_damage_dealt         Int @default(0)
+  total_items_used           Int @default(0)
+  expired_medicine_survived  Int @default(0)
+  total_adrenaline_uses      Int @default(0)
+  total_handcuff_uses        Int @default(0)
+  total_info_item_uses       Int @default(0)
+  items_used_bitmask         Int @default(0)
+  best_win_streak            Int @default(0)
+  current_win_streak         Int @default(0)
+
+  // Active title
+  active_title_id String?
 
   // Timestamps
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-  lastLoginAt DateTime?
+  created_at    DateTime  @default(now())
+  updated_at    DateTime  @updatedAt
+  last_login_at DateTime?
 
   // Relations
-  sessions           Session[]
-  gameParticipations GameParticipant[]
-  leaderboardEntries LeaderboardEntry[]
-  bugReports         BugReport[]
+  sessions            Session[]
+  game_participations GameParticipant[]
+  leaderboard_entries LeaderboardEntry[]
+  bug_reports         BugReport[]
+  achievements        UserAchievement[]
+  game_badges         GameBadge[]
+  titles              UserTitle[]
 
-  @@index([eloRating(sort: Desc)])
-  @@index([googleId])
+  @@index([elo_rating(sort: Desc)])
+  @@index([total_xp(sort: Desc)])
+  @@index([google_id])
 }
 
 model Session {
-  id        String   @id @default(uuid())
-  userId    String
-  token     String   @unique
-  expiresAt DateTime
-  createdAt DateTime @default(now())
+  id         String   @id @default(uuid())
+  user_id    String
+  token      String   @unique
+  expires_at DateTime
+  created_at DateTime @default(now())
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   @@index([token])
-  @@index([userId])
+  @@index([user_id])
 }
 
 // ==========================================
@@ -73,31 +96,33 @@ model Session {
 // ==========================================
 
 model Game {
-  id       String     @id @default(uuid())
-  roomCode String     @unique
-  status   GameStatus @default(WAITING)
+  id        String     @id @default(uuid())
+  room_code String     @unique
+  status    GameStatus @default(WAITING)
 
   // Game settings
-  maxPlayers  Int     @default(4)
-  isRanked    Boolean @default(false)
-  hasPassword Boolean @default(false)
+  max_players  Int     @default(4)
+  is_ranked    Boolean @default(false)
+  has_password Boolean @default(false)
 
   // Game state
-  currentRound Int     @default(1)
-  maxRounds    Int     @default(3)
-  winnerId     String?
+  current_round Int     @default(1)
+  max_rounds    Int     @default(3)
+  winner_id     String?
 
   // Timestamps
-  createdAt DateTime  @default(now())
-  startedAt DateTime?
-  endedAt   DateTime?
+  created_at DateTime  @default(now())
+  started_at DateTime?
+  ended_at   DateTime?
 
   // Relations
   participants GameParticipant[]
   rounds       Round[]
+  achievements UserAchievement[]
+  game_badges  GameBadge[]
 
   @@index([status])
-  @@index([roomCode])
+  @@index([room_code])
 }
 
 enum GameStatus {
@@ -108,69 +133,73 @@ enum GameStatus {
 }
 
 model GameParticipant {
-  id     String  @id @default(uuid())
-  gameId String
-  userId String?
+  id      String  @id @default(uuid())
+  game_id String
+  user_id String?
 
   // Player info (for guests)
-  guestName String?
+  guest_name String?
 
   // Socket info (para reconexão)
-  socketId       String?
-  reconnectToken String?
+  socket_id       String?
+  reconnect_token String?
 
   // Game results
-  position  Int? // Final position (1st, 2nd, etc.)
-  roundsWon Int  @default(0)
-  kills     Int  @default(0)
-  deaths    Int  @default(0)
-  itemsUsed Int  @default(0)
+  position   Int? // Final position (1st, 2nd, etc.)
+  rounds_won Int  @default(0)
+  kills      Int  @default(0)
+  deaths     Int  @default(0)
+  items_used Int  @default(0)
 
   // Detailed stats
-  damageDealt  Int @default(0)
-  damageTaken  Int @default(0)
-  selfDamage   Int @default(0)
-  shotsFired   Int @default(0)
+  damage_dealt Int @default(0)
+  damage_taken Int @default(0)
+  self_damage  Int @default(0)
+  shots_fired  Int @default(0)
 
   // Elo change (for ranked)
-  eloChange Int?
+  elo_change Int?
+
+  // XP earned
+  xp_earned Int?
 
   // Timestamps
-  joinedAt DateTime  @default(now())
-  leftAt   DateTime?
+  joined_at DateTime  @default(now())
+  left_at   DateTime?
 
   // Relations
-  game Game  @relation(fields: [gameId], references: [id], onDelete: Cascade)
-  user User? @relation(fields: [userId], references: [id])
+  game        Game        @relation(fields: [game_id], references: [id], onDelete: Cascade)
+  user        User?       @relation(fields: [user_id], references: [id])
+  game_badges GameBadge[]
 
-  @@unique([gameId, userId])
-  @@index([gameId])
-  @@index([userId])
-  @@index([socketId])
+  @@unique([game_id, user_id])
+  @@index([game_id])
+  @@index([user_id])
+  @@index([socket_id])
 }
 
 model Round {
-  id          String @id @default(uuid())
-  gameId      String
-  roundNumber Int
+  id           String @id @default(uuid())
+  game_id      String
+  round_number Int
 
   // Round config
-  maxHp       Int
-  shellsLive  Int
-  shellsBlank Int
+  max_hp       Int
+  shells_live  Int
+  shells_blank Int
 
   // Result
-  winnerId String? // participant ID
+  winner_id String? // participant ID
 
   // Timestamps
-  startedAt DateTime  @default(now())
-  endedAt   DateTime?
+  started_at DateTime  @default(now())
+  ended_at   DateTime?
 
   // Relations
-  game Game @relation(fields: [gameId], references: [id], onDelete: Cascade)
+  game Game @relation(fields: [game_id], references: [id], onDelete: Cascade)
 
-  @@unique([gameId, roundNumber])
-  @@index([gameId])
+  @@unique([game_id, round_number])
+  @@index([game_id])
 }
 
 // ==========================================
@@ -178,26 +207,26 @@ model Round {
 // ==========================================
 
 model LeaderboardEntry {
-  id     String @id @default(uuid())
-  userId String
+  id      String @id @default(uuid())
+  user_id String
 
   // Period
-  period      LeaderboardPeriod
-  periodStart DateTime
-  periodEnd   DateTime
+  period       LeaderboardPeriod
+  period_start DateTime
+  period_end   DateTime
 
   // Stats for this period
-  gamesPlayed Int   @default(0)
-  gamesWon    Int   @default(0)
-  winRate     Float @default(0)
-  eloGain     Int   @default(0)
-  peakElo     Int   @default(1000)
+  games_played Int   @default(0)
+  games_won    Int   @default(0)
+  win_rate     Float @default(0)
+  elo_gain     Int   @default(0)
+  peak_elo     Int   @default(1000)
 
   // Relations
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
-  @@unique([userId, period, periodStart])
-  @@index([period, periodStart, eloGain(sort: Desc)])
+  @@unique([user_id, period, period_start])
+  @@index([period, period_start, elo_gain(sort: Desc)])
 }
 
 enum LeaderboardPeriod {
@@ -208,53 +237,119 @@ enum LeaderboardPeriod {
 }
 
 // ==========================================
+// ACHIEVEMENTS & GAMIFICATION
+// ==========================================
+
+model UserAchievement {
+  id             String   @id @default(uuid())
+  user_id        String
+  achievement_id String
+  unlocked_at    DateTime @default(now())
+  game_id        String?
+
+  user User  @relation(fields: [user_id], references: [id], onDelete: Cascade)
+  game Game? @relation(fields: [game_id], references: [id])
+
+  @@unique([user_id, achievement_id])
+  @@index([user_id])
+}
+
+model GameBadge {
+  id             String   @id @default(uuid())
+  game_id        String
+  participant_id String
+  user_id        String
+  badge_id       String
+  awarded_at     DateTime @default(now())
+
+  game        Game            @relation(fields: [game_id], references: [id], onDelete: Cascade)
+  participant GameParticipant @relation(fields: [participant_id], references: [id], onDelete: Cascade)
+  user        User            @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@unique([game_id, user_id, badge_id])
+  @@index([game_id])
+  @@index([user_id])
+}
+
+model UserTitle {
+  id         String      @id @default(uuid())
+  user_id    String
+  title_id   String
+  period     TitlePeriod
+  awarded_at DateTime    @default(now())
+  expires_at DateTime?
+  is_active  Boolean     @default(true)
+
+  user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@index([user_id, is_active])
+  @@index([title_id, period])
+}
+
+enum TitlePeriod {
+  WEEKLY
+  MONTHLY
+  ALL_TIME
+}
+
+// ==========================================
 // BUG REPORTS
 // ==========================================
 
 model BugReport {
-  id     String @id @default(uuid())
-  userId String?
+  id      String  @id @default(uuid())
+  user_id String?
 
   // Report details
   title       String
-  description String   @db.Text
+  description String      @db.Text
   category    BugCategory
   priority    BugPriority @default(MEDIUM)
   status      BugStatus   @default(OPEN)
 
   // Game context (optional)
-  gameRoomCode String?
-  gameRound    Int?
-  gameState    String?  @db.Text // JSON do estado do jogo no momento
+  game_room_code String?
+  game_round     Int?
+  game_state     String? @db.Text // JSON do estado do jogo no momento
 
   // Screenshot (base64 ou URL)
   screenshot String? @db.LongText
 
   // Admin response
-  adminNotes String? @db.Text
-  resolvedBy String?
-  resolvedAt DateTime?
+  admin_notes String?   @db.Text
+  resolved_by String?
+  resolved_at DateTime?
+
+  // Responsavel (assignee)
+  assigned_to_id   String?
+  assigned_to_name String?
+  assigned_at      DateTime?
+
+  // GitHub Integration
+  git_issue_url    String?
+  git_issue_number Int?
+  git_issue_state  String? // open, closed
 
   // Timestamps
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  created_at DateTime @default(now())
+  updated_at DateTime @updatedAt
 
   // Relations
-  user User? @relation(fields: [userId], references: [id])
+  user User? @relation(fields: [user_id], references: [id])
 
   @@index([status])
   @@index([category])
   @@index([priority])
-  @@index([userId])
-  @@index([createdAt(sort: Desc)])
+  @@index([user_id])
+  @@index([created_at(sort: Desc)])
 }
 
 enum BugCategory {
-  GAMEPLAY      // Bugs de gameplay (itens, turnos, etc)
-  UI            // Bugs visuais/interface
-  CONNECTION    // Problemas de conexão/reconexão
-  PERFORMANCE   // Lag, lentidão
-  OTHER         // Outros
+  GAMEPLAY    // Bugs de gameplay (itens, turnos, etc)
+  UI          // Bugs visuais/interface
+  CONNECTION  // Problemas de conexão/reconexão
+  PERFORMANCE // Lag, lentidão
+  OTHER       // Outros
 }
 
 enum BugPriority {

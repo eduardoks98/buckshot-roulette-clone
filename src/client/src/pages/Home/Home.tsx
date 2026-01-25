@@ -1,6 +1,17 @@
-import { useState, useEffect } from 'react';
+// ==========================================
+// HOME PAGE - Landing + LoL-Style Lobby
+// ==========================================
+
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useSocket } from '../../context/SocketContext';
+import LevelBadge from '../../components/common/LevelBadge/LevelBadge';
+import BugReportModal from '../../components/common/BugReportModal/BugReportModal';
+import { getRankColor } from '../../utils/helpers';
+import { ActiveRooms } from '../../components/home/ActiveRooms';
+import { MiniLeaderboard } from '../../components/home/MiniLeaderboard';
+import { Changelog } from '../../components/home/Changelog';
 import './Home.css';
 
 interface LeaderboardEntry {
@@ -14,9 +25,12 @@ interface LeaderboardEntry {
 
 export default function Home() {
   const navigate = useNavigate();
-  const { user, isAuthenticated, login, logout } = useAuth();
+  const { user, isAuthenticated, login, logout, authError, clearAuthError } = useAuth();
+  const { socket, isConnected } = useSocket();
   const [topPlayers, setTopPlayers] = useState<LeaderboardEntry[]>([]);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(true);
+  const [onlineCount, setOnlineCount] = useState(0);
+  const [showBugReport, setShowBugReport] = useState(false);
 
   // Fetch top 5 players for landing page
   useEffect(() => {
@@ -24,6 +38,37 @@ export default function Home() {
       fetchTopPlayers();
     }
   }, [isAuthenticated]);
+
+  // Fetch online count via REST (no socket needed)
+  const fetchOnlineCount = useCallback(async () => {
+    try {
+      const res = await fetch('/api/online');
+      if (res.ok) {
+        const data = await res.json();
+        setOnlineCount(data.total);
+      }
+    } catch {
+      // silently fail
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isAuthenticated) {
+      fetchOnlineCount();
+      const interval = setInterval(fetchOnlineCount, 30000);
+      return () => clearInterval(interval);
+    }
+  }, [isAuthenticated, fetchOnlineCount]);
+
+  // Also listen for socket broadcasts if connected
+  useEffect(() => {
+    if (!socket || !isConnected) return;
+    const handler = (data: { total: number; inQueue: number }) => {
+      setOnlineCount(data.total);
+    };
+    socket.on('onlineCount', handler);
+    return () => { socket.off('onlineCount', handler); };
+  }, [socket, isConnected]);
 
   const fetchTopPlayers = async () => {
     try {
@@ -40,28 +85,35 @@ export default function Home() {
   };
 
   const getRankIcon = (rank: number) => {
-    if (rank === 1) return '🥇';
-    if (rank === 2) return '🥈';
-    if (rank === 3) return '🥉';
+    if (rank === 1) return '\u{1F947}';
+    if (rank === 2) return '\u{1F948}';
+    if (rank === 3) return '\u{1F949}';
     return `#${rank}`;
   };
 
   const handleMultiplayerClick = () => {
     if (!isAuthenticated) {
-      // Show login prompt or redirect to profile
       login();
     } else {
       navigate('/multiplayer');
     }
   };
 
-  // Landing page for non-authenticated users
+  // ==========================================
+  // LANDING PAGE (Non-Authenticated)
+  // ==========================================
   if (!isAuthenticated) {
     return (
       <div className="landing-container">
+        {authError && (
+          <div className="auth-error-banner">
+            <span>{authError}</span>
+            <button className="auth-error-close" onClick={clearAuthError}>X</button>
+          </div>
+        )}
         <div className="landing-hero">
           <h1 className="game-title">
-            BUCKSHOT<br />ROULETTE
+            BANG<br />SHOT
           </h1>
           <p className="subtitle">Um jogo de vida ou morte</p>
 
@@ -115,15 +167,15 @@ export default function Home() {
 
         <div className="landing-features">
           <div className="feature">
-            <span className="feature-icon">🎯</span>
+            <span className="feature-icon">&#127919;</span>
             <span className="feature-text">Partidas Ranqueadas</span>
           </div>
           <div className="feature">
-            <span className="feature-icon">📊</span>
+            <span className="feature-icon">&#128202;</span>
             <span className="feature-text">Sistema de ELO</span>
           </div>
           <div className="feature">
-            <span className="feature-icon">🏆</span>
+            <span className="feature-icon">&#127942;</span>
             <span className="feature-text">Leaderboards</span>
           </div>
         </div>
@@ -131,55 +183,131 @@ export default function Home() {
     );
   }
 
-  // Logged in user view
+  // ==========================================
+  // LOBBY PAGE (Authenticated) - LoL Style
+  // ==========================================
+
   return (
-    <div className="home-container">
-      <div className="home-content">
-        <h1 className="game-title">
-          BUCKSHOT<br />ROULETTE
-        </h1>
-        <p className="subtitle">Um jogo de vida ou morte</p>
-
-        <div className="menu-buttons">
-          <button
-            className="main-btn"
-            onClick={() => navigate('/singleplayer')}
-          >
-            JOGAR SOLO
-          </button>
-
-          <button
-            className="main-btn"
-            onClick={handleMultiplayerClick}
-          >
-            MULTIPLAYER
-          </button>
-
-          <button
-            className="main-btn secondary"
-            onClick={() => navigate('/leaderboard')}
-          >
-            RANKING
+    <div className="lobby-container">
+      {/* ===== HEADER ===== */}
+      <header className="lobby-header">
+        <div className="lobby-header__left">
+          <span className="lobby-header__logo">BANG SHOT</span>
+          <button className="lobby-header__play-btn" onClick={handleMultiplayerClick}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+              <path d="M8 5v14l11-7z" fill="currentColor"/>
+            </svg>
+            JOGAR
           </button>
         </div>
 
-        <div className="auth-section">
-          <div className="user-info">
-            <img
-              src={user?.avatarUrl || '/default-avatar.png'}
-              alt={user?.displayName}
-              className="user-avatar"
-              onClick={() => navigate('/profile')}
-              style={{ cursor: 'pointer' }}
-            />
-            <span className="user-name">{user?.displayName}</span>
-            <span className="user-rank">{user?.rank} • {user?.eloRating} ELO</span>
-            <button className="logout-btn" onClick={logout} title="Sair">
-              Sair
+        <nav className="lobby-header__nav">
+          <button className="lobby-nav-item" onClick={() => navigate('/profile')}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+              <circle cx="12" cy="7" r="4"/>
+            </svg>
+            <span>Perfil</span>
+          </button>
+          <button className="lobby-nav-item" onClick={() => navigate('/history')}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="12" r="10"/>
+              <polyline points="12 6 12 12 16 14"/>
+            </svg>
+            <span>Historico</span>
+          </button>
+          <button className="lobby-nav-item" onClick={() => navigate('/achievements')}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="12" cy="8" r="7"/>
+              <polyline points="8.21 13.89 7 23 12 20 17 23 15.79 13.88"/>
+            </svg>
+            <span>Conquistas</span>
+          </button>
+          <button className="lobby-nav-item" onClick={() => navigate('/leaderboard')}>
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="20" x2="18" y2="10"/>
+              <line x1="12" y1="20" x2="12" y2="4"/>
+              <line x1="6" y1="20" x2="6" y2="14"/>
+            </svg>
+            <span>Ranking</span>
+          </button>
+          {user?.isAdmin && (
+            <button className="lobby-nav-item lobby-nav-item--admin" onClick={() => navigate('/admin')}>
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+              </svg>
+              <span>Admin</span>
             </button>
+          )}
+        </nav>
+
+        <div className="lobby-header__right">
+          <div className="lobby-online-count">
+            <span className="online-dot" />
+            <span>{onlineCount} online</span>
+          </div>
+          <button
+            className="lobby-bug-btn"
+            onClick={() => setShowBugReport(true)}
+            title="Reportar Bug"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M8 2l1.88 1.88M14.12 3.88L16 2M9 7.13v-1a3 3 0 0 1 6 0v1"/>
+              <path d="M12 20c-3.3 0-6-2.7-6-6v-3a6 6 0 0 1 12 0v3c0 3.3-2.7 6-6 6z"/>
+              <path d="M12 20v2M6 13H2M22 13h-4M6 17l-2 2M18 17l2 2"/>
+            </svg>
+          </button>
+          <div className="lobby-header__user" onClick={() => navigate('/profile')}>
+            <div className="lobby-header__avatar-wrapper">
+              {user?.avatarUrl ? (
+                <img src={user.avatarUrl} alt={user.displayName} className="lobby-header__avatar" />
+              ) : (
+                <div className="lobby-header__avatar lobby-header__avatar--placeholder">
+                  {user?.displayName.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <div className="lobby-header__level-badge">
+                <LevelBadge totalXp={user?.totalXp || 0} size="sm" />
+              </div>
+            </div>
+            <div className="lobby-header__user-info">
+              <span className="lobby-header__username">{user?.displayName}</span>
+              <span className="lobby-header__rank" style={{ color: getRankColor(user?.rank || '') }}>
+                {user?.rank}
+              </span>
+            </div>
           </div>
         </div>
-      </div>
+      </header>
+
+      {/* ===== MAIN BODY ===== */}
+      <main className="lobby-body">
+        {/* Left Column - Active Rooms */}
+        <section className="lobby-body__left">
+          <ActiveRooms />
+        </section>
+
+        {/* Right Column - Leaderboard + Changelog */}
+        <section className="lobby-body__right">
+          <MiniLeaderboard />
+          <Changelog />
+        </section>
+      </main>
+
+      {/* ===== FOOTER ===== */}
+      <footer className="lobby-footer">
+        <span className="lobby-footer__version">Bang Shot v1.0</span>
+        <button className="lobby-footer__logout" onClick={logout}>
+          Sair
+        </button>
+      </footer>
+
+      {/* Bug Report Modal */}
+      <BugReportModal
+        isOpen={showBugReport}
+        onClose={() => setShowBugReport(false)}
+      />
     </div>
   );
 }

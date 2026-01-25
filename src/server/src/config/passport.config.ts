@@ -4,10 +4,8 @@
 
 import passport from 'passport';
 import { Strategy as GoogleStrategy, Profile } from 'passport-google-oauth20';
-import { PrismaClient } from '@prisma/client';
 import { env } from './env.config';
-
-const prisma = new PrismaClient();
+import prisma from '../lib/prisma';
 
 // ==========================================
 // GOOGLE STRATEGY
@@ -38,7 +36,7 @@ passport.use(
 
         // Find or create user
         let user = await prisma.user.findUnique({
-          where: { googleId: profile.id },
+          where: { google_id: profile.id },
         });
 
         if (!user) {
@@ -52,8 +50,8 @@ passport.use(
             user = await prisma.user.update({
               where: { email },
               data: {
-                googleId: profile.id,
-                avatarUrl: avatarUrl || existingUser.avatarUrl,
+                google_id: profile.id,
+                avatar_url: avatarUrl || existingUser.avatar_url,
               },
             });
           } else {
@@ -64,9 +62,9 @@ passport.use(
               data: {
                 email,
                 username,
-                displayName,
-                avatarUrl,
-                googleId: profile.id,
+                display_name: displayName,
+                avatar_url: avatarUrl,
+                google_id: profile.id,
               },
             });
           }
@@ -75,8 +73,8 @@ passport.use(
           user = await prisma.user.update({
             where: { id: user.id },
             data: {
-              lastLoginAt: new Date(),
-              avatarUrl: avatarUrl || user.avatarUrl,
+              last_login_at: new Date(),
+              avatar_url: avatarUrl || user.avatar_url,
             },
           });
         }

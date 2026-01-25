@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useRef, useCallback, ReactNode } from 'react';
 import { io, Socket } from 'socket.io-client';
 import type {
   ClientToServerEvents,
@@ -36,11 +36,30 @@ export function SocketProvider({ children }: SocketProviderProps) {
   const [socket, setSocket] = useState<TypedSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
 
-  const connect = () => {
-    if (socket?.connected) {
-      console.log('Já conectado ao servidor');
+  // Usar ref para evitar criacao duplicada de socket em React.StrictMode
+  const socketRef = useRef<TypedSocket | null>(null);
+  const connectingRef = useRef(false);
+
+  const connect = useCallback(() => {
+    // Evitar conexoes duplicadas
+    if (socketRef.current?.connected) {
+      console.log('Ja conectado ao servidor');
       return;
     }
+
+    // Evitar multiplas tentativas simultaneas de conexao
+    if (connectingRef.current) {
+      console.log('Conexao ja em andamento');
+      return;
+    }
+
+    // Desconectar socket anterior se existir
+    if (socketRef.current) {
+      socketRef.current.disconnect();
+      socketRef.current = null;
+    }
+
+    connectingRef.current = true;
 
     const serverUrl = import.meta.env.DEV
       ? 'http://localhost:3000'
@@ -59,40 +78,48 @@ export function SocketProvider({ children }: SocketProviderProps) {
       auth: authToken ? { token: authToken } : undefined,
     });
 
+    socketRef.current = newSocket;
+
     newSocket.on('connect', () => {
       console.log('Conectado ao servidor:', newSocket.id);
       setIsConnected(true);
+      connectingRef.current = false;
     });
 
     newSocket.on('disconnect', (reason) => {
       console.log('Desconectado do servidor:', reason);
       setIsConnected(false);
+      connectingRef.current = false;
     });
 
     newSocket.on('connect_error', (error) => {
-      console.error('Erro de conexão:', error.message);
+      console.error('Erro de conexao:', error.message);
       setIsConnected(false);
+      connectingRef.current = false;
     });
 
     setSocket(newSocket);
-  };
+  }, []);
 
-  const disconnect = () => {
-    if (socket) {
-      socket.disconnect();
+  const disconnect = useCallback(() => {
+    if (socketRef.current) {
+      socketRef.current.disconnect();
+      socketRef.current = null;
       setSocket(null);
       setIsConnected(false);
+      connectingRef.current = false;
     }
-  };
+  }, []);
 
   // Limpar ao desmontar
   useEffect(() => {
     return () => {
-      if (socket) {
-        socket.disconnect();
+      if (socketRef.current) {
+        socketRef.current.disconnect();
+        socketRef.current = null;
       }
     };
-  }, [socket]);
+  }, []);
 
   const value: SocketContextType = {
     socket,

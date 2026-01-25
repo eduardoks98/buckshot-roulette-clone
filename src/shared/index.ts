@@ -20,3 +20,4 @@ export {
 } from './utils/gameUtils';
 export * from './services/itemProcessor';
 export * from './utils/eloCalculator';
+export * from './utils/xpCalculator';

@@ -2,15 +2,19 @@
 // GAME PERSISTENCE SERVICE
 // ==========================================
 
-import { PrismaClient, GameStatus } from '@prisma/client';
+import { GameStatus } from '@prisma/client';
+import prisma from '../../lib/prisma';
 import { leaderboardService } from '../leaderboard.service';
 import {
   calculatePerformanceBasedElo,
   EloCalculationInput,
   getRankFromElo,
 } from '../../../../shared/utils/eloCalculator';
-
-const prisma = new PrismaClient();
+import {
+  calculateXpGain,
+  getLevelInfo,
+} from '../../../../shared/utils/xpCalculator';
+import { PlayerXpResult } from '../../../../shared/types/achievement.types';
 
 // ==========================================
 // TYPES
@@ -71,14 +75,14 @@ export class GamePersistenceService {
     try {
       const game = await prisma.game.create({
         data: {
-          roomCode: params.roomCode,
+          room_code: params.roomCode,
           status: GameStatus.WAITING,
-          hasPassword: params.hasPassword,
-          maxPlayers: params.maxPlayers || 4,
+          has_password: params.hasPassword,
+          max_players: params.maxPlayers || 4,
           participants: {
             create: {
-              userId: params.hostUserId || null,
-              guestName: params.hostUserId ? null : params.hostGuestName,
+              user_id: params.hostUserId || null,
+              guest_name: params.hostUserId ? null : params.hostGuestName,
             },
           },
         },
@@ -97,9 +101,9 @@ export class GamePersistenceService {
     try {
       const participant = await prisma.gameParticipant.create({
         data: {
-          gameId: params.gameId,
-          userId: params.userId || null,
-          guestName: params.userId ? null : params.guestName,
+          game_id: params.gameId,
+          user_id: params.userId || null,
+          guest_name: params.userId ? null : params.guestName,
         },
       });
 
@@ -115,7 +119,7 @@ export class GamePersistenceService {
   async getGameId(roomCode: string): Promise<string | null> {
     try {
       const game = await prisma.game.findUnique({
-        where: { roomCode },
+        where: { room_code: roomCode },
         select: { id: true },
       });
       return game?.id || null;
@@ -129,10 +133,10 @@ export class GamePersistenceService {
   async startGame(roomCode: string): Promise<void> {
     try {
       await prisma.game.update({
-        where: { roomCode },
+        where: { room_code: roomCode },
         data: {
           status: GameStatus.IN_PROGRESS,
-          startedAt: new Date(),
+          started_at: new Date(),
         },
       });
 
@@ -143,17 +147,18 @@ export class GamePersistenceService {
   }
 
   // End a game and update stats
-  async endGame(params: EndGameParams): Promise<void> {
+  async endGame(params: EndGameParams): Promise<{ gameId: string; xpResults: PlayerXpResult[] } | null> {
     const { roomCode, winnerUserId, playerStats } = params;
+    const xpResults: PlayerXpResult[] = [];
 
     try {
       // Update game status
       const game = await prisma.game.update({
-        where: { roomCode },
+        where: { room_code: roomCode },
         data: {
           status: GameStatus.COMPLETED,
-          winnerId: winnerUserId,
-          endedAt: new Date(),
+          winner_id: winnerUserId,
+          ended_at: new Date(),
         },
         include: {
           participants: {
@@ -161,7 +166,7 @@ export class GamePersistenceService {
               user: {
                 select: {
                   id: true,
-                  eloRating: true,
+                  elo_rating: true,
                 },
               },
             },
@@ -171,7 +176,7 @@ export class GamePersistenceService {
 
       // Coletar ELOs de todos os jogadores para cálculo
       const playersElos: number[] = game.participants.map(p =>
-        p.user?.eloRating || 1000
+        p.user?.elo_rating || 1000
       );
       const totalPlayers = game.participants.length;
 
@@ -180,19 +185,19 @@ export class GamePersistenceService {
         totalPlayers,
         totalKills: playerStats.reduce((sum, p) => sum + p.kills, 0),
         totalDamage: playerStats.reduce((sum, p) => sum + p.damageDealt, 0),
-        totalRounds: game.currentRound,
+        totalRounds: game.current_round,
       };
 
       // Update each participant with their stats
       for (const stats of playerStats) {
         // Find participant by odUserId
         const participant = game.participants.find(
-          p => stats.odUserId && p.userId === stats.odUserId
+          p => stats.odUserId && p.user_id === stats.odUserId
         );
 
-        if (participant && participant.userId) {
-          const isWinner = participant.userId === winnerUserId;
-          const playerElo = participant.user?.eloRating || 1000;
+        if (participant && participant.user_id) {
+          const isWinner = participant.user_id === winnerUserId;
+          const playerElo = participant.user?.elo_rating || 1000;
 
           // Preparar input para cálculo de ELO com performance
           const eloInput: EloCalculationInput = {
@@ -207,7 +212,7 @@ export class GamePersistenceService {
               kills: stats.kills,
               deaths: stats.deaths,
               roundsWon: stats.roundsWon,
-              totalRounds: game.currentRound,
+              totalRounds: game.current_round,
               itemsUsed: stats.itemsUsed,
               shotsFired: stats.shotsFired,
             },
@@ -218,20 +223,45 @@ export class GamePersistenceService {
           const eloResult = calculatePerformanceBasedElo(eloInput);
           const eloChange = eloResult.totalChange;
 
-          // Update participant stats with eloChange
+          // Calculate XP
+          const currentUser = await prisma.user.findUnique({
+            where: { id: participant.user_id },
+            select: { total_xp: true },
+          });
+          const currentTotalXp = currentUser?.total_xp || 0;
+          const previousLevelInfo = getLevelInfo(currentTotalXp);
+
+          const xpResult = calculateXpGain({
+            position: stats.position,
+            totalPlayers,
+            kills: stats.kills,
+            roundsWon: stats.roundsWon,
+            totalRounds: game.current_round,
+            damageDealt: stats.damageDealt,
+            itemsUsed: stats.itemsUsed,
+            selfDamage: stats.selfDamage,
+            deaths: stats.deaths,
+            prestigeLevel: previousLevelInfo.prestigeLevel,
+          });
+
+          const newTotalXp = currentTotalXp + xpResult.totalXp;
+          const newLevelInfo = getLevelInfo(newTotalXp);
+
+          // Update participant stats with eloChange + xpEarned
           await prisma.gameParticipant.update({
             where: { id: participant.id },
             data: {
               position: stats.position,
-              roundsWon: stats.roundsWon,
+              rounds_won: stats.roundsWon,
               kills: stats.kills,
               deaths: stats.deaths,
-              itemsUsed: stats.itemsUsed,
-              damageDealt: stats.damageDealt,
-              damageTaken: stats.damageTaken,
-              selfDamage: stats.selfDamage,
-              shotsFired: stats.shotsFired,
-              eloChange: eloChange,
+              items_used: stats.itemsUsed,
+              damage_dealt: stats.damageDealt,
+              damage_taken: stats.damageTaken,
+              self_damage: stats.selfDamage,
+              shots_fired: stats.shotsFired,
+              elo_change: eloChange,
+              xp_earned: xpResult.totalXp,
             },
           });
 
@@ -239,36 +269,53 @@ export class GamePersistenceService {
           const newElo = playerElo + eloChange;
           const newRank = getRankFromElo(newElo);
 
-          // Atualizar User com ELO, rank e stats
+          // Atualizar User com ELO, rank, stats e XP
           await prisma.user.update({
-            where: { id: participant.userId },
+            where: { id: participant.user_id },
             data: {
-              gamesPlayed: { increment: 1 },
-              gamesWon: isWinner ? { increment: 1 } : undefined,
-              roundsPlayed: { increment: game.currentRound },
-              roundsWon: { increment: stats.roundsWon },
-              totalKills: { increment: stats.kills },
-              totalDeaths: { increment: stats.deaths },
-              eloRating: newElo,
+              games_played: { increment: 1 },
+              games_won: isWinner ? { increment: 1 } : undefined,
+              rounds_played: { increment: game.current_round },
+              rounds_won: { increment: stats.roundsWon },
+              total_kills: { increment: stats.kills },
+              total_deaths: { increment: stats.deaths },
+              elo_rating: newElo,
               rank: newRank,
+              total_xp: { increment: xpResult.totalXp },
             },
           });
 
           // Atualizar leaderboard com ELO real
-          await leaderboardService.updatePlayerStats(participant.userId, {
-            gamesPlayed: 1,
-            gamesWon: isWinner ? 1 : 0,
-            eloChange: eloChange,
+          await leaderboardService.updatePlayerStats(participant.user_id, {
+            games_played: 1,
+            games_won: isWinner ? 1 : 0,
+            elo_change: eloChange,
           });
 
-          // Log detalhado do cálculo de ELO
-          console.log(`[ELO] ${participant.userId}: ${playerElo} -> ${playerElo + eloChange} (base: ${eloResult.baseChange}, perf: ${eloResult.performanceModifier >= 0 ? '+' : ''}${eloResult.performanceModifier}, score: ${(eloResult.performanceScore * 100).toFixed(0)}%)`);
+          // Store XP result for returning to handler
+          xpResults.push({
+            odId: stats.odId,
+            odUserId: participant.user_id,
+            xpEarned: xpResult.totalXp,
+            newTotalXp: newTotalXp,
+            previousLevel: previousLevelInfo.displayLevel,
+            newLevel: newLevelInfo.displayLevel,
+            previousPrestige: previousLevelInfo.prestigeLevel,
+            newPrestige: newLevelInfo.prestigeLevel,
+            breakdown: xpResult.breakdown,
+          });
+
+          // Log detalhado do cálculo de ELO e XP
+          console.log(`[ELO] ${participant.user_id}: ${playerElo} -> ${playerElo + eloChange} (base: ${eloResult.baseChange}, perf: ${eloResult.performanceModifier >= 0 ? '+' : ''}${eloResult.performanceModifier}, score: ${(eloResult.performanceScore * 100).toFixed(0)}%)`);
+          console.log(`[XP] ${participant.user_id}: +${xpResult.totalXp} XP (total: ${newTotalXp}, lvl ${newLevelInfo.displayLevel} P${newLevelInfo.prestigeLevel})`);
         }
       }
 
       console.log(`[DB] Jogo finalizado com stats: ${roomCode}`);
+      return { gameId: game.id, xpResults };
     } catch (error) {
       console.error('[DB] Erro ao finalizar jogo:', error);
+      return null;
     }
   }
 
@@ -278,7 +325,7 @@ export class GamePersistenceService {
 
     try {
       const game = await prisma.game.findUnique({
-        where: { roomCode },
+        where: { room_code: roomCode },
       });
 
       if (!game) {
@@ -288,20 +335,20 @@ export class GamePersistenceService {
 
       await prisma.round.create({
         data: {
-          gameId: game.id,
-          roundNumber,
-          maxHp,
-          shellsLive,
-          shellsBlank,
-          winnerId, // Socket ID do vencedor
+          game_id: game.id,
+          round_number: roundNumber,
+          max_hp: maxHp,
+          shells_live: shellsLive,
+          shells_blank: shellsBlank,
+          winner_id: winnerId, // Socket ID do vencedor
         },
       });
 
       // Update game currentRound
       await prisma.game.update({
-        where: { roomCode },
+        where: { room_code: roomCode },
         data: {
-          currentRound: roundNumber,
+          current_round: roundNumber,
         },
       });
 
@@ -315,19 +362,19 @@ export class GamePersistenceService {
   async endRound(roomCode: string, roundNumber: number, winnerId: string): Promise<void> {
     try {
       const game = await prisma.game.findUnique({
-        where: { roomCode },
+        where: { room_code: roomCode },
       });
 
       if (!game) return;
 
       await prisma.round.updateMany({
         where: {
-          gameId: game.id,
-          roundNumber,
+          game_id: game.id,
+          round_number: roundNumber,
         },
         data: {
-          winnerId,
-          endedAt: new Date(),
+          winner_id: winnerId,
+          ended_at: new Date(),
         },
       });
 
@@ -341,16 +388,16 @@ export class GamePersistenceService {
   async getGameByRoomCode(roomCode: string) {
     try {
       return await prisma.game.findUnique({
-        where: { roomCode },
+        where: { room_code: roomCode },
         include: {
           participants: {
             include: {
               user: {
                 select: {
                   id: true,
-                  displayName: true,
-                  avatarUrl: true,
-                  eloRating: true,
+                  display_name: true,
+                  avatar_url: true,
+                  elo_rating: true,
                   rank: true,
                 },
               },
@@ -370,15 +417,15 @@ export class GamePersistenceService {
       if (odUserId) {
         await prisma.gameParticipant.deleteMany({
           where: {
-            gameId,
-            userId: odUserId,
+            game_id: gameId,
+            user_id: odUserId,
           },
         });
       } else if (guestName) {
         await prisma.gameParticipant.deleteMany({
           where: {
-            gameId,
-            guestName,
+            game_id: gameId,
+            guest_name: guestName,
           },
         });
       }
@@ -393,7 +440,7 @@ export class GamePersistenceService {
   async deleteGame(roomCode: string): Promise<void> {
     try {
       await prisma.game.delete({
-        where: { roomCode },
+        where: { room_code: roomCode },
       });
 
       console.log(`[DB] Jogo deletado: ${roomCode}`);
@@ -406,10 +453,10 @@ export class GamePersistenceService {
   async abandonGame(roomCode: string): Promise<void> {
     try {
       await prisma.game.update({
-        where: { roomCode },
+        where: { room_code: roomCode },
         data: {
           status: GameStatus.ABANDONED,
-          endedAt: new Date(),
+          ended_at: new Date(),
         },
       });
 

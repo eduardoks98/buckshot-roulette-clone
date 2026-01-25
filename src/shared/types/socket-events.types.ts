@@ -5,6 +5,7 @@
 import { PlayerPublicState } from './player.types';
 import { Item, ItemId, ItemUseResult } from './item.types';
 import { ShellInfo, ShellType, TurnDirection } from './game.types';
+import { PlayerXpResult, AchievementUnlocked, MatchBadgeAwarded } from './achievement.types';
 
 // ==========================================
 // CLIENT -> SERVER EVENTS
@@ -25,6 +26,9 @@ export interface ClientToServerEvents {
 
   // Reconnection
   reconnectToGame: (data: ReconnectPayload) => void;
+
+  // Online count
+  requestOnlineCount: () => void;
 }
 
 export interface CreateRoomPayload {
@@ -96,6 +100,12 @@ export interface ServerToClientEvents {
   reconnected: (data: ReconnectedPayload) => void;
   reconnectError: (data: ReconnectErrorPayload) => void;
   reconnectCredentials: (data: ReconnectCredentialsPayload) => void;
+
+  // Achievement events
+  achievementsUnlocked: (data: AchievementUnlocked[]) => void;
+
+  // Online count
+  onlineCount: (data: { total: number; inQueue: number }) => void;
 }
 
 // ==========================================
@@ -173,7 +183,7 @@ export interface ItemUsedPayload extends ItemUseResult {
 
 export interface TurnChangedPayload {
   currentPlayer: string;
-  reason: 'shot' | 'timeout' | 'playerDisconnected' | 'handcuffs' | 'reconnected';
+  reason: 'shot' | 'timeout' | 'playerDisconnected' | 'handcuffs' | 'reconnected' | 'elimination';
   players: PlayerPublicState[];
 }
 
@@ -228,6 +238,8 @@ export interface GameOverPayload {
   reason: string;
   stats?: PlayerGameStats[];
   awards?: GameAward[];
+  xpResults?: PlayerXpResult[];
+  badges?: MatchBadgeAwarded[];
 }
 
 export interface PlayerItemsPayload {

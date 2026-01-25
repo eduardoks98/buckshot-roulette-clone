@@ -2,9 +2,8 @@
 // LEADERBOARD SERVICE
 // ==========================================
 
-import { PrismaClient, LeaderboardPeriod } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { LeaderboardPeriod } from '@prisma/client';
+import prisma from '../lib/prisma';
 
 // ==========================================
 // TYPES
@@ -12,15 +11,17 @@ const prisma = new PrismaClient();
 
 interface LeaderboardEntry {
   rank: number;
-  userId: string;
+  user_id: string;
   username: string;
-  displayName: string;
-  avatarUrl: string | null;
-  gamesPlayed: number;
-  gamesWon: number;
-  winRate: number;
-  eloRating: number;
-  eloGain?: number;
+  display_name: string;
+  avatar_url: string | null;
+  games_played: number;
+  games_won: number;
+  win_rate: number;
+  elo_rating: number;
+  elo_gain?: number;
+  total_xp: number;
+  active_title_id: string | null;
 }
 
 // ==========================================
@@ -69,24 +70,26 @@ export class LeaderboardService {
   private async getAllTimeLeaderboard(limit: number): Promise<LeaderboardEntry[]> {
     const users = await prisma.user.findMany({
       where: {
-        gamesPlayed: { gt: 0 },
+        games_played: { gt: 0 },
       },
       orderBy: {
-        eloRating: 'desc',
+        elo_rating: 'desc',
       },
       take: limit,
     });
 
     return users.map((user, index) => ({
       rank: index + 1,
-      userId: user.id,
+      user_id: user.id,
       username: user.username,
-      displayName: user.displayName,
-      avatarUrl: user.avatarUrl,
-      gamesPlayed: user.gamesPlayed,
-      gamesWon: user.gamesWon,
-      winRate: user.gamesPlayed > 0 ? (user.gamesWon / user.gamesPlayed) * 100 : 0,
-      eloRating: user.eloRating,
+      display_name: user.display_name,
+      avatar_url: user.avatar_url,
+      games_played: user.games_played,
+      games_won: user.games_won,
+      win_rate: user.games_played > 0 ? (user.games_won / user.games_played) * 100 : 0,
+      elo_rating: user.elo_rating,
+      total_xp: user.total_xp,
+      active_title_id: user.active_title_id,
     }));
   }
 
@@ -95,12 +98,12 @@ export class LeaderboardService {
       where: { id: userId },
     });
 
-    if (!user || user.gamesPlayed === 0) return null;
+    if (!user || user.games_played === 0) return null;
 
     const higherRanked = await prisma.user.count({
       where: {
-        gamesPlayed: { gt: 0 },
-        eloRating: { gt: user.eloRating },
+        games_played: { gt: 0 },
+        elo_rating: { gt: user.elo_rating },
       },
     });
 
@@ -119,11 +122,11 @@ export class LeaderboardService {
     const entries = await prisma.leaderboardEntry.findMany({
       where: {
         period,
-        periodStart: periodDates.start,
-        periodEnd: periodDates.end,
+        period_start: periodDates.start,
+        period_end: periodDates.end,
       },
       orderBy: {
-        eloGain: 'desc',
+        elo_gain: 'desc',
       },
       take: limit,
       include: {
@@ -133,15 +136,17 @@ export class LeaderboardService {
 
     return entries.map((entry, index) => ({
       rank: index + 1,
-      userId: entry.userId,
+      user_id: entry.user_id,
       username: entry.user.username,
-      displayName: entry.user.displayName,
-      avatarUrl: entry.user.avatarUrl,
-      gamesPlayed: entry.gamesPlayed,
-      gamesWon: entry.gamesWon,
-      winRate: entry.winRate,
-      eloRating: entry.user.eloRating,
-      eloGain: entry.eloGain,
+      display_name: entry.user.display_name,
+      avatar_url: entry.user.avatar_url,
+      games_played: entry.games_played,
+      games_won: entry.games_won,
+      win_rate: entry.win_rate,
+      elo_rating: entry.user.elo_rating,
+      elo_gain: entry.elo_gain,
+      total_xp: entry.user.total_xp,
+      active_title_id: entry.user.active_title_id,
     }));
   }
 
@@ -152,9 +157,9 @@ export class LeaderboardService {
   ): Promise<number | null> {
     const entry = await prisma.leaderboardEntry.findFirst({
       where: {
-        userId,
+        user_id: userId,
         period,
-        periodStart: periodDates.start,
+        period_start: periodDates.start,
       },
     });
 
@@ -163,8 +168,8 @@ export class LeaderboardService {
     const higherRanked = await prisma.leaderboardEntry.count({
       where: {
         period,
-        periodStart: periodDates.start,
-        eloGain: { gt: entry.eloGain },
+        period_start: periodDates.start,
+        elo_gain: { gt: entry.elo_gain },
       },
     });
 
@@ -178,9 +183,9 @@ export class LeaderboardService {
   async updatePlayerStats(
     userId: string,
     stats: {
-      gamesPlayed: number;
-      gamesWon: number;
-      eloChange: number;
+      games_played: number;
+      games_won: number;
+      elo_change: number;
     }
   ): Promise<void> {
     const periods: LeaderboardPeriod[] = ['DAILY', 'WEEKLY', 'MONTHLY'];
@@ -193,9 +198,9 @@ export class LeaderboardService {
       // Find or create entry
       const existing = await prisma.leaderboardEntry.findFirst({
         where: {
-          userId,
+          user_id: userId,
           period,
-          periodStart: dates.start,
+          period_start: dates.start,
         },
       });
 
@@ -203,38 +208,38 @@ export class LeaderboardService {
       if (!user) continue;
 
       if (existing) {
-        const newGamesPlayed = existing.gamesPlayed + stats.gamesPlayed;
-        const newGamesWon = existing.gamesWon + stats.gamesWon;
+        const newGamesPlayed = existing.games_played + stats.games_played;
+        const newGamesWon = existing.games_won + stats.games_won;
         const newWinRate = newGamesPlayed > 0 ? (newGamesWon / newGamesPlayed) * 100 : 0;
-        const newEloGain = existing.eloGain + stats.eloChange;
-        const newPeakElo = Math.max(existing.peakElo, user.eloRating);
+        const newEloGain = existing.elo_gain + stats.elo_change;
+        const newPeakElo = Math.max(existing.peak_elo, user.elo_rating);
 
         await prisma.leaderboardEntry.update({
           where: { id: existing.id },
           data: {
-            gamesPlayed: newGamesPlayed,
-            gamesWon: newGamesWon,
-            winRate: newWinRate,
-            eloGain: newEloGain,
-            peakElo: newPeakElo,
+            games_played: newGamesPlayed,
+            games_won: newGamesWon,
+            win_rate: newWinRate,
+            elo_gain: newEloGain,
+            peak_elo: newPeakElo,
           },
         });
       } else {
-        const winRate = stats.gamesPlayed > 0
-          ? (stats.gamesWon / stats.gamesPlayed) * 100
+        const winRate = stats.games_played > 0
+          ? (stats.games_won / stats.games_played) * 100
           : 0;
 
         await prisma.leaderboardEntry.create({
           data: {
-            userId,
+            user_id: userId,
             period,
-            periodStart: dates.start,
-            periodEnd: dates.end,
-            gamesPlayed: stats.gamesPlayed,
-            gamesWon: stats.gamesWon,
-            winRate,
-            eloGain: stats.eloChange,
-            peakElo: user.eloRating,
+            period_start: dates.start,
+            period_end: dates.end,
+            games_played: stats.games_played,
+            games_won: stats.games_won,
+            win_rate: winRate,
+            elo_gain: stats.elo_change,
+            peak_elo: user.elo_rating,
           },
         });
       }

@@ -29,8 +29,8 @@ export const GAME_RULES = {
   ITEMS: {
     MAX_PER_PLAYER: 8, // Máximo de itens no inventário (regra oficial: 8 slots)
     PER_RELOAD: {
-      MIN: 1,
-      MAX: 5,
+      MIN: 2,
+      MAX: 4,
     },
   },
 

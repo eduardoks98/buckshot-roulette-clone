@@ -2,24 +2,36 @@
    HISTORY STYLES
    ========================================== */
 
-.history-container {
-  min-height: 100vh;
-  padding: 2rem;
-  max-width: 600px;
-  margin: 0 auto;
+/* History content wrapper (inside PageLayout) */
+.history-content {
+  width: 100%;
+  max-width: 900px;
 }
 
-.history-container .back-btn {
+/* Login page container (without PageLayout) */
+.history-container--login {
+  min-height: 100vh;
+  padding: 2rem;
+  max-width: 500px;
+  margin: 0 auto;
+  background: linear-gradient(180deg, #0a0a0a 0%, #121212 50%, #0a0a0a 100%);
+}
+
+.history-container--login .back-btn {
   position: absolute;
   top: 1rem;
   left: 1rem;
 }
 
-.history-container .page-title {
+.page-title {
   text-align: center;
   font-size: 2.5rem;
-  margin-top: 2rem;
+  margin-top: 0;
   margin-bottom: 1.5rem;
+  background: linear-gradient(135deg, var(--gold-accent) 0%, #fff 50%, var(--gold-accent) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 /* Loading & Error */
@@ -238,6 +250,15 @@
   color: #ef4444;
 }
 
+.xp-change {
+  font-size: 0.85rem;
+  font-weight: bold;
+  color: #d4a418;
+  padding: 0.25rem 0.5rem;
+  background: rgba(212, 164, 24, 0.1);
+  border-radius: 6px;
+}
+
 .game-stats {
   display: flex;
   gap: 1rem;
@@ -344,7 +365,7 @@
 
 /* Responsive */
 @media (max-width: 480px) {
-  .history-container {
+  .history-container--login {
     padding: 1rem;
   }
 

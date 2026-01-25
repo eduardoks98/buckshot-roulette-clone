@@ -5,6 +5,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { PageLayout } from '../../components/layout/PageLayout';
+import { LoadingState } from '../../components/common/LoadingState';
+import { EmptyState } from '../../components/common/EmptyState';
+import { formatDate } from '../../utils/helpers';
 import './History.css';
 
 // ==========================================
@@ -28,6 +32,7 @@ interface GameHistoryEntry {
   shotsFired: number;
   itemsUsed: number;
   eloChange: number | null;
+  xpEarned: number | null;
   opponents: {
     displayName: string;
     position: number | null;
@@ -127,18 +132,6 @@ export default function History() {
     fetchStats();
   }, [token]);
 
-  // Format date
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('pt-BR', {
-      day: '2-digit',
-      month: '2-digit',
-      year: '2-digit',
-      hour: '2-digit',
-      minute: '2-digit',
-    });
-  };
-
   // Get position badge
   const getPositionBadge = (position: number | null, totalPlayers: number) => {
     if (position === null) return '?';
@@ -157,16 +150,16 @@ export default function History() {
   // Loading state
   if (authLoading) {
     return (
-      <div className="history-container">
-        <div className="loading-message">Carregando...</div>
-      </div>
+      <PageLayout>
+        <LoadingState message="Carregando..." />
+      </PageLayout>
     );
   }
 
   // Not logged in
   if (!user) {
     return (
-      <div className="history-container">
+      <div className="history-container--login">
         <button className="back-btn" onClick={() => navigate('/')}>
           Voltar
         </button>
@@ -182,148 +175,150 @@ export default function History() {
   }
 
   return (
-    <div className="history-container">
-      <button className="back-btn" onClick={() => navigate('/')}>
-        Voltar
-      </button>
+    <PageLayout>
+      <div className="history-content">
+        <h1 className="page-title">HISTORICO</h1>
 
-      <h1 className="page-title">HISTORICO</h1>
-
-      {/* Stats Summary */}
-      {stats && (
-        <div className="stats-summary">
-          <div className="form-display">
-            <span className="form-label">Forma Recente:</span>
-            <div className="form-icons">
-              {stats.recentForm.slice(0, 10).map((result, i) => (
-                <span key={i} className={`form-icon ${result === 'W' ? 'win' : 'loss'}`}>
-                  {result}
-                </span>
-              ))}
-            </div>
-          </div>
-          <div className="stats-row">
-            <div className="mini-stat">
-              <span className="mini-value">{stats.currentStreak}</span>
-              <span className="mini-label">Streak Atual</span>
-            </div>
-            <div className="mini-stat">
-              <span className="mini-value">{stats.bestStreak}</span>
-              <span className="mini-label">Melhor Streak</span>
-            </div>
-            <div className="mini-stat">
-              <span className="mini-value">{stats.averageKills.toFixed(1)}</span>
-              <span className="mini-label">Media Kills</span>
-            </div>
-            <div className="mini-stat">
-              <span className="mini-value">{stats.averageDamageDealt.toFixed(0)}</span>
-              <span className="mini-label">Media Dano</span>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Error State */}
-      {error && (
-        <div className="error-message">
-          {error}
-        </div>
-      )}
-
-      {/* Loading State */}
-      {loading && (
-        <div className="loading-message">Carregando partidas...</div>
-      )}
-
-      {/* Empty State */}
-      {!loading && games.length === 0 && (
-        <div className="empty-state">
-          <div className="empty-icon">🎮</div>
-          <p>Nenhuma partida encontrada</p>
-          <button className="action-btn primary" onClick={() => navigate('/multiplayer')}>
-            Jogar Agora
-          </button>
-        </div>
-      )}
-
-      {/* Games List */}
-      {!loading && games.length > 0 && (
-        <div className="games-list">
-          {games.map(game => {
-            const totalPlayers = game.opponents.length + 1;
-            const isWin = game.position === 1;
-
-            return (
-              <div key={game.id} className={`game-card ${isWin ? 'win' : 'loss'}`}>
-                <div className="game-header">
-                  <div className={`position-badge ${getPositionClass(game.position, totalPlayers)}`}>
-                    {getPositionBadge(game.position, totalPlayers)}
-                  </div>
-                  <div className="game-info">
-                    <span className="game-date">{formatDate(game.createdAt)}</span>
-                    <span className="game-players">{totalPlayers} jogadores</span>
-                  </div>
-                  {game.eloChange !== null && (
-                    <div className={`elo-change ${game.eloChange >= 0 ? 'positive' : 'negative'}`}>
-                      {game.eloChange >= 0 ? '+' : ''}{game.eloChange}
-                    </div>
-                  )}
-                </div>
-
-                <div className="game-stats">
-                  <div className="stat">
-                    <span className="stat-icon">💀</span>
-                    <span className="stat-num">{game.kills}</span>
-                  </div>
-                  <div className="stat">
-                    <span className="stat-icon">💥</span>
-                    <span className="stat-num">{game.damageDealt}</span>
-                  </div>
-                  <div className="stat">
-                    <span className="stat-icon">🏆</span>
-                    <span className="stat-num">{game.roundsWon}</span>
-                  </div>
-                  <div className="stat">
-                    <span className="stat-icon">🎯</span>
-                    <span className="stat-num">{game.shotsFired}</span>
-                  </div>
-                </div>
-
-                <div className="game-opponents">
-                  <span className="opponents-label">vs</span>
-                  {game.opponents.slice(0, 3).map((opp, i) => (
-                    <span key={i} className="opponent-name">{opp.displayName}</span>
-                  ))}
-                  {game.opponents.length > 3 && (
-                    <span className="more-opponents">+{game.opponents.length - 3}</span>
-                  )}
-                </div>
+        {/* Stats Summary */}
+        {stats && (
+          <div className="stats-summary">
+            <div className="form-display">
+              <span className="form-label">Forma Recente:</span>
+              <div className="form-icons">
+                {stats.recentForm.slice(0, 10).map((result, i) => (
+                  <span key={i} className={`form-icon ${result === 'W' ? 'win' : 'loss'}`}>
+                    {result}
+                  </span>
+                ))}
               </div>
-            );
-          })}
-        </div>
-      )}
+            </div>
+            <div className="stats-row">
+              <div className="mini-stat">
+                <span className="mini-value">{stats.currentStreak}</span>
+                <span className="mini-label">Streak Atual</span>
+              </div>
+              <div className="mini-stat">
+                <span className="mini-value">{stats.bestStreak}</span>
+                <span className="mini-label">Melhor Streak</span>
+              </div>
+              <div className="mini-stat">
+                <span className="mini-value">{stats.averageKills.toFixed(1)}</span>
+                <span className="mini-label">Media Kills</span>
+              </div>
+              <div className="mini-stat">
+                <span className="mini-value">{stats.averageDamageDealt.toFixed(0)}</span>
+                <span className="mini-label">Media Dano</span>
+              </div>
+            </div>
+          </div>
+        )}
 
-      {/* Pagination */}
-      {totalPages > 1 && (
-        <div className="pagination">
-          <button
-            className="page-btn"
-            onClick={() => setPage(p => Math.max(1, p - 1))}
-            disabled={page === 1}
-          >
-            Anterior
-          </button>
-          <span className="page-info">{page} / {totalPages}</span>
-          <button
-            className="page-btn"
-            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
-            disabled={page === totalPages}
-          >
-            Proxima
-          </button>
-        </div>
-      )}
-    </div>
+        {/* Error State */}
+        {error && (
+          <div className="error-message">
+            {error}
+          </div>
+        )}
+
+        {/* Loading State */}
+        {loading && (
+          <LoadingState message="Carregando partidas..." />
+        )}
+
+        {/* Empty State */}
+        {!loading && games.length === 0 && (
+          <EmptyState
+            icon="🎮"
+            title="Nenhuma partida encontrada"
+            description="Jogue sua primeira partida para ver o historico"
+            action={{ label: 'Jogar Agora', onClick: () => navigate('/multiplayer') }}
+          />
+        )}
+
+        {/* Games List */}
+        {!loading && games.length > 0 && (
+          <div className="games-list">
+            {games.map(game => {
+              const totalPlayers = game.opponents.length + 1;
+              const isWin = game.position === 1;
+
+              return (
+                <div key={game.id} className={`game-card ${isWin ? 'win' : 'loss'}`}>
+                  <div className="game-header">
+                    <div className={`position-badge ${getPositionClass(game.position, totalPlayers)}`}>
+                      {getPositionBadge(game.position, totalPlayers)}
+                    </div>
+                    <div className="game-info">
+                      <span className="game-date">{formatDate(game.createdAt)}</span>
+                      <span className="game-players">{totalPlayers} jogadores</span>
+                    </div>
+                    {game.eloChange !== null && (
+                      <div className={`elo-change ${game.eloChange >= 0 ? 'positive' : 'negative'}`}>
+                        {game.eloChange >= 0 ? '+' : ''}{game.eloChange}
+                      </div>
+                    )}
+                    {game.xpEarned !== null && game.xpEarned > 0 && (
+                      <div className="xp-change">
+                        +{game.xpEarned} XP
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="game-stats">
+                    <div className="stat">
+                      <span className="stat-icon">💀</span>
+                      <span className="stat-num">{game.kills}</span>
+                    </div>
+                    <div className="stat">
+                      <span className="stat-icon">💥</span>
+                      <span className="stat-num">{game.damageDealt}</span>
+                    </div>
+                    <div className="stat">
+                      <span className="stat-icon">🏆</span>
+                      <span className="stat-num">{game.roundsWon}</span>
+                    </div>
+                    <div className="stat">
+                      <span className="stat-icon">🎯</span>
+                      <span className="stat-num">{game.shotsFired}</span>
+                    </div>
+                  </div>
+
+                  <div className="game-opponents">
+                    <span className="opponents-label">vs</span>
+                    {game.opponents.slice(0, 3).map((opp, i) => (
+                      <span key={i} className="opponent-name">{opp.displayName}</span>
+                    ))}
+                    {game.opponents.length > 3 && (
+                      <span className="more-opponents">+{game.opponents.length - 3}</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Pagination */}
+        {totalPages > 1 && (
+          <div className="pagination">
+            <button
+              className="page-btn"
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1}
+            >
+              Anterior
+            </button>
+            <span className="page-info">{page} / {totalPages}</span>
+            <button
+              className="page-btn"
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages}
+            >
+              Proxima
+            </button>
+          </div>
+        )}
+      </div>
+    </PageLayout>
   );
 }

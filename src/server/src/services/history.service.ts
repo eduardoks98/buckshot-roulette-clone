@@ -3,9 +3,8 @@
 // Serviço para buscar histórico de partidas
 // ==========================================
 
-import { PrismaClient, GameStatus } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { GameStatus } from '@prisma/client';
+import prisma from '../lib/prisma';
 
 // ==========================================
 // TYPES
@@ -13,64 +12,66 @@ const prisma = new PrismaClient();
 
 export interface GameHistoryEntry {
   id: string;
-  roomCode: string;
+  room_code: string;
   status: GameStatus;
-  createdAt: Date;
-  endedAt: Date | null;
-  totalRounds: number;
+  created_at: Date;
+  ended_at: Date | null;
+  total_rounds: number;
 
   // Resultado do usuário
   position: number | null;
-  roundsWon: number;
+  rounds_won: number;
   kills: number;
   deaths: number;
-  damageDealt: number;
-  damageTaken: number;
-  selfDamage: number;
-  shotsFired: number;
-  itemsUsed: number;
-  eloChange: number | null;
+  damage_dealt: number;
+  damage_taken: number;
+  self_damage: number;
+  shots_fired: number;
+  items_used: number;
+  elo_change: number | null;
+  xp_earned: number | null;
 
   // Oponentes
   opponents: {
-    displayName: string;
+    display_name: string;
     position: number | null;
-    eloRating: number;
+    elo_rating: number;
   }[];
 
   // Vencedor
   winner: {
     id: string;
-    displayName: string;
+    display_name: string;
   } | null;
 }
 
 export interface GameDetailedHistory extends GameHistoryEntry {
   rounds: {
-    roundNumber: number;
-    winnerId: string | null;
-    maxHp: number;
-    shellsLive: number;
-    shellsBlank: number;
-    startedAt: Date;
-    endedAt: Date | null;
+    round_number: number;
+    winner_id: string | null;
+    max_hp: number;
+    shells_live: number;
+    shells_blank: number;
+    started_at: Date;
+    ended_at: Date | null;
   }[];
 
   // Stats completas de todos os participantes
   participants: {
-    odUserId: string | null;
-    displayName: string;
+    user_id: string | null;
+    display_name: string;
     position: number | null;
-    roundsWon: number;
+    rounds_won: number;
     kills: number;
     deaths: number;
-    damageDealt: number;
-    damageTaken: number;
-    selfDamage: number;
-    shotsFired: number;
-    itemsUsed: number;
-    eloChange: number | null;
-    eloRating: number | null;
+    damage_dealt: number;
+    damage_taken: number;
+    self_damage: number;
+    shots_fired: number;
+    items_used: number;
+    elo_change: number | null;
+    xp_earned: number | null;
+    elo_rating: number | null;
   }[];
 }
 
@@ -110,7 +111,7 @@ class HistoryService {
       // Buscar total de partidas do usuário
       const total = await prisma.gameParticipant.count({
         where: {
-          userId,
+          user_id: userId,
           game: {
             status: {
               in: [GameStatus.COMPLETED, GameStatus.ABANDONED],
@@ -122,7 +123,7 @@ class HistoryService {
       // Buscar partidas com paginação
       const participations = await prisma.gameParticipant.findMany({
         where: {
-          userId,
+          user_id: userId,
           game: {
             status: {
               in: [GameStatus.COMPLETED, GameStatus.ABANDONED],
@@ -137,8 +138,8 @@ class HistoryService {
                   user: {
                     select: {
                       id: true,
-                      displayName: true,
-                      eloRating: true,
+                      display_name: true,
+                      elo_rating: true,
                     },
                   },
                 },
@@ -148,7 +149,7 @@ class HistoryService {
         },
         orderBy: {
           game: {
-            endedAt: 'desc',
+            ended_at: 'desc',
           },
         },
         skip,
@@ -161,11 +162,11 @@ class HistoryService {
 
         // Encontrar oponentes (outros participantes)
         const opponents = game.participants
-          .filter(p => p.userId !== userId)
+          .filter(p => p.user_id !== userId)
           .map(p => ({
-            displayName: p.user?.displayName || 'Jogador',
+            display_name: p.user?.display_name || 'Jogador',
             position: p.position,
-            eloRating: p.user?.eloRating || 1000,
+            elo_rating: p.user?.elo_rating || 1000,
           }));
 
         // Encontrar vencedor
@@ -173,27 +174,28 @@ class HistoryService {
         const winner = winnerParticipant?.user
           ? {
               id: winnerParticipant.user.id,
-              displayName: winnerParticipant.user.displayName,
+              display_name: winnerParticipant.user.display_name,
             }
           : null;
 
         return {
           id: game.id,
-          roomCode: game.roomCode,
+          room_code: game.room_code,
           status: game.status,
-          createdAt: game.createdAt,
-          endedAt: game.endedAt,
-          totalRounds: game.currentRound,
+          created_at: game.created_at,
+          ended_at: game.ended_at,
+          total_rounds: game.current_round,
           position: participation.position,
-          roundsWon: participation.roundsWon,
+          rounds_won: participation.rounds_won,
           kills: participation.kills,
           deaths: participation.deaths,
-          damageDealt: participation.damageDealt,
-          damageTaken: participation.damageTaken,
-          selfDamage: participation.selfDamage,
-          shotsFired: participation.shotsFired,
-          itemsUsed: participation.itemsUsed,
-          eloChange: participation.eloChange,
+          damage_dealt: participation.damage_dealt,
+          damage_taken: participation.damage_taken,
+          self_damage: participation.self_damage,
+          shots_fired: participation.shots_fired,
+          items_used: participation.items_used,
+          elo_change: participation.elo_change,
+          xp_earned: participation.xp_earned,
           opponents,
           winner,
         };
@@ -222,8 +224,8 @@ class HistoryService {
       // Verificar se o usuário participou da partida
       const participation = await prisma.gameParticipant.findFirst({
         where: {
-          gameId,
-          userId,
+          game_id: gameId,
+          user_id: userId,
         },
       });
 
@@ -240,15 +242,15 @@ class HistoryService {
               user: {
                 select: {
                   id: true,
-                  displayName: true,
-                  eloRating: true,
+                  display_name: true,
+                  elo_rating: true,
                 },
               },
             },
           },
           rounds: {
             orderBy: {
-              roundNumber: 'asc',
+              round_number: 'asc',
             },
           },
         },
@@ -259,18 +261,18 @@ class HistoryService {
       }
 
       // Encontrar participação do usuário
-      const userParticipation = game.participants.find(p => p.userId === userId);
+      const userParticipation = game.participants.find(p => p.user_id === userId);
       if (!userParticipation) {
         return null;
       }
 
       // Mapear oponentes
       const opponents = game.participants
-        .filter(p => p.userId !== userId)
+        .filter(p => p.user_id !== userId)
         .map(p => ({
-          displayName: p.user?.displayName || 'Jogador',
+          display_name: p.user?.display_name || 'Jogador',
           position: p.position,
-          eloRating: p.user?.eloRating || 1000,
+          elo_rating: p.user?.elo_rating || 1000,
         }));
 
       // Encontrar vencedor
@@ -278,55 +280,57 @@ class HistoryService {
       const winner = winnerParticipant?.user
         ? {
             id: winnerParticipant.user.id,
-            displayName: winnerParticipant.user.displayName,
+            display_name: winnerParticipant.user.display_name,
           }
         : null;
 
       // Mapear participantes
       const participants = game.participants.map(p => ({
-        odUserId: p.userId,
-        displayName: p.user?.displayName || 'Jogador',
+        user_id: p.user_id,
+        display_name: p.user?.display_name || 'Jogador',
         position: p.position,
-        roundsWon: p.roundsWon,
+        rounds_won: p.rounds_won,
         kills: p.kills,
         deaths: p.deaths,
-        damageDealt: p.damageDealt,
-        damageTaken: p.damageTaken,
-        selfDamage: p.selfDamage,
-        shotsFired: p.shotsFired,
-        itemsUsed: p.itemsUsed,
-        eloChange: p.eloChange,
-        eloRating: p.user?.eloRating || null,
+        damage_dealt: p.damage_dealt,
+        damage_taken: p.damage_taken,
+        self_damage: p.self_damage,
+        shots_fired: p.shots_fired,
+        items_used: p.items_used,
+        elo_change: p.elo_change,
+        xp_earned: p.xp_earned,
+        elo_rating: p.user?.elo_rating || null,
       }));
 
       // Mapear rounds
       const rounds = game.rounds.map(r => ({
-        roundNumber: r.roundNumber,
-        winnerId: r.winnerId,
-        maxHp: r.maxHp,
-        shellsLive: r.shellsLive,
-        shellsBlank: r.shellsBlank,
-        startedAt: r.startedAt,
-        endedAt: r.endedAt,
+        round_number: r.round_number,
+        winner_id: r.winner_id,
+        max_hp: r.max_hp,
+        shells_live: r.shells_live,
+        shells_blank: r.shells_blank,
+        started_at: r.started_at,
+        ended_at: r.ended_at,
       }));
 
       return {
         id: game.id,
-        roomCode: game.roomCode,
+        room_code: game.room_code,
         status: game.status,
-        createdAt: game.createdAt,
-        endedAt: game.endedAt,
-        totalRounds: game.currentRound,
+        created_at: game.created_at,
+        ended_at: game.ended_at,
+        total_rounds: game.current_round,
         position: userParticipation.position,
-        roundsWon: userParticipation.roundsWon,
+        rounds_won: userParticipation.rounds_won,
         kills: userParticipation.kills,
         deaths: userParticipation.deaths,
-        damageDealt: userParticipation.damageDealt,
-        damageTaken: userParticipation.damageTaken,
-        selfDamage: userParticipation.selfDamage,
-        shotsFired: userParticipation.shotsFired,
-        itemsUsed: userParticipation.itemsUsed,
-        eloChange: userParticipation.eloChange,
+        damage_dealt: userParticipation.damage_dealt,
+        damage_taken: userParticipation.damage_taken,
+        self_damage: userParticipation.self_damage,
+        shots_fired: userParticipation.shots_fired,
+        items_used: userParticipation.items_used,
+        elo_change: userParticipation.elo_change,
+        xp_earned: userParticipation.xp_earned,
         opponents,
         winner,
         rounds,
@@ -346,7 +350,7 @@ class HistoryService {
       // Buscar últimas 10 partidas para calcular forma recente
       const recentGames = await prisma.gameParticipant.findMany({
         where: {
-          userId,
+          user_id: userId,
           game: {
             status: GameStatus.COMPLETED,
           },
@@ -354,12 +358,12 @@ class HistoryService {
         select: {
           position: true,
           kills: true,
-          damageDealt: true,
+          damage_dealt: true,
           game: {
             select: {
               participants: {
                 select: {
-                  userId: true,
+                  user_id: true,
                 },
               },
             },
@@ -367,7 +371,7 @@ class HistoryService {
         },
         orderBy: {
           game: {
-            endedAt: 'desc',
+            ended_at: 'desc',
           },
         },
         take: 20, // Buscar mais para calcular streak
@@ -388,7 +392,7 @@ class HistoryService {
 
       // Calcular média de dano
       const averageDamageDealt = recentGames.length > 0
-        ? recentGames.reduce((a, b) => a + b.damageDealt, 0) / recentGames.length
+        ? recentGames.reduce((a, b) => a + b.damage_dealt, 0) / recentGames.length
         : 0;
 
       // Calcular média de kills
@@ -416,7 +420,7 @@ class HistoryService {
       // Total de partidas
       const totalGames = await prisma.gameParticipant.count({
         where: {
-          userId,
+          user_id: userId,
           game: {
             status: GameStatus.COMPLETED,
           },

@@ -22,6 +22,16 @@ const roomService = new RoomService();
 // Map de socket.id para dados do usuário
 export const socketUserMap = new Map<string, { odUserId: string; displayName: string } | null>();
 
+// Referência ao io server para acesso externo (online count REST endpoint)
+let ioInstance: Server<ClientToServerEvents, ServerToClientEvents> | null = null;
+
+export function getOnlineCount(): { total: number; inQueue: number } {
+  return {
+    total: ioInstance ? ioInstance.engine.clientsCount : 0,
+    inQueue: 0, // Futuro: matchmaking queue
+  };
+}
+
 // Tipo do Socket com eventos tipados
 export type TypedSocket = Socket<ClientToServerEvents, ServerToClientEvents>;
 
@@ -38,6 +48,9 @@ export function setupSocketIO(httpServer: HttpServer): TypedIOServer {
     pingTimeout: 60000,
     pingInterval: 25000,
   });
+
+  // Salvar referência para acesso externo
+  ioInstance = io;
 
   // Setup callbacks do room service (uma vez)
   setupRoomCallbacks(io, roomService);
@@ -56,8 +69,8 @@ export function setupSocketIO(httpServer: HttpServer): TypedIOServer {
       try {
         const user = await authService.validateToken(authToken);
         if (user) {
-          socketUserMap.set(socket.id, { odUserId: user.id, displayName: user.displayName });
-          console.log(`[Auth] Socket ${socket.id} autenticado como ${user.displayName}`);
+          socketUserMap.set(socket.id, { odUserId: user.id, displayName: user.display_name });
+          console.log(`[Auth] Socket ${socket.id} autenticado como ${user.display_name}`);
         }
       } catch (error) {
         console.log(`[Auth] Token inválido para socket ${socket.id}`);
@@ -68,12 +81,23 @@ export function setupSocketIO(httpServer: HttpServer): TypedIOServer {
     registerRoomHandlers(io, socket, roomService);
     registerGameHandlers(io, socket, roomService);
 
+    // Online count handler
+    socket.on('requestOnlineCount', () => {
+      socket.emit('onlineCount', getOnlineCount());
+    });
+
+    // Broadcast online count atualizado para todos
+    io.emit('onlineCount', getOnlineCount());
+
     // Handler de desconexão
     socket.on('disconnect', (reason) => {
       console.log(`[${new Date().toLocaleString('pt-BR')}] Desconectado: ${socket.id} | Motivo: ${reason}`);
       // Limpar dados do usuário
       socketUserMap.delete(socket.id);
       // A lógica de desconexão será tratada no room.handler
+
+      // Broadcast online count atualizado
+      io.emit('onlineCount', getOnlineCount());
     });
 
     // Handler de erros

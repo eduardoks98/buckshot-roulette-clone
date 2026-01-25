@@ -2,17 +2,9 @@
    LEADERBOARD STYLES
    ========================================== */
 
-.leaderboard-container {
-  min-height: 100vh;
-  padding: 2rem;
-  max-width: 600px;
-  margin: 0 auto;
-}
-
-.leaderboard-container .back-btn {
-  position: absolute;
-  top: 1rem;
-  left: 1rem;
+.leaderboard-content {
+  width: 100%;
+  max-width: 900px;
 }
 
 .page-title {
@@ -166,6 +158,27 @@
 .entry-name {
   font-weight: 600;
   color: var(--text-primary);
+}
+
+.entry-level {
+  font-size: 0.7rem;
+  font-weight: normal;
+  color: #d4a418;
+  margin-left: 0.4rem;
+  padding: 0.1rem 0.4rem;
+  background: rgba(212, 164, 24, 0.15);
+  border-radius: 4px;
+}
+
+.entry-title {
+  font-size: 0.65rem;
+  font-weight: 500;
+  color: #a78bfa;
+  margin-left: 0.4rem;
+  padding: 0.1rem 0.4rem;
+  background: rgba(167, 139, 250, 0.12);
+  border: 1px solid rgba(167, 139, 250, 0.25);
+  border-radius: 4px;
 }
 
 .entry-stats {

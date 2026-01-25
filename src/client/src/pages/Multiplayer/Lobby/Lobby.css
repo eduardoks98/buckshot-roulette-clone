@@ -1,23 +1,23 @@
-.lobby-container {
+.mp-lobby-container {
   min-height: 100vh;
   padding: 2rem;
   max-width: 500px;
   margin: 0 auto;
 }
 
-.lobby-container .back-btn {
+.mp-lobby-container .back-btn {
   position: absolute;
   top: 1rem;
   left: 1rem;
 }
 
-.lobby-container .game-title {
+.mp-lobby-container .game-title {
   text-align: center;
   font-size: 2.5rem;
   margin-top: 2rem;
 }
 
-.lobby-container .subtitle {
+.mp-lobby-container .subtitle {
   text-align: center;
   margin-bottom: 1rem;
 }

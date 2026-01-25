@@ -15,7 +15,7 @@ interface ReconnectData {
 export default function Lobby() {
   const navigate = useNavigate();
   const { socket, isConnected, connect } = useSocket();
-  const { user, isAuthenticated, isLoading, login } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
 
   // Redirecionar para login se não autenticado
   useEffect(() => {
@@ -48,9 +48,10 @@ export default function Lobby() {
     if (saved) {
       try {
         const data: ReconnectData = JSON.parse(saved);
-        // Verificar se não expirou (60 segundos)
+        // Verificar se não expirou (10 minutos - tempo máximo razoável de um jogo)
+        // O servidor é quem controla o grace period real de 60s após disconnect
         const elapsed = Date.now() - data.timestamp;
-        if (elapsed < 60000) {
+        if (elapsed < 10 * 60 * 1000) {
           setActiveGame(data);
         } else {
           // Expirado - limpar
@@ -213,7 +214,7 @@ export default function Lobby() {
   // Loading state
   if (isLoading) {
     return (
-      <div className="lobby-container">
+      <div className="mp-lobby-container">
         <div className="loading-message">Carregando...</div>
       </div>
     );
@@ -225,7 +226,7 @@ export default function Lobby() {
   }
 
   return (
-    <div className="lobby-container">
+    <div className="mp-lobby-container">
       <button className="back-btn" onClick={() => navigate('/')}>
         Voltar
       </button>

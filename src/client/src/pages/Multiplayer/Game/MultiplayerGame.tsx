@@ -14,15 +14,26 @@ import {
   GameOverPayload,
   PlayerGameStats,
   GameAward,
+  AchievementUnlocked,
+  PlayerXpResult,
+  MatchBadgeAwarded,
 } from '../../../../../shared/types';
 import { GAME_RULES, ITEMS } from '../../../../../shared/constants';
 import { ItemId } from '../../../../../shared/types';
+import { getLevelInfo } from '../../../../../shared/utils/xpCalculator';
 import { BugReportModal, GameStateForReport } from '../../../components/common/BugReportModal';
+import { AchievementToast } from '../../../components/common';
 import './MultiplayerGame.css';
 
 interface LocationState {
   roomCode: string;
-  gameState?: RoundStartedPayload;
+  reconnected?: boolean;
+  gameState?: RoundStartedPayload & {
+    // ReconnectedPayload has yourItems instead of itemsReceived, and yourHp instead of maxHp
+    yourItems?: { id: string; emoji: string; name: string }[];
+    yourHp?: number;
+    roomCode?: string;
+  };
 }
 
 interface ShellInfo {
@@ -72,6 +83,7 @@ export default function MultiplayerGame() {
     items: { id: string; emoji: string; name: string }[];
   } | null>(null);
   const [gameOverData, setGameOverData] = useState<GameOverPayload | null>(null);
+  const [unlockedAchievements, setUnlockedAchievements] = useState<AchievementUnlocked[]>([]);
   const [showBugReport, setShowBugReport] = useState(false);
   const [recentEvents, setRecentEvents] = useState<string[]>([]);
 
@@ -143,9 +155,59 @@ export default function MultiplayerGame() {
       setCurrentPlayerId(gs.currentPlayer);
       setRound(gs.round);
       setShells(gs.shells);
-      setMyItems(gs.itemsReceived || []);
+
+      // Suportar tanto RoundStartedPayload (itemsReceived) quanto ReconnectedPayload (yourItems)
+      const items = gs.itemsReceived || gs.yourItems || [];
+      setMyItems(items);
+
+      // maxHp pode vir de RoundStartedPayload ou ser derivado dos players (ReconnectedPayload)
+      const maxHp = gs.maxHp || gs.yourHp || players.find(p => p.alive)?.maxHp || 4;
+
+      // Mostrar anúncio de rodada (mesmo overlay que aparece nas rodadas seguintes)
+      if (!state.reconnected) {
+        setRoundAnnouncement({
+          round: gs.round,
+          live: gs.shells.live,
+          blank: gs.shells.blank,
+          hp: maxHp,
+        });
+        hasActiveOverlayRef.current = true;
+        setTimeout(() => setRoundAnnouncement(null), 5000);
+      } else {
+        setMessage('Reconectado ao jogo!');
+      }
     }
   }, [state, socket, navigate]);
+
+  // Auto-reconnect quando Socket.IO reconecta automaticamente (novo socket ID)
+  // Socket.IO pode reconectar sozinho (reconnectionAttempts: 5), mas o novo socket
+  // não está associado a nenhuma room. Precisamos emitir reconnectToGame.
+  useEffect(() => {
+    if (!socket || !isConnected) return;
+
+    const saved = localStorage.getItem('buckshotReconnect');
+    if (!saved) return;
+
+    try {
+      const data = JSON.parse(saved);
+      // Verificar se o socket já está na room (players contém o myId atual)
+      const alreadyInRoom = players.some(p => p.id === socket.id);
+      if (alreadyInRoom) return;
+
+      // Se temos players mas nosso ID não está neles, significa que reconectamos
+      // com novo socket ID e precisamos re-associar
+      if (players.length > 0) {
+        console.log('[Game] Socket reconectou com novo ID, tentando reconexão automática...');
+        socket.emit('reconnectToGame', {
+          roomCode: data.roomCode,
+          playerName: data.playerName,
+          reconnectToken: data.reconnectToken,
+        });
+      }
+    } catch {
+      // ignore
+    }
+  }, [socket, isConnected]);
 
   // Socket event handlers
   useEffect(() => {
@@ -402,6 +464,26 @@ export default function MultiplayerGame() {
       setGameOverData(data);
     });
 
+    // Reconnected - quando auto-reconexão funciona (restaurar game state)
+    socket.on('reconnected', (data) => {
+      console.log('[Game] Reconectado com sucesso ao jogo:', data.roomCode);
+      setPlayers(data.players);
+      setCurrentPlayerId(data.currentPlayer);
+      setRound(data.round);
+      setShells(data.shells);
+      setMyItems(data.yourItems || []);
+      setRevealedShell(null);
+      setSelectedTarget(null);
+      setSelectedItem(null);
+      setMessage('Reconectado ao jogo!');
+    });
+
+    // Reconnect error
+    socket.on('reconnectError', (data) => {
+      console.log('[Game] Erro ao reconectar:', data.message);
+      setMessage(`Erro: ${data.message}`);
+    });
+
     // Reconnect credentials - salvar para possível reconexão
     socket.on('reconnectCredentials', (data: { roomCode: string; playerName: string; reconnectToken: string }) => {
       localStorage.setItem('buckshotReconnect', JSON.stringify({
@@ -411,6 +493,13 @@ export default function MultiplayerGame() {
         timestamp: Date.now(),
       }));
       console.log('[Game] Credenciais de reconexão salvas:', data.roomCode);
+    });
+
+    // Achievements unlocked
+    socket.on('achievementsUnlocked', (achievements: AchievementUnlocked[]) => {
+      if (achievements.length > 0) {
+        setUnlockedAchievements(achievements);
+      }
     });
 
     // Player disconnected
@@ -464,7 +553,10 @@ export default function MultiplayerGame() {
       socket.off('playerDisconnected');
       socket.off('playerReconnected');
       socket.off('actionError');
+      socket.off('reconnected');
+      socket.off('reconnectError');
       socket.off('reconnectCredentials');
+      socket.off('achievementsUnlocked');
     };
   }, [socket, players, myId, selectedItem, navigate]);
 
@@ -864,6 +956,12 @@ export default function MultiplayerGame() {
         gameState={gameStateForReport}
       />
 
+      {/* Achievement Toast */}
+      <AchievementToast
+        achievements={unlockedAchievements}
+        onDismiss={() => setUnlockedAchievements([])}
+      />
+
       {/* Game Over Modal */}
       {gameOverData && (
         <div className="game-over-overlay">
@@ -941,6 +1039,76 @@ export default function MultiplayerGame() {
                       <span className="award-title">{getAwardTitle(award.type)}</span>
                       <span className="award-player">{award.playerName}</span>
                       <span className="award-value">({award.value})</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* XP Results */}
+            {gameOverData.xpResults && gameOverData.xpResults.length > 0 && (
+              <div className="xp-results-section">
+                <h3>✨ EXPERIÊNCIA ✨</h3>
+                <div className="xp-results-list">
+                  {gameOverData.xpResults.map((xpResult: PlayerXpResult) => {
+                    const playerName = gameOverData.stats?.find(s => s.odId === xpResult.odId)?.guestName || 'Jogador';
+                    const levelInfo = getLevelInfo(xpResult.newTotalXp);
+                    const isMe = xpResult.odId === myId;
+                    const leveledUp = xpResult.newLevel > xpResult.previousLevel;
+                    const prestiged = xpResult.newPrestige > xpResult.previousPrestige;
+                    return (
+                      <div key={xpResult.odId} className={`xp-result-item ${isMe ? 'is-me' : ''} ${leveledUp ? 'leveled-up' : ''}`}>
+                        <div className="xp-result-header">
+                          <span className="xp-player-name">{playerName}</span>
+                          <span className="xp-earned">+{xpResult.xpEarned} XP</span>
+                        </div>
+                        {isMe && (
+                          <div className="xp-breakdown">
+                            {xpResult.breakdown.participation > 0 && <span className="xp-detail">Participação: +{xpResult.breakdown.participation}</span>}
+                            {xpResult.breakdown.positionBonus > 0 && <span className="xp-detail">Posição: +{xpResult.breakdown.positionBonus}</span>}
+                            {xpResult.breakdown.killXp > 0 && <span className="xp-detail">Kills: +{xpResult.breakdown.killXp}</span>}
+                            {xpResult.breakdown.roundWinXp > 0 && <span className="xp-detail">Rounds: +{xpResult.breakdown.roundWinXp}</span>}
+                            {xpResult.breakdown.damageXp > 0 && <span className="xp-detail">Dano: +{xpResult.breakdown.damageXp}</span>}
+                            {xpResult.breakdown.itemXp > 0 && <span className="xp-detail">Itens: +{xpResult.breakdown.itemXp}</span>}
+                            {xpResult.breakdown.survivalXp > 0 && <span className="xp-detail">Sobrevivência: +{xpResult.breakdown.survivalXp}</span>}
+                            {xpResult.breakdown.cleanPlayBonus > 0 && <span className="xp-detail">Jogo Limpo: +{xpResult.breakdown.cleanPlayBonus}</span>}
+                          </div>
+                        )}
+                        <div className="xp-level-bar">
+                          <div className="xp-level-info">
+                            <span className="xp-level">Nv. {levelInfo.displayLevel}</span>
+                            {levelInfo.prestigeLevel > 0 && (
+                              <span className="xp-prestige">{'⭐'.repeat(Math.min(levelInfo.prestigeLevel, 5))}</span>
+                            )}
+                          </div>
+                          <div className="xp-progress-bar">
+                            <div
+                              className="xp-progress-fill"
+                              style={{ width: `${Math.round(levelInfo.xpProgress * 100)}%` }}
+                            />
+                          </div>
+                        </div>
+                        {leveledUp && <div className="level-up-alert">LEVEL UP! Nv. {xpResult.newLevel}</div>}
+                        {prestiged && <div className="prestige-alert">⭐ PRESTÍGIO {xpResult.newPrestige}! ⭐</div>}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Badges */}
+            {gameOverData.badges && gameOverData.badges.length > 0 && (
+              <div className="badges-section">
+                <h3>🎖️ BADGES 🎖️</h3>
+                <div className="badges-list">
+                  {gameOverData.badges.map((badge: MatchBadgeAwarded, index: number) => (
+                    <div key={`${badge.badgeId}-${index}`} className="badge-item">
+                      <span className="badge-icon">{badge.icon}</span>
+                      <div className="badge-info">
+                        <span className="badge-name">{badge.name}</span>
+                        <span className="badge-player">{badge.playerName}</span>
+                      </div>
                     </div>
                   ))}
                 </div>

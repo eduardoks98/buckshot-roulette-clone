@@ -2,47 +2,99 @@
 // PROFILE PAGE
 // ==========================================
 
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { getTitleById } from '@shared/constants/achievements';
+import { PageLayout } from '../../components/layout/PageLayout';
+import XpBar from '../../components/common/XpBar/XpBar';
+import LevelBadge from '../../components/common/LevelBadge/LevelBadge';
+import { LoadingState } from '../../components/common/LoadingState';
+import { getRankColor, calculateWinRate, calculateKD } from '../../utils/helpers';
 import './Profile.css';
+
+interface UserTitleEntry {
+  titleId: string;
+  name: string;
+  description: string;
+  icon: string;
+  period: string;
+  awardedAt: string;
+  expiresAt: string | null;
+  isSelected: boolean;
+}
 
 export default function Profile() {
   const navigate = useNavigate();
-  const { user, isLoading, login, logout } = useAuth();
+  const { user, isLoading, login, token } = useAuth();
+  const [titles, setTitles] = useState<UserTitleEntry[]>([]);
+  const [showTitleSelector, setShowTitleSelector] = useState(false);
+  const [titleLoading, setTitleLoading] = useState(false);
 
   const handleGoogleLogin = () => {
     login();
   };
 
-  const handleLogout = () => {
-    logout();
+  const fetchTitles = useCallback(async () => {
+    if (!token) return;
+    try {
+      const res = await fetch('/api/achievements/titles', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setTitles(data.titles || []);
+      }
+    } catch {
+      // silently fail
+    }
+  }, [token]);
+
+  useEffect(() => {
+    if (user) fetchTitles();
+  }, [user, fetchTitles]);
+
+  const handleSelectTitle = async (titleId: string | null) => {
+    if (!token) return;
+    setTitleLoading(true);
+    try {
+      const res = await fetch('/api/achievements/title', {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ titleId }),
+      });
+      if (res.ok) {
+        await fetchTitles();
+        setShowTitleSelector(false);
+      }
+    } catch {
+      // silently fail
+    } finally {
+      setTitleLoading(false);
+    }
   };
 
-  const getRankColor = (rank: string) => {
-    const colors: Record<string, string> = {
-      Bronze: '#cd7f32',
-      Silver: '#c0c0c0',
-      Gold: '#ffd700',
-      Platinum: '#e5e4e2',
-      Diamond: '#b9f2ff',
-      Master: '#ff6b6b',
-      Grandmaster: '#ff4757',
-    };
-    return colors[rank] || '#c0c0c0';
+  const getActiveTitleInfo = () => {
+    if (!user?.activeTitleId) return null;
+    return getTitleById(user.activeTitleId) || null;
   };
 
+  // Loading state
   if (isLoading) {
     return (
-      <div className="profile-container">
-        <div className="loading-message">Carregando...</div>
-      </div>
+      <PageLayout>
+        <LoadingState message="Carregando perfil..." />
+      </PageLayout>
     );
   }
 
-  // Not logged in
+  // Not logged in - show login page without PageLayout header/footer
   if (!user) {
     return (
-      <div className="profile-container">
+      <div className="profile-container profile-container--login">
         <button className="back-btn" onClick={() => navigate('/')}>
           Voltar
         </button>
@@ -89,87 +141,137 @@ export default function Profile() {
   }
 
   // Logged in
-  const winRate = user.gamesPlayed > 0
-    ? ((user.gamesWon / user.gamesPlayed) * 100).toFixed(1)
-    : '0';
-
-  const kd = user.totalDeaths > 0
-    ? (user.totalKills / user.totalDeaths).toFixed(2)
-    : user.totalKills.toString();
+  const winRate = calculateWinRate(user.gamesWon, user.gamesPlayed).toFixed(1);
+  const kd = calculateKD(user.totalKills, user.totalDeaths);
 
   return (
-    <div className="profile-container">
-      <button className="back-btn" onClick={() => navigate('/')}>
-        Voltar
-      </button>
+    <PageLayout>
+      <div className="profile-content">
+        <h1 className="page-title">PERFIL</h1>
 
-      <h1 className="page-title">PERFIL</h1>
+        {/* User Card */}
+        <div className="user-card">
+          <div className="user-avatar">
+            {user.avatarUrl ? (
+              <img src={user.avatarUrl} alt={user.displayName} />
+            ) : (
+              user.displayName.charAt(0).toUpperCase()
+            )}
+          </div>
+          <div className="user-info">
+            <h2 className="user-name">{user.displayName}</h2>
+            <span className="user-username">@{user.username}</span>
+            {(() => {
+              const titleInfo = getActiveTitleInfo();
+              return titleInfo ? (
+                <span className="user-active-title" onClick={() => setShowTitleSelector(true)}>
+                  {titleInfo.icon} {titleInfo.name}
+                </span>
+              ) : titles.length > 0 ? (
+                <button className="user-set-title" onClick={() => setShowTitleSelector(true)}>
+                  Selecionar titulo
+                </button>
+              ) : null;
+            })()}
+          </div>
+          <div
+            className="user-rank"
+            style={{ borderColor: getRankColor(user.rank) }}
+          >
+            <span className="rank-label">Rank</span>
+            <span className="rank-value" style={{ color: getRankColor(user.rank) }}>
+              {user.rank}
+            </span>
+            <span className="elo-value">{user.eloRating} ELO</span>
+          </div>
+        </div>
 
-      {/* User Card */}
-      <div className="user-card">
-        <div className="user-avatar">
-          {user.avatarUrl ? (
-            <img src={user.avatarUrl} alt={user.displayName} />
-          ) : (
-            user.displayName.charAt(0).toUpperCase()
-          )}
+        {/* XP / Level Section */}
+        <div className="xp-section">
+          <div className="xp-section-header">
+            <LevelBadge totalXp={user.totalXp} size="lg" />
+            <div className="xp-section-info">
+              <span className="xp-total">{user.totalXp.toLocaleString()} XP Total</span>
+            </div>
+          </div>
+          <XpBar totalXp={user.totalXp} size="lg" showLevel={false} />
         </div>
-        <div className="user-info">
-          <h2 className="user-name">{user.displayName}</h2>
-          <span className="user-username">@{user.username}</span>
+
+        {/* Stats Grid */}
+        <div className="stats-grid">
+          <div className="stat-card">
+            <span className="stat-value">{user.gamesPlayed}</span>
+            <span className="stat-label">Partidas</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-value">{user.gamesWon}</span>
+            <span className="stat-label">Vitorias</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-value">{winRate}%</span>
+            <span className="stat-label">Win Rate</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-value">{user.roundsWon}</span>
+            <span className="stat-label">Rodadas</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-value">{user.totalKills}</span>
+            <span className="stat-label">Kills</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-value">{kd}</span>
+            <span className="stat-label">K/D</span>
+          </div>
         </div>
-        <div
-          className="user-rank"
-          style={{ borderColor: getRankColor(user.rank) }}
-        >
-          <span className="rank-label">Rank</span>
-          <span className="rank-value" style={{ color: getRankColor(user.rank) }}>
-            {user.rank}
-          </span>
-          <span className="elo-value">{user.eloRating} ELO</span>
-        </div>
+
+        {/* Title Selector Modal */}
+        {showTitleSelector && (
+          <div className="title-selector-overlay" onClick={() => setShowTitleSelector(false)}>
+            <div className="title-selector-modal" onClick={e => e.stopPropagation()}>
+              <h3 className="title-selector-header">Selecionar Titulo</h3>
+              <div className="title-selector-list">
+                <button
+                  className={`title-selector-item ${!user.activeTitleId ? 'selected' : ''}`}
+                  onClick={() => handleSelectTitle(null)}
+                  disabled={titleLoading}
+                >
+                  <span className="title-selector-item__icon">-</span>
+                  <div className="title-selector-item__info">
+                    <span className="title-selector-item__name">Sem titulo</span>
+                    <span className="title-selector-item__desc">Remover titulo ativo</span>
+                  </div>
+                </button>
+                {titles.map(t => (
+                  <button
+                    key={t.titleId}
+                    className={`title-selector-item ${t.isSelected ? 'selected' : ''}`}
+                    onClick={() => handleSelectTitle(t.titleId)}
+                    disabled={titleLoading}
+                  >
+                    <span className="title-selector-item__icon">{t.icon}</span>
+                    <div className="title-selector-item__info">
+                      <span className="title-selector-item__name">{t.name}</span>
+                      <span className="title-selector-item__desc">{t.description}</span>
+                    </div>
+                    <span className="title-selector-item__period">
+                      {t.period === 'WEEKLY' ? 'Semanal' : t.period === 'MONTHLY' ? 'Mensal' : 'Geral'}
+                    </span>
+                  </button>
+                ))}
+              </div>
+              {titles.length === 0 && (
+                <p className="title-selector-empty">
+                  Voce ainda nao conquistou nenhum titulo. Continue jogando!
+                </p>
+              )}
+              <button className="title-selector-close" onClick={() => setShowTitleSelector(false)}>
+                Fechar
+              </button>
+            </div>
+          </div>
+        )}
       </div>
-
-      {/* Stats Grid */}
-      <div className="stats-grid">
-        <div className="stat-card">
-          <span className="stat-value">{user.gamesPlayed}</span>
-          <span className="stat-label">Partidas</span>
-        </div>
-        <div className="stat-card">
-          <span className="stat-value">{user.gamesWon}</span>
-          <span className="stat-label">Vitorias</span>
-        </div>
-        <div className="stat-card">
-          <span className="stat-value">{winRate}%</span>
-          <span className="stat-label">Win Rate</span>
-        </div>
-        <div className="stat-card">
-          <span className="stat-value">{user.roundsWon}</span>
-          <span className="stat-label">Rodadas</span>
-        </div>
-        <div className="stat-card">
-          <span className="stat-value">{user.totalKills}</span>
-          <span className="stat-label">Kills</span>
-        </div>
-        <div className="stat-card">
-          <span className="stat-value">{kd}</span>
-          <span className="stat-label">K/D</span>
-        </div>
-      </div>
-
-      {/* Actions */}
-      <div className="profile-actions">
-        <button className="action-btn history" onClick={() => navigate('/history')}>
-          Historico de Partidas
-        </button>
-        <button className="action-btn leaderboard" onClick={() => navigate('/leaderboard')}>
-          Ver Leaderboard
-        </button>
-        <button className="action-btn logout" onClick={handleLogout}>
-          Sair da Conta
-        </button>
-      </div>
-    </div>
+    </PageLayout>
   );
 }

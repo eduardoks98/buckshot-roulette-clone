@@ -7,7 +7,9 @@ import MultiplayerGame from './pages/Multiplayer/Game/MultiplayerGame';
 import Leaderboard from './pages/Leaderboard/Leaderboard';
 import Profile from './pages/Profile/Profile';
 import History from './pages/History/History';
-import Admin from './pages/Admin/Admin';
+import Achievements from './pages/Achievements/Achievements';
+import PrivacyPolicy from './pages/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService';
 
 function App() {
   return (
@@ -21,7 +23,9 @@ function App() {
         <Route path="/leaderboard" element={<Leaderboard />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/history" element={<History />} />
-        <Route path="/admin" element={<Admin />} />
+        <Route path="/achievements" element={<Achievements />} />
+        <Route path="/privacy" element={<PrivacyPolicy />} />
+        <Route path="/terms" element={<TermsOfService />} />
       </Routes>
     </div>
   );

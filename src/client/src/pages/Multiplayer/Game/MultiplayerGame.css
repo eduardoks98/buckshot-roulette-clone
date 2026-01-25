@@ -1717,6 +1717,205 @@
   font-size: 0.9rem;
 }
 
+/* XP Results Section */
+.xp-results-section {
+  margin-bottom: 2rem;
+}
+
+.xp-results-section h3 {
+  color: var(--gold-accent, #d4a418);
+  font-size: 1.3rem;
+  margin-bottom: 1rem;
+}
+
+.xp-results-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.xp-result-item {
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(100, 100, 100, 0.3);
+  border-radius: 10px;
+  transition: all 0.3s ease;
+}
+
+.xp-result-item.is-me {
+  border-color: rgba(212, 164, 24, 0.4);
+  background: rgba(212, 164, 24, 0.08);
+}
+
+.xp-result-item.leveled-up {
+  animation: level-up-glow 1.5s ease-in-out infinite;
+}
+
+@keyframes level-up-glow {
+  0%, 100% { box-shadow: 0 0 5px rgba(212, 164, 24, 0.2); }
+  50% { box-shadow: 0 0 20px rgba(212, 164, 24, 0.5); }
+}
+
+.xp-result-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+}
+
+.xp-player-name {
+  font-weight: bold;
+  color: #fff;
+}
+
+.xp-earned {
+  font-weight: bold;
+  color: var(--gold-accent, #d4a418);
+  font-size: 1.1rem;
+}
+
+.xp-breakdown {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+
+.xp-detail {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.6);
+  padding: 0.15rem 0.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+}
+
+.xp-level-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.xp-level-info {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 70px;
+}
+
+.xp-level {
+  font-size: 0.85rem;
+  font-weight: bold;
+  color: var(--gold-accent, #d4a418);
+}
+
+.xp-prestige {
+  font-size: 0.75rem;
+}
+
+.xp-progress-bar {
+  flex: 1;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+  overflow: hidden;
+}
+
+.xp-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #d4a418, #f0c850);
+  border-radius: 3px;
+  transition: width 1s ease;
+}
+
+.level-up-alert {
+  margin-top: 0.5rem;
+  text-align: center;
+  font-weight: bold;
+  color: #fbbf24;
+  font-size: 0.9rem;
+  animation: level-up-pulse 0.8s ease infinite;
+}
+
+@keyframes level-up-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.05); }
+}
+
+.prestige-alert {
+  margin-top: 0.5rem;
+  text-align: center;
+  font-weight: bold;
+  color: var(--gold-accent, #d4a418);
+  font-size: 1rem;
+  text-shadow: 0 0 10px rgba(212, 164, 24, 0.5);
+  animation: prestige-glow 1s ease infinite;
+}
+
+@keyframes prestige-glow {
+  0%, 100% { text-shadow: 0 0 10px rgba(212, 164, 24, 0.5); }
+  50% { text-shadow: 0 0 25px rgba(212, 164, 24, 0.9); }
+}
+
+/* Badges Section */
+.badges-section {
+  margin-bottom: 2rem;
+}
+
+.badges-section h3 {
+  color: var(--gold-accent, #d4a418);
+  font-size: 1.3rem;
+  margin-bottom: 1rem;
+}
+
+.badges-list {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.6rem;
+}
+
+.badge-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: linear-gradient(135deg, rgba(60, 60, 60, 0.6) 0%, rgba(40, 40, 40, 0.8) 100%);
+  border: 1px solid rgba(212, 164, 24, 0.3);
+  border-radius: 8px;
+  animation: badge-appear 0.5s ease backwards;
+}
+
+.badge-item:nth-child(1) { animation-delay: 0s; }
+.badge-item:nth-child(2) { animation-delay: 0.1s; }
+.badge-item:nth-child(3) { animation-delay: 0.2s; }
+.badge-item:nth-child(4) { animation-delay: 0.3s; }
+.badge-item:nth-child(5) { animation-delay: 0.4s; }
+
+@keyframes badge-appear {
+  from { opacity: 0; transform: translateY(10px) scale(0.9); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.badge-icon {
+  font-size: 1.3rem;
+}
+
+.badge-info {
+  display: flex;
+  flex-direction: column;
+}
+
+.badge-name {
+  font-weight: bold;
+  font-size: 0.85rem;
+  color: #fff;
+}
+
+.badge-player {
+  font-size: 0.7rem;
+  color: var(--gold-accent, #d4a418);
+}
+
 /* Back to Lobby Button */
 .back-to-lobby-btn {
   padding: 1rem 3rem;
