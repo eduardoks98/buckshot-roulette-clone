@@ -18,6 +18,7 @@ interface User {
   totalDeaths: number;
   eloRating: number;
   rank: string;
+  isAdmin: boolean;
 }
 
 const TOKEN_KEY = 'buckshot_auth_token';
@@ -26,6 +27,7 @@ interface AuthContextType {
   user: User | null;
   token: string | null;
   isAuthenticated: boolean;
+  isAdmin: boolean;
   isLoading: boolean;
   login: () => void;
   logout: () => void;
@@ -120,6 +122,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     user,
     token: getToken(),
     isAuthenticated: !!user,
+    isAdmin: user?.isAdmin ?? false,
     isLoading,
     login,
     logout,

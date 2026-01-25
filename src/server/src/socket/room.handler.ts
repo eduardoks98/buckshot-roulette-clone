@@ -360,6 +360,14 @@ export function registerRoomHandlers(
         playerName: playerName,
       });
 
+      // CRÍTICO: Sincronizar TODOS os clientes com o estado atualizado
+      // Isso garante que todos vejam o novo socket.id do jogador reconectado
+      io.to(roomCode).emit('turnChanged', {
+        currentPlayer: result.gameState.currentPlayer,
+        reason: 'reconnected',
+        players: result.gameState.players,
+      });
+
       console.log(`[Room] ${playerName} reconectou à sala ${roomCode}`);
     } catch (error) {
       console.error('[Room] Erro ao reconectar:', error);

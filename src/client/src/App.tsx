@@ -7,6 +7,7 @@ import MultiplayerGame from './pages/Multiplayer/Game/MultiplayerGame';
 import Leaderboard from './pages/Leaderboard/Leaderboard';
 import Profile from './pages/Profile/Profile';
 import History from './pages/History/History';
+import Admin from './pages/Admin/Admin';
 
 function App() {
   return (
@@ -20,6 +21,7 @@ function App() {
         <Route path="/leaderboard" element={<Leaderboard />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/history" element={<History />} />
+        <Route path="/admin" element={<Admin />} />
       </Routes>
     </div>
   );

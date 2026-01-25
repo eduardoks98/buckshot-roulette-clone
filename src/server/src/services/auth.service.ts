@@ -32,6 +32,7 @@ interface UserProfile {
   totalDeaths: number;
   eloRating: number;
   rank: string;
+  isAdmin: boolean;
 }
 
 // ==========================================
@@ -138,6 +139,7 @@ export class AuthService {
       totalDeaths: user.totalDeaths,
       eloRating: user.eloRating,
       rank: user.rank,
+      isAdmin: user.isAdmin,
     };
   }
 

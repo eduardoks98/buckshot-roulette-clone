@@ -173,7 +173,7 @@ export interface ItemUsedPayload extends ItemUseResult {
 
 export interface TurnChangedPayload {
   currentPlayer: string;
-  reason: 'shot' | 'timeout' | 'playerDisconnected' | 'handcuffs';
+  reason: 'shot' | 'timeout' | 'playerDisconnected' | 'handcuffs' | 'reconnected';
   players: PlayerPublicState[];
 }
 

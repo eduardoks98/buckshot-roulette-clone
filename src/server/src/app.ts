@@ -11,6 +11,7 @@ import { ENV } from './config/env.config';
 import authRoutes from './routes/auth.routes';
 import leaderboardRoutes from './routes/leaderboard.routes';
 import historyRoutes from './routes/history.routes';
+import bugRoutes from './routes/bug.routes';
 
 export function createServer(): { app: Express; httpServer: http.Server } {
   const app = express();
@@ -68,6 +69,9 @@ export function createServer(): { app: Express; httpServer: http.Server } {
 
   // History routes
   app.use('/api/history', historyRoutes);
+
+  // Bug report routes
+  app.use('/api/bugs', bugRoutes);
 
   // ==========================================
   // ERROR HANDLING

@@ -17,6 +17,7 @@ import {
 } from '../../../../../shared/types';
 import { GAME_RULES, ITEMS } from '../../../../../shared/constants';
 import { ItemId } from '../../../../../shared/types';
+import { BugReportModal, GameStateForReport } from '../../../components/common/BugReportModal';
 import './MultiplayerGame.css';
 
 interface LocationState {
@@ -71,6 +72,8 @@ export default function MultiplayerGame() {
     items: { id: string; emoji: string; name: string }[];
   } | null>(null);
   const [gameOverData, setGameOverData] = useState<GameOverPayload | null>(null);
+  const [showBugReport, setShowBugReport] = useState(false);
+  const [recentEvents, setRecentEvents] = useState<string[]>([]);
 
   // Disconnected players tracking for countdown
   const [disconnectedPlayers, setDisconnectedPlayers] = useState<{
@@ -439,8 +442,11 @@ export default function MultiplayerGame() {
       });
     });
 
-    // Action error
+    // Action error - fecha modal de roubo se estiver aberto
     socket.on('actionError', (error) => {
+      setStealingFromPlayer(null);
+      setSelectedItem(null);
+      setSelectedTarget(null);
       setMessage(`Erro: ${error}`);
     });
 
@@ -515,6 +521,14 @@ export default function MultiplayerGame() {
       return;
     }
 
+    // Adrenaline: precisa abrir modal para escolher item do alvo
+    // Mesmo se já tem alvo selecionado, não pode enviar useItem direto
+    if (item.id === 'adrenaline' && selectedTarget) {
+      socket.emit('getPlayerItems', { targetId: selectedTarget });
+      // NÃO limpar selectedItem aqui - manter para caso de cancelamento
+      return;
+    }
+
     socket.emit('useItem', {
       itemId: item.id as ItemId,
       targetId: selectedTarget || undefined,
@@ -532,9 +546,9 @@ export default function MultiplayerGame() {
       const item = myItems[selectedItem];
 
       // Adrenaline: primeiro obter os itens do alvo antes de usar
+      // NÃO limpar selectedItem - manter para caso de cancelamento
       if (item.id === 'adrenaline') {
         socket.emit('getPlayerItems', { targetId: playerId });
-        setSelectedItem(null);
         return;
       }
 
@@ -561,6 +575,23 @@ export default function MultiplayerGame() {
 
   const alivePlayers = players.filter(p => p.alive);
   const otherPlayers = alivePlayers.filter(p => p.id !== myId);
+
+  // Helper to log events for bug reports
+  const logEvent = useCallback((event: string) => {
+    const timestamp = new Date().toISOString();
+    setRecentEvents(prev => [...prev.slice(-49), `[${timestamp}] ${event}`]);
+  }, []);
+
+  // Build game state for bug report
+  const gameStateForReport: GameStateForReport = useMemo(() => ({
+    roomCode: state?.roomCode,
+    round,
+    players: players.map(p => ({ id: p.id, name: p.name, hp: p.hp, alive: p.alive })),
+    currentPlayerId,
+    shells,
+    myItems: myItems.map(i => ({ id: i.id, name: i.name })),
+    recentEvents,
+  }), [state?.roomCode, round, players, currentPlayerId, shells, myItems, recentEvents]);
 
   return (
     <div className="game-container">
@@ -787,6 +818,8 @@ export default function MultiplayerGame() {
                         itemIndex: originalIndex,
                       });
                       setStealingFromPlayer(null);
+                      setSelectedItem(null);
+                      setSelectedTarget(null);
                     }}
                     title={`${item.name} (será usado imediatamente)`}
                   >
@@ -800,13 +833,36 @@ export default function MultiplayerGame() {
             </div>
             <button
               className="steal-cancel-btn"
-              onClick={() => setStealingFromPlayer(null)}
+              onClick={() => {
+                setStealingFromPlayer(null);
+                setSelectedItem(null);
+                setSelectedTarget(null);
+              }}
             >
               Cancelar
             </button>
           </div>
         </div>
       )}
+
+      {/* Bug Report Button */}
+      <button
+        className="bug-report-btn"
+        onClick={() => {
+          logEvent('Bug report opened');
+          setShowBugReport(true);
+        }}
+        title="Reportar Bug"
+      >
+        🐛
+      </button>
+
+      {/* Bug Report Modal */}
+      <BugReportModal
+        isOpen={showBugReport}
+        onClose={() => setShowBugReport(false)}
+        gameState={gameStateForReport}
+      />
 
       {/* Game Over Modal */}
       {gameOverData && (
