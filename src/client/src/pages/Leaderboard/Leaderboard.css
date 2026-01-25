@@ -249,6 +249,12 @@
   box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2);
 }
 
+/* Ad Banner */
+.leaderboard-ad {
+  margin-top: 2rem;
+  text-align: center;
+}
+
 /* Responsive */
 @media (max-width: 500px) {
   .period-tab {

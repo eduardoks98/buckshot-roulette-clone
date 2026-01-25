@@ -11,7 +11,13 @@ import { PageLayout } from '../../components/layout/PageLayout';
 import { LoadingState } from '../../components/common/LoadingState';
 import { EmptyState } from '../../components/common/EmptyState';
 import { getRankIcon } from '../../utils/helpers';
+import { AdBanner } from '../../components/common/AdBanner';
 import './Leaderboard.css';
+
+// AdSense config
+const ADSENSE_PUBLISHER_ID = import.meta.env.VITE_ADSENSE_PUBLISHER_ID || '';
+const ADSENSE_SLOT_LEADERBOARD = import.meta.env.VITE_ADSENSE_SLOT_LEADERBOARD || '';
+const ADSENSE_TEST_MODE = import.meta.env.VITE_ADSENSE_TEST_MODE === 'true';
 
 type LeaderboardPeriod = 'daily' | 'weekly' | 'monthly' | 'all_time';
 
@@ -214,6 +220,19 @@ export default function Leaderboard() {
             <button className="login-btn" onClick={() => navigate('/profile')}>
               Entrar com Google
             </button>
+          </div>
+        )}
+
+        {/* Ad Banner - Leaderboard */}
+        {ADSENSE_PUBLISHER_ID && ADSENSE_SLOT_LEADERBOARD && (
+          <div className="leaderboard-ad">
+            <AdBanner
+              publisherId={ADSENSE_PUBLISHER_ID}
+              slotId={ADSENSE_SLOT_LEADERBOARD}
+              format="leaderboard"
+              className="ad-leaderboard"
+              testMode={ADSENSE_TEST_MODE}
+            />
           </div>
         )}
       </div>

@@ -12,7 +12,16 @@ import { getRankColor } from '../../utils/helpers';
 import { ActiveRooms } from '../../components/home/ActiveRooms';
 import { MiniLeaderboard } from '../../components/home/MiniLeaderboard';
 import { Changelog } from '../../components/home/Changelog';
+import { AdBanner } from '../../components/common/AdBanner';
 import './Home.css';
+
+// AdSense config - usar variáveis de ambiente do .env
+const ADSENSE_PUBLISHER_ID = import.meta.env.VITE_ADSENSE_PUBLISHER_ID || '';
+const AD_SLOTS = {
+  landing: import.meta.env.VITE_ADSENSE_SLOT_LANDING || '',
+  lobby: import.meta.env.VITE_ADSENSE_SLOT_LOBBY || '',
+};
+const ADSENSE_TEST_MODE = import.meta.env.VITE_ADSENSE_TEST_MODE === 'true';
 
 interface LeaderboardEntry {
   rank: number;
@@ -25,7 +34,7 @@ interface LeaderboardEntry {
 
 export default function Home() {
   const navigate = useNavigate();
-  const { user, isAuthenticated, login, logout, authError, clearAuthError } = useAuth();
+  const { user, isAuthenticated, isLoading, login, logout, authError, clearAuthError } = useAuth();
   const { socket, isConnected } = useSocket();
   const [topPlayers, setTopPlayers] = useState<LeaderboardEntry[]>([]);
   const [loadingLeaderboard, setLoadingLeaderboard] = useState(true);
@@ -98,6 +107,20 @@ export default function Home() {
       navigate('/multiplayer');
     }
   };
+
+  // ==========================================
+  // LOADING STATE - Evita flash durante verificacao de auth
+  // ==========================================
+  if (isLoading) {
+    return (
+      <div className="loading-splash">
+        <div className="loading-splash__content">
+          <h1 className="loading-splash__title">BANG SHOT</h1>
+          <div className="loading-splash__spinner" />
+        </div>
+      </div>
+    );
+  }
 
   // ==========================================
   // LANDING PAGE (Non-Authenticated)
@@ -179,6 +202,19 @@ export default function Home() {
             <span className="feature-text">Leaderboards</span>
           </div>
         </div>
+
+        {/* Ad Banner - Landing Page */}
+        {ADSENSE_PUBLISHER_ID && AD_SLOTS.landing && (
+          <div className="landing-ad">
+            <AdBanner
+              publisherId={ADSENSE_PUBLISHER_ID}
+              slotId={AD_SLOTS.landing}
+              format="responsive"
+              className="ad-landing"
+              testMode={ADSENSE_TEST_MODE}
+            />
+          </div>
+        )}
       </div>
     );
   }
@@ -231,7 +267,7 @@ export default function Home() {
             </svg>
             <span>Ranking</span>
           </button>
-          {user?.isAdmin && (
+          {user?.is_admin && (
             <button className="lobby-nav-item lobby-nav-item--admin" onClick={() => navigate('/admin')}>
               <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <circle cx="12" cy="12" r="3"/>
@@ -260,19 +296,19 @@ export default function Home() {
           </button>
           <div className="lobby-header__user" onClick={() => navigate('/profile')}>
             <div className="lobby-header__avatar-wrapper">
-              {user?.avatarUrl ? (
-                <img src={user.avatarUrl} alt={user.displayName} className="lobby-header__avatar" />
+              {user?.avatar_url ? (
+                <img src={user.avatar_url} alt={user.display_name} className="lobby-header__avatar" />
               ) : (
                 <div className="lobby-header__avatar lobby-header__avatar--placeholder">
-                  {user?.displayName.charAt(0).toUpperCase()}
+                  {user?.display_name?.charAt(0)?.toUpperCase() || '?'}
                 </div>
               )}
               <div className="lobby-header__level-badge">
-                <LevelBadge totalXp={user?.totalXp || 0} size="sm" />
+                <LevelBadge totalXp={user?.total_xp || 0} size="sm" />
               </div>
             </div>
             <div className="lobby-header__user-info">
-              <span className="lobby-header__username">{user?.displayName}</span>
+              <span className="lobby-header__username">{user?.display_name}</span>
               <span className="lobby-header__rank" style={{ color: getRankColor(user?.rank || '') }}>
                 {user?.rank}
               </span>
@@ -288,10 +324,22 @@ export default function Home() {
           <ActiveRooms />
         </section>
 
-        {/* Right Column - Leaderboard + Changelog */}
+        {/* Right Column - Leaderboard + Changelog + Ad */}
         <section className="lobby-body__right">
           <MiniLeaderboard />
           <Changelog />
+          {/* Ad Banner - Lobby */}
+          {ADSENSE_PUBLISHER_ID && AD_SLOTS.lobby && (
+            <div className="lobby-ad">
+              <AdBanner
+                publisherId={ADSENSE_PUBLISHER_ID}
+                slotId={AD_SLOTS.lobby}
+                format="rectangle"
+                className="ad-lobby"
+                testMode={ADSENSE_TEST_MODE}
+              />
+            </div>
+          )}
         </section>
       </main>
 
