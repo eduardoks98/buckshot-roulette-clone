@@ -90,6 +90,7 @@ interface Room {
   currentPlayerIndex: number;
   shells: ('live' | 'blank')[];
   currentShellIndex: number;
+  initialShellCount: number;  // Total shells at start of current round (for cylinder display)
   revealedShell: 'live' | 'blank' | null;
   turnTimeout: NodeJS.Timeout | null;
   turnStartTime: number | null;
@@ -262,6 +263,7 @@ export class GameService {
     // Usando generateShells de shared/utils/gameUtils
     room.shells = generateShells();
     room.currentShellIndex = 0;
+    room.initialShellCount = room.shells.length; // Track total shells for cylinder display
   }
 
   private distributeItems(room: Room): { playerId: string; items: Item[] }[] {
@@ -857,7 +859,8 @@ export class GameService {
 
   private getShellCountsForRoom(room: Room): ShellInfo {
     // Usando getShellCounts de shared/utils/gameUtils
-    return getShellCounts(room.shells, room.currentShellIndex);
+    // Passa initialShellCount para o cliente poder mostrar o cilindro corretamente
+    return getShellCounts(room.shells, room.currentShellIndex, room.initialShellCount);
   }
 
   // NOTA: As funções utilitárias (getRandomHP, getRandomInRange, shuffle)

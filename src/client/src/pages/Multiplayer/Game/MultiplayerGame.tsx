@@ -174,30 +174,46 @@ export default function MultiplayerGame() {
     }
   }, [state, socket, navigate]);
 
+  // Ref para evitar múltiplas tentativas de reconexão
+  const reconnectAttemptedRef = useRef(false);
+
   // Auto-reconnect quando Socket.IO reconecta automaticamente
   useEffect(() => {
     if (!socket || !isConnected) return;
+    if (reconnectAttemptedRef.current) return;
 
     const saved = localStorage.getItem('bangshotReconnect');
     if (!saved) return;
 
     try {
       const data = JSON.parse(saved);
-      const alreadyInRoom = players.some(p => p.id === socket.id);
-      if (alreadyInRoom) return;
 
-      if (players.length > 0) {
-        console.log('[Game] Socket reconectou com novo ID, tentando reconexão automática...');
-        socket.emit('reconnectToGame', {
-          roomCode: data.roomCode,
-          playerName: data.playerName,
-          reconnectToken: data.reconnectToken,
-        });
+      // Verificar se a sessão não expirou (5 minutos)
+      if (Date.now() - data.timestamp > 5 * 60 * 1000) {
+        localStorage.removeItem('bangshotReconnect');
+        return;
       }
+
+      // Verificar se já está na sala com este socket.id
+      const alreadyInRoom = players.some(p => p.id === socket.id);
+      if (alreadyInRoom) {
+        localStorage.removeItem('bangshotReconnect');
+        return;
+      }
+
+      // Marcar que já tentou reconectar para evitar tentativas duplicadas
+      reconnectAttemptedRef.current = true;
+
+      console.log('[Game] Tentando reconexão automática para sala:', data.roomCode);
+      socket.emit('reconnectToGame', {
+        roomCode: data.roomCode,
+        playerName: data.playerName,
+        reconnectToken: data.reconnectToken,
+      });
     } catch {
-      // ignore
+      localStorage.removeItem('bangshotReconnect');
     }
-  }, [socket, isConnected]);
+  }, [socket, isConnected, players]);
 
   // Socket event handlers
   useEffect(() => {
@@ -427,6 +443,8 @@ export default function MultiplayerGame() {
     // Reconnected
     socket.on('reconnected', (data) => {
       console.log('[Game] Reconectado com sucesso ao jogo:', data.roomCode);
+      // Limpar dados de reconexão antigos (novo token será enviado pelo servidor)
+      localStorage.removeItem('bangshotReconnect');
       setPlayers(data.players);
       setCurrentPlayerId(data.currentPlayer);
       setRound(data.round);
@@ -441,6 +459,8 @@ export default function MultiplayerGame() {
     // Reconnect error
     socket.on('reconnectError', (data) => {
       console.log('[Game] Erro ao reconectar:', data.message);
+      // Limpar dados de reconexão inválidos
+      localStorage.removeItem('bangshotReconnect');
       setMessage(`Erro: ${data.message}`);
     });
 
@@ -464,6 +484,7 @@ export default function MultiplayerGame() {
 
     // Player disconnected
     socket.on('playerDisconnected', ({ playerId, playerName, gracePeriod }) => {
+      console.log('[Game] Recebeu playerDisconnected:', { playerId, playerName, gracePeriod });
       setDisconnectedPlayers(prev => {
         if (prev.find(p => p.playerId === playerId)) return prev;
         return [...prev, {

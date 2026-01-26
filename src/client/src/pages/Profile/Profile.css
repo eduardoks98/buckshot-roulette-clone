@@ -238,6 +238,12 @@
 }
 
 .action-btn.logout {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  width: 100%;
+  margin-top: 1rem;
   background: transparent;
   color: var(--red-live);
   border: 1px solid var(--red-live);

@@ -26,10 +26,13 @@ interface Room {
   currentPlayerIndex: number;
   shells: ('live' | 'blank')[];
   currentShellIndex: number;
+  initialShellCount: number;  // Total shells at start of current round (for cylinder display)
   revealedShell: 'live' | 'blank' | null;
   turnTimeout: NodeJS.Timeout | null;
   turnStartTime: number | null;
   firstToDie: number | null;
+  // Grace period timer for empty waiting rooms (60s before deletion)
+  emptyRoomTimeout: NodeJS.Timeout | null;
 }
 
 interface PlayerStats {
@@ -98,7 +101,7 @@ export class RoomService {
   onGameCancelled?: (roomCode: string) => void;
   onPlayerWonByDefault?: (roomCode: string, player: Player) => void;
   onPlayerEliminated?: (roomCode: string, player: Player) => void;
-  onRoomDeleted?: (roomCode: string) => void;
+  onRoomDeleted?: (roomCode: string) => void; // Called when room is deleted after grace period
 
   // ==========================================
   // HELPERS
@@ -223,10 +226,12 @@ export class RoomService {
       currentPlayerIndex: 0,
       shells: [],
       currentShellIndex: 0,
+      initialShellCount: 0,
       revealedShell: null,
       turnTimeout: null,
       turnStartTime: null,
       firstToDie: null,
+      emptyRoomTimeout: null,
     };
 
     this.rooms.set(code, room);
@@ -257,6 +262,13 @@ export class RoomService {
       return { error: 'Senha incorreta' };
     }
 
+    // Cancelar grace period se existir (alguém entrou na sala vazia)
+    if (room.emptyRoomTimeout) {
+      console.log(`[Room] Jogador entrou na sala ${code} - cancelando grace period`);
+      clearTimeout(room.emptyRoomTimeout);
+      room.emptyRoomTimeout = null;
+    }
+
     room.players.push(this.createPlayer(socketId, playerName));
 
     return {
@@ -270,6 +282,7 @@ export class RoomService {
     room: Room;
     players: PlayerPublicState[];
     deleted: boolean;
+    gracePeriodStarted: boolean;
   } | null {
     const found = this.findRoomByPlayer(socketId);
     if (!found) return null;
@@ -281,15 +294,33 @@ export class RoomService {
 
     room.players.splice(playerIndex, 1);
 
-    // Se não há mais jogadores, deletar a sala
+    // Se não há mais jogadores
     if (room.players.length === 0) {
-      this.rooms.delete(code);
-      return { code, room, players: [], deleted: true };
+      // Se o jogo já começou, deletar imediatamente
+      if (room.started) {
+        this.rooms.delete(code);
+        return { code, room, players: [], deleted: true, gracePeriodStarted: false };
+      }
+
+      // Waiting room vazia - iniciar grace period de 60s
+      console.log(`[Room] Sala ${code} está vazia - iniciando grace period de 60s`);
+      room.emptyRoomTimeout = setTimeout(() => {
+        // Verificar se a sala ainda existe e está vazia
+        const currentRoom = this.rooms.get(code);
+        if (currentRoom && currentRoom.players.length === 0) {
+          console.log(`[Room] Grace period expirado - deletando sala ${code}`);
+          this.rooms.delete(code);
+          this.onRoomDeleted?.(code);
+        }
+      }, 60000); // 60 segundos
+
+      return { code, room, players: [], deleted: false, gracePeriodStarted: true };
     }
 
     // Transferir host se necessário
     if (room.host === socketId) {
       room.host = room.players[0].id;
+      room.hostName = room.players[0].name;
     }
 
     return {
@@ -297,6 +328,7 @@ export class RoomService {
       room,
       players: room.players.map(p => this.toPublicPlayer(p)),
       deleted: false,
+      gracePeriodStarted: false,
     };
   }
 
@@ -357,15 +389,19 @@ export class RoomService {
     newHost?: string;
   } | null {
     const found = this.findRoomByPlayer(socketId);
+    console.log(`[RoomService] handleDisconnect - socketId: ${socketId}, found:`, found ? { code: found.code, started: found.room.started, playersCount: found.room.players.length } : null);
     if (!found) return null;
 
     const { code, room } = found;
     const player = room.players.find(p => p.id === socketId);
+    console.log(`[RoomService] handleDisconnect - player:`, player ? { name: player.name, id: player.id } : null);
+    console.log(`[RoomService] handleDisconnect - all players:`, room.players.map(p => ({ id: p.id, name: p.name })));
     if (!player) return null;
 
     const playerName = player.name;
     let newHost: string | undefined;
 
+    console.log(`[RoomService] handleDisconnect - room.started: ${room.started}`);
     // Se jogo não começou, remover jogador normalmente
     if (!room.started) {
       const result = this.leaveRoom(socketId);

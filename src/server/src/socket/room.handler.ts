@@ -193,6 +193,9 @@ export function setupRoomCallbacks(
   roomService.onRoomDeleted = (roomCode: string) => {
     gamePersistenceService.deleteGame(roomCode)
       .catch(err => console.error('[DB] Erro ao deletar jogo após grace period:', err));
+    // Notificar todos os clientes que a sala foi deletada
+    io.emit('roomDeleted', { code: roomCode });
+    console.log(`[Room] Sala ${roomCode} deletada após grace period de 60s`);
   };
 
   console.log('[Room] Callbacks do room service configurados');
@@ -295,17 +298,21 @@ export function registerRoomHandlers(
         console.log(`[Room] Jogador saiu da sala ${result.code}`);
 
         if (result.deleted) {
-          // Sala foi deletada - deletar game do banco também
+          // Sala foi deletada imediatamente (jogo em andamento)
           gamePersistenceService.deleteGame(result.code)
             .catch(err => console.error('[DB] Erro ao deletar jogo:', err));
           console.log(`[Room] Sala ${result.code} deletada - game removido do banco`);
-          // Notificar todos os clientes que a sala foi deletada (para atualizar lista)
           io.emit('roomDeleted', { code: result.code });
+        } else if (result.gracePeriodStarted) {
+          // Sala vazia em waiting room - grace period iniciado (60s)
+          console.log(`[Room] Sala ${result.code} em grace period de 60s`);
+          // Não notificar roomDeleted ainda - será feito pelo callback onRoomDeleted
+          io.emit('roomUpdated', { code: result.code });
         } else {
+          // Sala ainda tem jogadores
           io.to(result.code).emit('playerLeft', {
             players: result.players,
           });
-          // Notificar todos os clientes que a sala foi atualizada
           io.emit('roomUpdated', { code: result.code });
         }
       }
@@ -368,6 +375,7 @@ export function registerRoomHandlers(
 
           // Enviar credenciais de reconexão
           if (player.reconnectToken) {
+            console.log(`[Room] Enviando reconnectCredentials para ${player.name}`);
             playerSocket.emit('reconnectCredentials', {
               roomCode: result.room.code,
               playerName: player.name,
@@ -391,8 +399,11 @@ export function registerRoomHandlers(
   // DISCONNECT (handled separately)
   // ==========================================
   socket.on('disconnect', () => {
+    console.log(`[Room] Socket ${socket.id} desconectou`);
+    console.log(`[Room] Rooms do socket antes de processar:`, Array.from(socket.rooms));
     try {
       const result = roomService.handleDisconnect(socket.id);
+      console.log(`[Room] handleDisconnect result:`, result ? { code: result.code, gameInProgress: result.gameInProgress, playerName: result.playerName, deleted: result.deleted } : null);
 
       if (result && result.room) {
         if (result.deleted) {
@@ -404,6 +415,7 @@ export function registerRoomHandlers(
           io.emit('roomDeleted', { code: result.code });
         } else if (result.gameInProgress) {
           // Notificar sobre desconexão durante jogo
+          console.log(`[Room] Emitindo playerDisconnected para sala ${result.code}: ${result.playerName}`);
           io.to(result.code).emit('playerDisconnected', {
             playerId: socket.id,
             playerName: result.playerName,

@@ -33,10 +33,6 @@ export default function WaitingRoom() {
   const state = location.state as LocationState | null;
   const reconnectAttempted = useRef(false);
   const gameStarted = useRef(false);
-  const hasLeft = useRef(false);
-  const isInRoom = useRef(false); // Será true só após montagem estável
-  const socketRef = useRef(socket);
-  const mountedRef = useRef(false); // Para detectar StrictMode double-mount
 
   // Redirecionar se não autenticado
   useEffect(() => {
@@ -116,7 +112,6 @@ export default function WaitingRoom() {
       setIsHost(data.isHost);
       setPlayers(data.players);
       setReconnecting(false);
-      isInRoom.current = true; // Reconectou com sucesso
     };
 
     const handleJoinError = (message: string) => {
@@ -193,23 +188,9 @@ export default function WaitingRoom() {
     };
   }, [socket, state, navigate, roomCode, players]);
 
-  // Manter socketRef atualizado
-  useEffect(() => {
-    socketRef.current = socket;
-  }, [socket]);
-
-  // Cleanup quando componente desmonta (navegação para outra página)
-  // Usa refs para evitar problemas com React.StrictMode e dependências
-  // IMPORTANTE: Só emite leaveRoom se realmente está na sala (isInRoom)
-  useEffect(() => {
-    return () => {
-      if (!hasLeft.current && socketRef.current && !gameStarted.current && isInRoom.current) {
-        hasLeft.current = true;
-        localStorage.removeItem('bangshotSession');
-        socketRef.current.emit('leaveRoom');
-      }
-    };
-  }, []);
+  // NÃO fazemos cleanup automático ao desmontar.
+  // O servidor controla o grace period de 60s para reconexão.
+  // Se o jogador sair explicitamente, usa handleLeaveRoom.
 
   const handleStartGame = () => {
     if (!socket || !isHost) return;
@@ -217,12 +198,12 @@ export default function WaitingRoom() {
     socket.emit('startGame');
   };
 
-  const handleLeaveRoom = () => {
-    if (!socket) return;
-    hasLeft.current = true; // Evita emit duplicado no cleanup
-    localStorage.removeItem('bangshotSession');
-    socket.emit('leaveRoom');
-  };
+  // TODO: Implement leave room functionality
+  // const handleLeaveRoom = () => {
+  //   if (!socket) return;
+  //   localStorage.removeItem('bangshotSession');
+  //   socket.emit('leaveRoom');
+  // };
 
   const handleCopyCode = async () => {
     try {
@@ -257,12 +238,6 @@ export default function WaitingRoom() {
   return (
     <PageLayout title="Sala de Espera">
       <div className="waiting-room-content">
-        <div className="waiting-room-actions">
-          <button className="leave-room-btn" onClick={handleLeaveRoom}>
-            Sair da Sala
-          </button>
-        </div>
-
         <div className="room-code-display">
           <span className="code-label">Codigo da Sala</span>
           <div className="code-value" onClick={handleCopyCode}>

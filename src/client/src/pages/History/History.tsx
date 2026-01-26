@@ -156,22 +156,10 @@ export default function History() {
     );
   }
 
-  // Not logged in
+  // Not logged in - redirect to home
   if (!user) {
-    return (
-      <div className="history-container--login">
-        <button className="back-btn" onClick={() => navigate('/')}>
-          Voltar
-        </button>
-        <h1 className="page-title">HISTORICO</h1>
-        <div className="login-required">
-          <p>Faca login para ver seu historico de partidas</p>
-          <button className="action-btn primary" onClick={() => navigate('/profile')}>
-            Fazer Login
-          </button>
-        </div>
-      </div>
-    );
+    navigate('/');
+    return null;
   }
 
   return (

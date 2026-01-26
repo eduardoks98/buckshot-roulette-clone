@@ -4,17 +4,16 @@
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getRankColor } from '../../../utils/helpers';
+import { getRankColor, getRankFromElo } from '../../../utils/helpers';
 import './MiniLeaderboard.css';
 
 interface LeaderboardEntry {
   rank: number;
-  userId: string;
-  displayName: string;
-  avatarUrl?: string;
-  eloRating: number;
-  userRank: string;
-  gamesWon: number;
+  user_id: string;
+  display_name: string;
+  avatar_url?: string;
+  elo_rating: number;
+  games_won: number;
 }
 
 export function MiniLeaderboard() {
@@ -71,23 +70,23 @@ export function MiniLeaderboard() {
           <div className="mini-leaderboard__list">
             {players.map((player, index) => (
               <div
-                key={player.userId}
+                key={player.user_id || `player-${index}`}
                 className={`leaderboard-entry ${index < 3 ? `leaderboard-entry--top${index + 1}` : ''}`}
               >
                 <span className="leaderboard-entry__rank">{getRankIcon(index + 1)}</span>
                 <div className="leaderboard-entry__avatar">
-                  {player.avatarUrl ? (
-                    <img src={player.avatarUrl} alt={player.displayName} />
+                  {player.avatar_url ? (
+                    <img src={player.avatar_url} alt={player.display_name || 'Jogador'} />
                   ) : (
-                    <span>{player.displayName.charAt(0).toUpperCase()}</span>
+                    <span>{(player.display_name || '?').charAt(0).toUpperCase()}</span>
                   )}
                 </div>
-                <span className="leaderboard-entry__name">{player.displayName}</span>
+                <span className="leaderboard-entry__name">{player.display_name || 'Jogador'}</span>
                 <span
                   className="leaderboard-entry__elo"
-                  style={{ color: getRankColor(player.userRank || 'Bronze') }}
+                  style={{ color: getRankColor(getRankFromElo(player.elo_rating)) }}
                 >
-                  {player.eloRating}
+                  {player.elo_rating}
                 </span>
               </div>
             ))}

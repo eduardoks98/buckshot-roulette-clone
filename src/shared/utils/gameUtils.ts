@@ -14,6 +14,8 @@ export interface ShellInfo {
   total: number;
   live: number;
   blank: number;
+  initialTotal?: number;     // Total shells at start of round (for cylinder display)
+  currentPosition?: number;  // Current position in the cylinder (0 = first shell)
 }
 
 // ==========================================
@@ -98,13 +100,18 @@ export function generateShells(): ShellType[] {
 
 /**
  * Conta os shells restantes a partir de um índice
+ * @param shells - Array de shells
+ * @param currentIndex - Índice atual no cilindro
+ * @param initialTotal - Total inicial de shells na rodada (opcional, para display do cilindro)
  */
-export function getShellCounts(shells: ShellType[], currentIndex: number): ShellInfo {
+export function getShellCounts(shells: ShellType[], currentIndex: number, initialTotal?: number): ShellInfo {
   const remaining = shells.slice(currentIndex);
   return {
     total: remaining.length,
     live: remaining.filter(s => s === 'live').length,
     blank: remaining.filter(s => s === 'blank').length,
+    initialTotal: initialTotal ?? shells.length,
+    currentPosition: currentIndex,
   };
 }
 

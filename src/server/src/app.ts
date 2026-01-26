@@ -8,7 +8,7 @@ import http from 'http';
 import path from 'path';
 import passport from './config/passport.config';
 import { ENV } from './config/env.config';
-import { getOnlineCount, roomService } from './socket';
+import { getOnlineCount } from './socket';
 import authRoutes from './routes/auth.routes';
 import leaderboardRoutes from './routes/leaderboard.routes';
 import historyRoutes from './routes/history.routes';
@@ -70,20 +70,13 @@ export function createServer(): { app: Express; httpServer: http.Server } {
     res.json(getOnlineCount());
   });
 
-  // Leave room endpoint (para sendBeacon quando usuário fecha aba/navegador)
-  app.post('/api/leave-room', (req: Request, res: Response) => {
-    const { socketId } = req.body;
-
-    if (!socketId) {
-      return res.status(400).json({ error: 'socketId required' });
-    }
-
-    const result = roomService.leaveRoom(socketId);
-
-    if (result?.deleted) {
-      console.log(`[API] Sala ${result.code} deletada via beacon`);
-    }
-
+  // Leave room endpoint - DESATIVADO
+  // O servidor detecta desconexões automaticamente via Socket.IO disconnect event.
+  // Não devemos forçar leaveRoom via beacon porque isso impede o grace period de reconexão.
+  // Se o jogador fechar a aba durante um jogo, ele tem 60s para reconectar.
+  app.post('/api/leave-room', (_req: Request, res: Response) => {
+    // Endpoint mantido para compatibilidade mas não faz nada
+    // A desconexão é tratada pelo Socket.IO disconnect handler
     res.json({ ok: true });
   });
 

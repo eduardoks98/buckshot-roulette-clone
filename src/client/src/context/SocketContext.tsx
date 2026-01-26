@@ -121,31 +121,12 @@ export function SocketProvider({ children }: SocketProviderProps) {
   }, []);
 
   // Handler para quando o usuário fecha a aba/navegador
-  useEffect(() => {
-    const handleBeforeUnload = () => {
-      // Tentar enviar leaveRoom via socket
-      if (socketRef.current?.connected) {
-        socketRef.current.emit('leaveRoom');
-      }
-
-      // Usar sendBeacon como fallback para garantir que o servidor seja notificado
-      const serverUrl = API_URL || window.location.origin;
-
-      const socketId = socketRef.current?.id;
-      if (socketId) {
-        navigator.sendBeacon(
-          `${serverUrl}/api/leave-room`,
-          JSON.stringify({ socketId })
-        );
-      }
-    };
-
-    window.addEventListener('beforeunload', handleBeforeUnload);
-
-    return () => {
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-    };
-  }, []);
+  // IMPORTANTE: NÃO emitir leaveRoom aqui!
+  // O servidor detecta a desconexão automaticamente via Socket.IO disconnect event.
+  // Se emitirmos leaveRoom antes do disconnect, o jogador é removido da sala
+  // e perde a chance de reconectar durante o grace period.
+  //
+  // O leaveRoom só deve ser chamado EXPLICITAMENTE quando o jogador clica em "Sair".
 
   const value: SocketContextType = {
     socket,

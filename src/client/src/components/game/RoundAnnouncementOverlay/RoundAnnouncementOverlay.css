@@ -1,0 +1,335 @@
+/* ==========================================
+   ROUND ANNOUNCEMENT OVERLAY - Shell Loading Animation
+   ========================================== */
+
+.round-announcement-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.92);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: overlay-fade-in 0.4s ease;
+  pointer-events: auto;
+}
+
+@keyframes overlay-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.round-announcement {
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.5rem;
+  animation: announcement-scale 0.5s ease;
+}
+
+@keyframes announcement-scale {
+  from { transform: scale(0.8); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+/* ==========================================
+   TITLE
+   ========================================== */
+
+.round-title {
+  font-size: 2.5rem;
+  color: var(--gold-accent, #d4a418);
+  text-shadow: 0 0 30px rgba(212, 164, 24, 0.5);
+  margin: 0;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  animation: title-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes title-pulse {
+  0%, 100% { text-shadow: 0 0 30px rgba(212, 164, 24, 0.5); }
+  50% { text-shadow: 0 0 50px rgba(212, 164, 24, 0.8); }
+}
+
+/* ==========================================
+   CYLINDER LOADING AREA
+   ========================================== */
+
+.cylinder-loading-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+  margin: 1rem 0;
+}
+
+/* ==========================================
+   SHELLS QUEUE - Shells waiting to be loaded
+   ========================================== */
+
+.shells-queue {
+  display: flex;
+  gap: 0.5rem;
+  justify-content: center;
+  flex-wrap: wrap;
+  max-width: 400px;
+  min-height: 50px;
+}
+
+.shell-to-load {
+  width: 22px;
+  height: 44px;
+  position: relative;
+  animation: shell-appear 0.3s ease-out backwards;
+}
+
+.shell-to-load .shell-body {
+  width: 100%;
+  height: 100%;
+  border-radius: 4px 4px 11px 11px;
+  position: relative;
+  transition: all 0.3s ease;
+}
+
+.shell-to-load .shell-tip {
+  position: absolute;
+  top: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 8px;
+  height: 5px;
+  border-radius: 3px 3px 0 0;
+  background: rgba(255, 255, 255, 0.5);
+}
+
+/* Live shell */
+.shell-to-load.live .shell-body {
+  background: linear-gradient(180deg,
+    #fca5a5 0%,
+    #ef4444 20%,
+    #dc2626 50%,
+    #b91c1c 100%
+  );
+  box-shadow:
+    0 4px 15px rgba(239, 68, 68, 0.6),
+    inset 0 2px 4px rgba(255, 255, 255, 0.3);
+}
+
+/* Blank shell */
+.shell-to-load.blank .shell-body {
+  background: linear-gradient(180deg,
+    #93c5fd 0%,
+    #3b82f6 20%,
+    #2563eb 50%,
+    #1d4ed8 100%
+  );
+  box-shadow:
+    0 4px 15px rgba(59, 130, 246, 0.6),
+    inset 0 2px 4px rgba(255, 255, 255, 0.3);
+}
+
+/* Shell being loaded - animate into cylinder */
+.shell-to-load.loading {
+  animation: shell-load-into-cylinder 0.3s ease-in forwards;
+}
+
+@keyframes shell-load-into-cylinder {
+  0% {
+    transform: translateY(0) scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: translateY(-80px) scale(0.8);
+    opacity: 0.8;
+  }
+  100% {
+    transform: translateY(-120px) scale(0.3);
+    opacity: 0;
+  }
+}
+
+/* Shell already loaded - hidden */
+.shell-to-load.loaded {
+  opacity: 0;
+  transform: scale(0);
+  width: 0;
+  margin: 0;
+  padding: 0;
+  transition: all 0.2s ease;
+}
+
+@keyframes shell-appear {
+  0% {
+    opacity: 0;
+    transform: translateY(20px) rotate(-10deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) rotate(0);
+  }
+}
+
+/* ==========================================
+   SHELL INFO (count legend)
+   ========================================== */
+
+.shell-info {
+  display: flex;
+  gap: 2rem;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: all 0.5s ease;
+}
+
+.shell-info.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.shell-count {
+  font-size: 1.3rem;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+}
+
+.shell-count.live {
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.15);
+  border: 2px solid rgba(239, 68, 68, 0.4);
+  text-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+}
+
+.shell-count.blank {
+  color: #3b82f6;
+  background: rgba(59, 130, 246, 0.15);
+  border: 2px solid rgba(59, 130, 246, 0.4);
+  text-shadow: 0 0 10px rgba(59, 130, 246, 0.5);
+}
+
+/* ==========================================
+   HP ANNOUNCEMENT
+   ========================================== */
+
+.hp-announcement {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.3rem;
+  color: #fff;
+  opacity: 0;
+  transform: translateY(10px);
+  transition: all 0.5s ease 0.2s;
+}
+
+.hp-announcement.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ==========================================
+   LOADING / READY TEXT
+   ========================================== */
+
+.loading-text {
+  font-size: 1rem;
+  color: rgba(255, 255, 255, 0.6);
+  font-style: italic;
+  animation: loading-pulse 1s ease-in-out infinite;
+}
+
+@keyframes loading-pulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+.ready-text {
+  font-size: 1.8rem;
+  font-weight: bold;
+  color: var(--gold-accent, #d4a418);
+  text-transform: uppercase;
+  letter-spacing: 4px;
+  animation: ready-appear 0.5s ease;
+  text-shadow: 0 0 20px rgba(212, 164, 24, 0.6);
+}
+
+@keyframes ready-appear {
+  0% {
+    opacity: 0;
+    transform: scale(0.5);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* ==========================================
+   RESPONSIVE
+   ========================================== */
+
+@media (max-width: 768px) {
+  .round-title {
+    font-size: 2rem;
+  }
+
+  .shells-queue {
+    max-width: 300px;
+    gap: 0.4rem;
+  }
+
+  .shell-to-load {
+    width: 18px;
+    height: 36px;
+  }
+
+  .shell-count {
+    font-size: 1.1rem;
+    padding: 0.4rem 0.8rem;
+  }
+
+  .hp-announcement {
+    font-size: 1.1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .round-title {
+    font-size: 1.6rem;
+  }
+
+  .shell-info {
+    gap: 1rem;
+  }
+
+  .shell-count {
+    font-size: 1rem;
+    padding: 0.3rem 0.6rem;
+    letter-spacing: 1px;
+  }
+
+  .shells-queue {
+    max-width: 250px;
+    gap: 0.3rem;
+  }
+
+  .shell-to-load {
+    width: 16px;
+    height: 32px;
+  }
+
+  .ready-text {
+    font-size: 1.4rem;
+    letter-spacing: 3px;
+  }
+}

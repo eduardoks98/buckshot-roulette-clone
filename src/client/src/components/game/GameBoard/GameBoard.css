@@ -388,8 +388,21 @@
 }
 
 /* ==========================================
-   SHOTGUN AREA
+   REVOLVER AREA (replaces shotgun)
    ========================================== */
+.revolver-area {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin: 1.5rem 0;
+  padding: 2rem;
+  background: radial-gradient(ellipse at center, rgba(40, 40, 40, 0.5) 0%, transparent 70%);
+  gap: 1.5rem;
+}
+
+/* Keep shotgun styles for backwards compatibility */
 .shotgun-area {
   flex: 1;
   display: flex;
@@ -883,6 +896,11 @@
     transform: scale(0.85);
   }
 
+  .revolver-area {
+    padding: 1.5rem;
+    margin: 1rem 0;
+  }
+
   .shoot-btn {
     padding: 1rem 2.5rem;
     font-size: 1.2rem;
@@ -910,6 +928,12 @@
 
   .shotgun {
     transform: scale(0.6);
+  }
+
+  .revolver-area {
+    padding: 1rem;
+    margin: 0.75rem 0;
+    gap: 1rem;
   }
 
   .item-btn {

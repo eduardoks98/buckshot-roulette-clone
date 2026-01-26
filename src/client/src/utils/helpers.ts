@@ -70,3 +70,16 @@ export const calculateKD = (kills: number, deaths: number): string => {
   if (deaths === 0) return kills.toString();
   return (kills / deaths).toFixed(2);
 };
+
+/**
+ * Converte ELO rating para nome do rank
+ */
+export const getRankFromElo = (elo: number): string => {
+  if (elo >= 2500) return 'Grandmaster';
+  if (elo >= 2200) return 'Master';
+  if (elo >= 1900) return 'Diamond';
+  if (elo >= 1600) return 'Platinum';
+  if (elo >= 1300) return 'Gold';
+  if (elo >= 1000) return 'Silver';
+  return 'Bronze';
+};

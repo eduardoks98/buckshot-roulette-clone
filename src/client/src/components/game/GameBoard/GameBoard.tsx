@@ -3,6 +3,22 @@
 // ==========================================
 
 import { useMemo } from 'react';
+import { RevolverCylinder } from '../RevolverCylinder';
+import {
+  HeartFullIcon,
+  HeartEmptyIcon,
+  TrophyIcon,
+  ChainedIcon,
+  HandSawIcon,
+  ExplosionIcon,
+  SmokeIcon,
+  TargetIcon,
+  AdrenalineIcon,
+  ShellLiveIcon,
+  ShellBlankIcon,
+  ITEM_ICONS,
+  ItemIconId,
+} from '../../icons';
 import './GameBoard.css';
 
 // ========================================
@@ -31,6 +47,8 @@ export interface ShellInfo {
   total: number;
   live: number;
   blank: number;
+  initialTotal?: number;  // Total shells at start of round (for cylinder display)
+  currentPosition?: number;  // Current position in the cylinder (0 = first shell)
 }
 
 export interface ShotResult {
@@ -96,6 +114,19 @@ export interface GameBoardProps {
 
   // Extra content
   children?: React.ReactNode;
+}
+
+// ========================================
+// HELPER: Render Item Icon
+// ========================================
+
+function ItemIcon({ item, size = 20 }: { item: GameItem; size?: number }) {
+  const IconComponent = ITEM_ICONS[item.id as ItemIconId];
+  if (IconComponent) {
+    return <IconComponent size={size} color="var(--gold-accent, #d4a418)" />;
+  }
+  // Fallback to emoji if no icon found
+  return <span style={{ fontSize: size * 0.8 }}>{item.emoji}</span>;
 }
 
 // ========================================
@@ -182,7 +213,7 @@ export default function GameBoard({
             {turnTimer}s
           </div>
         )}
-        <button className="back-btn-small" onClick={onBack}>← Sair</button>
+        <button className="back-btn-small" onClick={onBack}>Sair</button>
       </div>
 
       {/* ========== MESSAGE ========== */}
@@ -193,6 +224,9 @@ export default function GameBoard({
       {/* ========== REVEALED SHELL (Magnifying Glass) ========== */}
       {revealedShell && !gameOverData && (
         <div className={`revealed-shell ${revealedShell}`}>
+          <span className="revealed-shell__icon">
+            {revealedShell === 'live' ? <ShellLiveIcon size={24} /> : <ShellBlankIcon size={24} />}
+          </span>
           Proximo cartucho: {revealedShell === 'live' ? 'VIVA' : 'VAZIA'}
         </div>
       )}
@@ -208,21 +242,26 @@ export default function GameBoard({
             <div className="opponent-name">
               {player.name}
               {player.roundWins !== undefined && player.roundWins > 0 && (
-                <span className="round-wins">🏆{player.roundWins}</span>
+                <span className="round-wins">
+                  <TrophyIcon size={14} color="#fbbf24" />
+                  {player.roundWins}
+                </span>
               )}
-              {player.handcuffed && <span className="status-icon">🔗</span>}
-              {player.sawedOff && <span className="status-icon">🪚</span>}
+              {player.handcuffed && <span className="status-icon"><ChainedIcon size={16} color="var(--gold-accent)" /></span>}
+              {player.sawedOff && <span className="status-icon"><HandSawIcon size={16} color="var(--gold-accent)" /></span>}
             </div>
             <div className="opponent-hp">
               {Array.from({ length: player.maxHp }).map((_, i) => (
                 <span key={i} className={`hp-heart ${i < player.hp ? 'full' : 'empty'}`}>
-                  {i < player.hp ? '❤️' : '🖤'}
+                  {i < player.hp ? <HeartFullIcon size={18} /> : <HeartEmptyIcon size={18} />}
                 </span>
               ))}
             </div>
             <div className="opponent-items">
               {player.items.slice(0, 8).map((item, i) => (
-                <span key={i} className="item-icon">{item.emoji}</span>
+                <span key={i} className="item-icon">
+                  <ItemIcon item={item} size={18} />
+                </span>
               ))}
             </div>
 
@@ -234,15 +273,21 @@ export default function GameBoard({
         ))}
       </div>
 
-      {/* ========== SHOTGUN AREA ========== */}
-      <div className="shotgun-area">
-        <div className={`shotgun ${isMyTurn ? 'active' : ''} ${shotAnimation ? `shot-${shotAnimation}` : ''}`}>
-          <div className="shotgun-barrel"></div>
-          <div className="shotgun-body"></div>
-          {shotAnimation && <div className={`muzzle-flash ${shotAnimation}`}></div>}
-        </div>
+      {/* ========== REVOLVER CYLINDER AREA ========== */}
+      <div className="revolver-area">
+        <RevolverCylinder
+          totalChambers={shells.initialTotal || shells.total}
+          remainingShells={shells.total}
+          currentPosition={shells.currentPosition || 0}
+          revealedChambers={revealedShell ? [{ position: shells.currentPosition || 0, type: revealedShell }] : []}
+          spentChambers={Array.from({ length: (shells.initialTotal || shells.total) - shells.total }, (_, i) => i)}
+          isSpinning={shotAnimation !== null}
+          isActive={isMyTurn}
+          shotResult={shotAnimation}
+          size="md"
+        />
 
-        {/* Shoot buttons - IDENTICAL for SinglePlayer and Multiplayer */}
+        {/* Shoot buttons */}
         {isMyTurn && !hasActiveOverlay && selectedTarget && (
           <button
             className={`shoot-btn ${!canAct ? 'disabled' : ''}`}
@@ -275,19 +320,29 @@ export default function GameBoard({
         )}
 
         {me && me.roundWins !== undefined && me.roundWins > 0 && (
-          <span className="my-round-wins">🏆 {me.roundWins}</span>
+          <span className="my-round-wins">
+            <TrophyIcon size={18} color="#fbbf24" /> {me.roundWins}
+          </span>
         )}
 
         <div className="my-hp">
           {Array.from({ length: me?.maxHp || 0 }).map((_, i) => (
             <span key={i} className={`hp-heart ${i < (me?.hp || 0) ? 'full' : 'empty'}`}>
-              {i < (me?.hp || 0) ? '❤️' : '🖤'}
+              {i < (me?.hp || 0) ? <HeartFullIcon size={28} /> : <HeartEmptyIcon size={28} />}
             </span>
           ))}
         </div>
 
-        {me?.handcuffed && <span className="my-status-effect">Algemado</span>}
-        {me?.sawedOff && <span className="my-status-effect">Serrada (2x dano)</span>}
+        {me?.handcuffed && (
+          <span className="my-status-effect">
+            <ChainedIcon size={16} color="var(--gold-accent)" /> Algemado
+          </span>
+        )}
+        {me?.sawedOff && (
+          <span className="my-status-effect">
+            <HandSawIcon size={16} color="var(--gold-accent)" /> Serrada (2x dano)
+          </span>
+        )}
       </div>
 
       {/* ========== MY ITEMS ========== */}
@@ -300,7 +355,7 @@ export default function GameBoard({
             disabled={!canAct}
             title={item.name}
           >
-            {item.emoji}
+            <ItemIcon item={item} size={28} />
           </button>
         ))}
         {myItems.length === 0 && <p className="no-items">Sem itens</p>}
@@ -317,17 +372,23 @@ export default function GameBoard({
       {roundAnnouncement && !gameOverData && (
         <div className="round-announcement-overlay">
           <div className="round-announcement">
-            <h2>🎯 RODADA {roundAnnouncement.round}</h2>
+            <h2><TargetIcon size={36} color="var(--gold-accent)" /> RODADA {roundAnnouncement.round}</h2>
             <div className="shell-distribution">
               <div className="shells-visual-container">
                 <ShellIcons live={roundAnnouncement.live} blank={roundAnnouncement.blank} />
               </div>
               <div className="shell-legend">
-                <span className="legend-item live">🔴 {roundAnnouncement.live} LIVE</span>
-                <span className="legend-item blank">🔵 {roundAnnouncement.blank} BLANK</span>
+                <span className="legend-item live">
+                  <ShellLiveIcon size={20} /> {roundAnnouncement.live} LIVE
+                </span>
+                <span className="legend-item blank">
+                  <ShellBlankIcon size={20} /> {roundAnnouncement.blank} BLANK
+                </span>
               </div>
             </div>
-            <div className="hp-announcement">❤️ {roundAnnouncement.hp} HP cada</div>
+            <div className="hp-announcement">
+              <HeartFullIcon size={24} /> {roundAnnouncement.hp} HP cada
+            </div>
           </div>
         </div>
       )}
@@ -338,13 +399,13 @@ export default function GameBoard({
           <div className="shot-result">
             {lastShotResult.type === 'live' ? (
               <>
-                <div className="shot-icon">💥</div>
+                <div className="shot-icon"><ExplosionIcon size={80} /></div>
                 <div className="shot-text">BALA REAL!</div>
                 <div className="shot-damage">-{lastShotResult.damage} HP</div>
               </>
             ) : (
               <>
-                <div className="shot-icon">💨</div>
+                <div className="shot-icon"><SmokeIcon size={80} /></div>
                 <div className="shot-text">VAZIA</div>
                 <div className="shot-info">Sem dano</div>
               </>
@@ -360,7 +421,7 @@ export default function GameBoard({
       {stealModalData && !gameOverData && onStealItem && onCancelSteal && (
         <div className="steal-modal-overlay">
           <div className="steal-modal">
-            <h3>💉 Roubar item de {stealModalData.playerName}</h3>
+            <h3><AdrenalineIcon size={24} color="var(--gold-accent)" /> Roubar item de {stealModalData.playerName}</h3>
             <p className="steal-instruction">Selecione um item para roubar e USAR IMEDIATAMENTE:</p>
             <div className="steal-items">
               {stealModalData.items.filter(item => item.id !== 'adrenaline').length > 0 ? (
@@ -372,14 +433,16 @@ export default function GameBoard({
                       key={originalIndex}
                       className="steal-item-btn"
                       onClick={() => onStealItem(originalIndex)}
-                      title={`${item.name} (será usado imediatamente)`}
+                      title={`${item.name} (sera usado imediatamente)`}
                     >
-                      <span className="steal-item-emoji">{item.emoji}</span>
+                      <span className="steal-item-emoji">
+                        <ItemIcon item={item} size={32} />
+                      </span>
                       <span className="steal-item-name">{item.name}</span>
                     </button>
                   ))
               ) : (
-                <p className="no-items-to-steal">Sem itens roubáveis!</p>
+                <p className="no-items-to-steal">Sem itens roubaveis!</p>
               )}
             </div>
             <button className="steal-cancel-btn" onClick={onCancelSteal}>

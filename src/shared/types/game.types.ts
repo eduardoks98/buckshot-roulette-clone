@@ -12,6 +12,8 @@ export interface ShellInfo {
   total: number;
   live: number;
   blank: number;
+  initialTotal?: number;     // Total shells at start of round (for cylinder display)
+  currentPosition?: number;  // Current position in the cylinder (0 = first shell)
 }
 
 export interface RoundConfig {
