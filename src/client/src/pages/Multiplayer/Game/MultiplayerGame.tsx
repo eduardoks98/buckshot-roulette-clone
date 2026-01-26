@@ -827,12 +827,12 @@ export default function MultiplayerGame() {
                   <thead>
                     <tr>
                       <th>Jogador</th>
-                      <th>ROUNDS</th>
-                      <th>DANO</th>
-                      <th>SOFRIDO</th>
-                      <th>AUTO</th>
-                      <th>TIROS</th>
-                      <th>KILLS</th>
+                      <th title="Rounds vencidos">ROUNDS</th>
+                      <th title="Dano causado em outros jogadores">DANO</th>
+                      <th title="Dano recebido de outros jogadores">SOFRIDO</th>
+                      <th title="Dano causado em si mesmo">AUTO</th>
+                      <th title="Total de tiros disparados">TIROS</th>
+                      <th title="Jogadores eliminados">KILLS</th>
                     </tr>
                   </thead>
                   <tbody>

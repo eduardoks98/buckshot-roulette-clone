@@ -1932,6 +1932,11 @@
   text-align: center;
 }
 
+.game-over-modal .stats-table th[title] {
+  cursor: help;
+  border-bottom: 1px dotted rgba(255, 255, 255, 0.3);
+}
+
 .game-over-modal .stats-table th:first-child {
   text-align: left;
 }
