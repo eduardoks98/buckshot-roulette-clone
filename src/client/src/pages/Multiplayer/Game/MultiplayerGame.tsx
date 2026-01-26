@@ -815,75 +815,49 @@ export default function MultiplayerGame() {
         gameOverData={gameOverData ? (
           <div className="game-over-overlay">
             <div className="game-over-modal">
-              <h1 className="game-over-title">🏆 FIM DE JOGO 🏆</h1>
-
-              {/* Winner */}
-              <div className="winner-section">
+              {/* Winner Header */}
+              <div className="winner-header">
                 <span className="crown">👑</span>
                 <h2 className="winner-name">{gameOverData.winner?.name || 'Empate'}</h2>
-                {gameOverData.winner && (
-                  <p className="winner-rounds">Vencedor com {gameOverData.winner.roundWins} rounds!</p>
-                )}
               </div>
 
-              {/* Stats Table */}
+              {/* Stats Table - Compact */}
               {gameOverData.stats && gameOverData.stats.length > 0 && (
-                <div className="stats-section">
-                  <h3>📊 ESTATÍSTICAS</h3>
-                  <table className="stats-table">
-                    <thead>
-                      <tr>
-                        <th className="th-player">Jogador</th>
-                        <th className="th-stat" title="Rounds Vencidos">
-                          <span className="th-emoji">🏆</span>
-                          <span className="th-label">Rounds</span>
-                        </th>
-                        <th className="th-stat" title="Dano Causado">
-                          <span className="th-emoji">💥</span>
-                          <span className="th-label">Dano</span>
-                        </th>
-                        <th className="th-stat" title="Dano Sofrido">
-                          <span className="th-emoji">💔</span>
-                          <span className="th-label">Sofrido</span>
-                        </th>
-                        <th className="th-stat" title="Dano em Si Mesmo">
-                          <span className="th-emoji">🤕</span>
-                          <span className="th-label">Auto</span>
-                        </th>
-                        <th className="th-stat" title="Tiros Disparados">
-                          <span className="th-emoji">🔫</span>
-                          <span className="th-label">Tiros</span>
-                        </th>
-                        <th className="th-stat" title="Eliminações">
-                          <span className="th-emoji">☠️</span>
-                          <span className="th-label">Kills</span>
-                        </th>
+                <table className="stats-table">
+                  <thead>
+                    <tr>
+                      <th>Jogador</th>
+                      <th>ROUNDS</th>
+                      <th>DANO</th>
+                      <th>SOFRIDO</th>
+                      <th>AUTO</th>
+                      <th>TIROS</th>
+                      <th>KILLS</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {gameOverData.stats.map((stat: PlayerGameStats) => (
+                      <tr key={stat.odId} className={stat.odId === gameOverData.winner?.id ? 'winner-row' : ''}>
+                        <td className="player-name-cell">{stat.guestName}</td>
+                        <td>{stat.roundsWon}</td>
+                        <td>{stat.damageDealt}</td>
+                        <td>{stat.damageTaken}</td>
+                        <td>{stat.selfDamage}</td>
+                        <td>{stat.shotsFired}</td>
+                        <td>{stat.kills}</td>
                       </tr>
-                    </thead>
-                    <tbody>
-                      {gameOverData.stats.map((stat: PlayerGameStats) => (
-                        <tr key={stat.odId} className={stat.odId === gameOverData.winner?.id ? 'winner-row' : ''}>
-                          <td className="player-name-cell">{stat.guestName}</td>
-                          <td>{stat.roundsWon}</td>
-                          <td>{stat.damageDealt}</td>
-                          <td>{stat.damageTaken}</td>
-                          <td>{stat.selfDamage}</td>
-                          <td>{stat.shotsFired}</td>
-                          <td>{stat.kills}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                    ))}
+                  </tbody>
+                </table>
               )}
 
-              {/* Awards */}
+              {/* Awards - Compact */}
               {gameOverData.awards && gameOverData.awards.length > 0 && (
                 <div className="awards-section">
-                  <h3>🏅 TÍTULOS 🏅</h3>
+                  <h4>🏅 TÍTULOS 🏅</h4>
                   <div className="awards-list">
                     {gameOverData.awards.map((award: GameAward) => (
-                      <div key={award.type} className={`award-item ${award.type}`}>
+                      <div key={award.type} className="award-item">
                         <span className="award-icon">{getAwardIcon(award.type)}</span>
                         <span className="award-title">{getAwardTitle(award.type)}</span>
                         <span className="award-player">{award.playerName}</span>
@@ -894,80 +868,44 @@ export default function MultiplayerGame() {
                 </div>
               )}
 
-              {/* XP Results */}
+              {/* XP Results - Compact */}
               {gameOverData.xpResults && gameOverData.xpResults.length > 0 && (
-                <div className="xp-results-section">
-                  <h3>✨ EXPERIÊNCIA ✨</h3>
-                  <div className="xp-results-list">
-                    {gameOverData.xpResults.map((xpResult: PlayerXpResult) => {
-                      const playerName = gameOverData.stats?.find(s => s.odId === xpResult.odId)?.guestName || 'Jogador';
-                      const levelInfo = getLevelInfo(xpResult.newTotalXp);
-                      const isMe = xpResult.odId === myId;
-                      const leveledUp = xpResult.newLevel > xpResult.previousLevel;
-                      const prestiged = xpResult.newPrestige > xpResult.previousPrestige;
-                      return (
-                        <div key={xpResult.odId} className={`xp-result-item ${isMe ? 'is-me' : ''} ${leveledUp ? 'leveled-up' : ''}`}>
-                          <div className="xp-result-header">
-                            <span className="xp-player-name">{playerName}</span>
-                            <span className="xp-earned">+{xpResult.xpEarned} XP</span>
-                          </div>
-                          {isMe && (
-                            <div className="xp-breakdown">
-                              {xpResult.breakdown.participation > 0 && <span className="xp-detail">Participação: +{xpResult.breakdown.participation}</span>}
-                              {xpResult.breakdown.positionBonus > 0 && <span className="xp-detail">Posição: +{xpResult.breakdown.positionBonus}</span>}
-                              {xpResult.breakdown.killXp > 0 && <span className="xp-detail">Kills: +{xpResult.breakdown.killXp}</span>}
-                              {xpResult.breakdown.roundWinXp > 0 && <span className="xp-detail">Rounds: +{xpResult.breakdown.roundWinXp}</span>}
-                              {xpResult.breakdown.damageXp > 0 && <span className="xp-detail">Dano: +{xpResult.breakdown.damageXp}</span>}
-                              {xpResult.breakdown.itemXp > 0 && <span className="xp-detail">Itens: +{xpResult.breakdown.itemXp}</span>}
-                              {xpResult.breakdown.survivalXp > 0 && <span className="xp-detail">Sobrevivência: +{xpResult.breakdown.survivalXp}</span>}
-                              {xpResult.breakdown.cleanPlayBonus > 0 && <span className="xp-detail">Jogo Limpo: +{xpResult.breakdown.cleanPlayBonus}</span>}
-                            </div>
-                          )}
-                          <div className="xp-level-bar">
-                            <div className="xp-level-info">
-                              <span className="xp-level">Nv. {levelInfo.displayLevel}</span>
-                              {levelInfo.prestigeLevel > 0 && (
-                                <span className="xp-prestige">{'⭐'.repeat(Math.min(levelInfo.prestigeLevel, 5))}</span>
-                              )}
-                            </div>
-                            <div className="xp-progress-bar">
-                              <div
-                                className="xp-progress-fill"
-                                style={{ width: `${Math.round(levelInfo.xpProgress * 100)}%` }}
-                              />
-                            </div>
-                          </div>
-                          {leveledUp && <div className="level-up-alert">LEVEL UP! Nv. {xpResult.newLevel}</div>}
-                          {prestiged && <div className="prestige-alert">⭐ PRESTÍGIO {xpResult.newPrestige}! ⭐</div>}
+                <div className="xp-section">
+                  <h4>✨ EXPERIÊNCIA ✨</h4>
+                  {gameOverData.xpResults.map((xpResult: PlayerXpResult) => {
+                    const playerName = gameOverData.stats?.find(s => s.odId === xpResult.odId)?.guestName || 'Jogador';
+                    const levelInfo = getLevelInfo(xpResult.newTotalXp);
+                    const isMe = xpResult.odId === myId;
+                    return (
+                      <div key={xpResult.odId} className={`xp-item ${isMe ? 'is-me' : ''}`}>
+                        <div className="xp-header">
+                          <span className="xp-name">{playerName}</span>
+                          <span className="xp-earned">+{xpResult.xpEarned} XP</span>
                         </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
-              {/* Badges */}
-              {gameOverData.badges && gameOverData.badges.length > 0 && (
-                <div className="badges-section">
-                  <h3>🎖️ BADGES 🎖️</h3>
-                  <div className="badges-list">
-                    {gameOverData.badges.map((badge: MatchBadgeAwarded, index: number) => (
-                      <div key={`${badge.badgeId}-${index}`} className="badge-item">
-                        <span className="badge-icon">{badge.icon}</span>
-                        <div className="badge-info">
-                          <span className="badge-name">{badge.name}</span>
-                          <span className="badge-player">{badge.playerName}</span>
+                        {isMe && xpResult.breakdown && (
+                          <div className="xp-breakdown">
+                            {xpResult.breakdown.participation > 0 && <span>Participação: +{xpResult.breakdown.participation}</span>}
+                            {xpResult.breakdown.positionBonus > 0 && <span>Posição: +{xpResult.breakdown.positionBonus}</span>}
+                            {xpResult.breakdown.killXp > 0 && <span>Kills: +{xpResult.breakdown.killXp}</span>}
+                            {xpResult.breakdown.roundWinXp > 0 && <span>Rounds: +{xpResult.breakdown.roundWinXp}</span>}
+                            {xpResult.breakdown.damageXp > 0 && <span>Dano: +{xpResult.breakdown.damageXp}</span>}
+                            {xpResult.breakdown.itemXp > 0 && <span>Itens: +{xpResult.breakdown.itemXp}</span>}
+                            {xpResult.breakdown.survivalXp > 0 && <span>Sobrevivência: +{xpResult.breakdown.survivalXp}</span>}
+                          </div>
+                        )}
+                        <div className="xp-bar">
+                          <span className="xp-level">Nv. {levelInfo.displayLevel}</span>
+                          <div className="xp-progress">
+                            <div className="xp-fill" style={{ width: `${Math.round(levelInfo.xpProgress * 100)}%` }} />
+                          </div>
                         </div>
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })}
                 </div>
               )}
 
-              <button
-                className="back-to-lobby-btn"
-                onClick={() => navigate('/multiplayer')}
-              >
+              <button className="back-btn" onClick={() => navigate('/multiplayer')}>
                 Voltar ao Lobby
               </button>
             </div>
