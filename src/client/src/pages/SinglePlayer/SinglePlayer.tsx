@@ -6,6 +6,7 @@ import {
   ITEMS as SHARED_ITEMS,
   getRandomItem as getRandomItemUtil,
 } from '../../../../shared';
+import { GameBoard, GamePlayer, GameItem, ShotResult, RoundAnnouncement, StealModalData } from '../../components/game';
 import './SinglePlayer.css';
 
 // ========================================
@@ -47,33 +48,22 @@ interface GameState {
   revealedPositions: RevealedPosition[];
 }
 
-interface Message {
-  text: string;
-  isHtml?: boolean;
-}
-
 // ========================================
 // ITEMS (usando shared/constants/items)
 // ========================================
 
-// Referência às definições compartilhadas
 const ITEMS = SHARED_ITEMS;
 
 // ========================================
 // HELPERS (usando shared/utils/gameUtils)
 // ========================================
 
-// generateShellsUtil é importado de shared/utils/gameUtils
-
-// Wrapper para getRandomItem que exclui turn_reverser no solo
 function getRandomItem(): Item {
-  // No modo solo, excluir turn_reverser (só funciona em multiplayer)
   const item = getRandomItemUtil(['turn_reverser']);
   return item;
 }
 
 function createInitialState(round: number): GameState {
-  // Usar getRandomHP de shared/utils/gameUtils
   const maxHp = getRandomHP();
 
   return {
@@ -104,7 +94,6 @@ function createInitialState(round: number): GameState {
   };
 }
 
-// Usar generateShells de shared/utils/gameUtils
 const generateShells = generateShellsUtil;
 
 // ========================================
@@ -115,16 +104,19 @@ export default function SinglePlayer() {
   const navigate = useNavigate();
   const [gameStarted, setGameStarted] = useState(false);
   const [game, setGame] = useState<GameState>(() => createInitialState(1));
-  const [message, setMessage] = useState<Message | null>(null);
+  const [message, setMessage] = useState<string>('');
+  const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
   const [stealModalOpen, setStealModalOpen] = useState(false);
-  const [roundEndScreen, setRoundEndScreen] = useState<{ show: boolean; victory: boolean } | null>(null);
-  const [gameOverScreen, setGameOverScreen] = useState<{ show: boolean; victory: boolean } | null>(null);
+  const [roundAnnouncement, setRoundAnnouncement] = useState<RoundAnnouncement | null>(null);
+  const [lastShotResult, setLastShotResult] = useState<ShotResult | null>(null);
+  const [gameOverData, setGameOverData] = useState<{ show: boolean; victory: boolean } | null>(null);
   const [phoneModal, setPhoneModal] = useState<{ position: number; shell: 'live' | 'blank' } | null>(null);
-  const [shotgunShaking, setShotgunShaking] = useState(false);
+  const [shotAnimation, setShotAnimation] = useState<'live' | 'blank' | null>(null);
   const [dealerDamageFlash, setDealerDamageFlash] = useState(false);
   const [playerDamageFlash, setPlayerDamageFlash] = useState(false);
   const [dealerHealFlash, setDealerHealFlash] = useState(false);
   const [playerHealFlash, setPlayerHealFlash] = useState(false);
+  const [playerLastShell, setPlayerLastShell] = useState<Record<string, 'live' | 'blank'>>({});
 
   const dealerTimeoutRef = useRef<number | null>(null);
 
@@ -135,7 +127,7 @@ export default function SinglePlayer() {
   const liveRemaining = game.shells.slice(game.currentShellIndex).filter(s => s === 'live').length;
   const blankRemaining = game.shells.slice(game.currentShellIndex).filter(s => s === 'blank').length;
   const currentShell = game.shells[game.currentShellIndex];
-  const canAct = gameStarted && game.currentTurn === 'player' && !game.actionInProgress && !message && !roundEndScreen && !gameOverScreen;
+  const hasActiveOverlay = roundAnnouncement !== null || lastShotResult !== null || gameOverData !== null || stealModalOpen;
 
   // ========================================
   // GAME LIFECYCLE
@@ -146,7 +138,6 @@ export default function SinglePlayer() {
     const shells = generateShells();
     const itemCount = 2;
 
-    // Distribute items
     const playerItems: Item[] = [];
     const dealerItems: Item[] = [];
     for (let i = 0; i < itemCount; i++) {
@@ -161,11 +152,17 @@ export default function SinglePlayer() {
       dealer: { ...initialState.dealer, items: dealerItems },
     });
     setGameStarted(true);
+    setPlayerLastShell({});
 
-    // Show loading message
     const liveCount = shells.filter(s => s === 'live').length;
     const blankCount = shells.filter(s => s === 'blank').length;
-    showMessage(`Carregando: ${liveCount} LIVE, ${blankCount} BLANK`);
+    setRoundAnnouncement({
+      round: 1,
+      live: liveCount,
+      blank: blankCount,
+      hp: initialState.player.maxHp,
+    });
+    setTimeout(() => setRoundAnnouncement(null), 5000);
   }, []);
 
   const startRound = useCallback((roundNumber: number) => {
@@ -186,23 +183,26 @@ export default function SinglePlayer() {
       player: { ...initialState.player, items: playerItems },
       dealer: { ...initialState.dealer, items: dealerItems },
     });
+    setPlayerLastShell({});
 
     const liveCount = shells.filter(s => s === 'live').length;
     const blankCount = shells.filter(s => s === 'blank').length;
-    showMessage(`Rodada ${roundNumber} - Carregando: ${liveCount} LIVE, ${blankCount} BLANK`);
+    setRoundAnnouncement({
+      round: roundNumber,
+      live: liveCount,
+      blank: blankCount,
+      hp: initialState.player.maxHp,
+    });
+    setTimeout(() => setRoundAnnouncement(null), 5000);
   }, []);
 
   // ========================================
   // MESSAGE SYSTEM
   // ========================================
 
-  const showMessage = useCallback((text: string, duration = 2000, isHtml = false) => {
-    setMessage({ text, isHtml });
-    setTimeout(() => setMessage(null), duration);
-  }, []);
-
-  const closeMessage = useCallback(() => {
-    setMessage(null);
+  const showMessage = useCallback((text: string, duration = 2000) => {
+    setMessage(text);
+    setTimeout(() => setMessage(''), duration);
   }, []);
 
   // ========================================
@@ -222,6 +222,17 @@ export default function SinglePlayer() {
           if (newPlayerItems.length < 8) newPlayerItems.push(getRandomItem());
           if (newDealerItems.length < 8) newDealerItems.push(getRandomItem());
         }
+
+        const liveCount = newShells.filter(s => s === 'live').length;
+        const blankCount = newShells.filter(s => s === 'blank').length;
+        setRoundAnnouncement({
+          round: prev.currentRound,
+          live: liveCount,
+          blank: blankCount,
+          hp: prev.player.maxHp,
+        });
+        setTimeout(() => setRoundAnnouncement(null), 4000);
+        setPlayerLastShell({});
 
         return {
           ...prev,
@@ -283,26 +294,22 @@ export default function SinglePlayer() {
 
   const checkRoundEnd = useCallback((): boolean => {
     if (game.player.hp <= 0) {
-      setGameOverScreen({ show: true, victory: false });
+      setGameOverData({ show: true, victory: false });
       return true;
     } else if (game.dealer.hp <= 0) {
       if (game.currentRound >= 3) {
-        setGameOverScreen({ show: true, victory: true });
+        setGameOverData({ show: true, victory: true });
       } else {
-        setRoundEndScreen({ show: true, victory: true });
+        // Next round after delay
+        setTimeout(() => startRound(game.currentRound + 1), 2000);
       }
       return true;
     }
     return false;
-  }, [game.player.hp, game.dealer.hp, game.currentRound]);
-
-  const handleNextRound = useCallback(() => {
-    setRoundEndScreen(null);
-    startRound(game.currentRound + 1);
-  }, [game.currentRound, startRound]);
+  }, [game.player.hp, game.dealer.hp, game.currentRound, startRound]);
 
   const handleRestart = useCallback(() => {
-    setGameOverScreen(null);
+    setGameOverData(null);
     setGameStarted(false);
   }, []);
 
@@ -313,12 +320,18 @@ export default function SinglePlayer() {
   const performShot = useCallback((shooter: 'player' | 'dealer', target: 'player' | 'dealer') => {
     setGame(prev => ({ ...prev, actionInProgress: true }));
 
-    setShotgunShaking(true);
-    setTimeout(() => setShotgunShaking(false), 400);
+    setShotAnimation(currentShell);
+    setTimeout(() => setShotAnimation(null), 600);
 
     const shell = currentShell;
     const sawedOff = game[shooter].sawedOff;
     const damage = sawedOff ? 2 : 1;
+
+    // Track shell
+    setPlayerLastShell(prev => ({
+      ...prev,
+      [shooter]: shell
+    }));
 
     // Reset saw
     setGame(prev => ({
@@ -335,30 +348,34 @@ export default function SinglePlayer() {
     }));
 
     setTimeout(() => {
+      const shooterName = shooter === 'player' ? 'Você' : 'Dealer';
+      const targetName = target === 'player' ? 'você' : 'Dealer';
+
+      setLastShotResult({
+        type: shell,
+        shooter: shooterName,
+        target: targetName,
+        damage: shell === 'live' ? damage : 0,
+      });
+      setTimeout(() => setLastShotResult(null), 3000);
+
       if (shell === 'live') {
         applyDamage(target, damage);
-        const msg = target === shooter
-          ? `💥 LIVE! -${damage} HP`
-          : `💥 LIVE! ${target === 'dealer' ? 'Dealer' : 'Você'}: -${damage} HP`;
-
-        showMessage(msg, 1200);
 
         setTimeout(() => {
           setGame(prev => ({ ...prev, actionInProgress: false }));
-          // Check game state after damage
           setGame(prev => {
             if (prev.player.hp <= 0) {
-              setTimeout(() => setGameOverScreen({ show: true, victory: false }), 100);
+              setTimeout(() => setGameOverData({ show: true, victory: false }), 100);
               return prev;
             } else if (prev.dealer.hp <= 0) {
               if (prev.currentRound >= 3) {
-                setTimeout(() => setGameOverScreen({ show: true, victory: true }), 100);
+                setTimeout(() => setGameOverData({ show: true, victory: true }), 100);
               } else {
-                setTimeout(() => setRoundEndScreen({ show: true, victory: true }), 100);
+                setTimeout(() => startRound(prev.currentRound + 1), 2000);
               }
               return prev;
             }
-            // End turn
             const opponent = shooter === 'player' ? 'dealer' : 'player';
             if (prev[opponent].handcuffed) {
               return { ...prev, [opponent]: { ...prev[opponent], handcuffed: false } };
@@ -366,22 +383,13 @@ export default function SinglePlayer() {
             return { ...prev, currentTurn: opponent };
           });
           reloadIfNeeded();
-        }, 1300);
+        }, 3100);
       } else {
-        // Blank
-        const msg = target === shooter
-          ? '💨 BLANK! Jogue novamente'
-          : '💨 BLANK!';
-
-        showMessage(msg, 1000);
-
         setTimeout(() => {
           setGame(prev => ({ ...prev, actionInProgress: false }));
           if (target === shooter) {
-            // Shot self with blank - play again
             reloadIfNeeded();
           } else {
-            // Shot opponent with blank - end turn
             setGame(prev => {
               const opponent = shooter === 'player' ? 'dealer' : 'player';
               if (prev[opponent].handcuffed) {
@@ -391,20 +399,33 @@ export default function SinglePlayer() {
             });
             reloadIfNeeded();
           }
-        }, 1100);
+        }, 3100);
       }
     }, 400);
-  }, [currentShell, game, applyDamage, showMessage, reloadIfNeeded]);
+  }, [currentShell, game, applyDamage, reloadIfNeeded, startRound]);
 
   const shootDealer = useCallback(() => {
-    if (!canAct) return;
+    if (game.currentTurn !== 'player' || game.actionInProgress || hasActiveOverlay) return;
     performShot('player', 'dealer');
-  }, [canAct, performShot]);
+  }, [game.currentTurn, game.actionInProgress, hasActiveOverlay, performShot]);
 
   const shootSelf = useCallback(() => {
-    if (!canAct) return;
+    if (game.currentTurn !== 'player' || game.actionInProgress || hasActiveOverlay) return;
     performShot('player', 'player');
-  }, [canAct, performShot]);
+    setSelectedTarget(null);
+  }, [game.currentTurn, game.actionInProgress, hasActiveOverlay, performShot]);
+
+  const handleSelectTarget = useCallback((playerId: string) => {
+    if (game.currentTurn !== 'player' || game.actionInProgress || hasActiveOverlay) return;
+    setSelectedTarget(prev => prev === playerId ? null : playerId);
+  }, [game.currentTurn, game.actionInProgress, hasActiveOverlay]);
+
+  const handleShoot = useCallback((targetId: string) => {
+    if (targetId === 'dealer') {
+      shootDealer();
+    }
+    setSelectedTarget(null);
+  }, [shootDealer]);
 
   // ========================================
   // ITEM USAGE
@@ -432,15 +453,19 @@ export default function SinglePlayer() {
           dealer: user === 'dealer' ? { ...prev.dealer, knownShell: shell } : prev.dealer,
         }));
         const msg = user === 'player'
-          ? `🔍 Cartucho atual: <span class="${shell}">${shell === 'live' ? 'LIVE' : 'BLANK'}</span>`
+          ? `🔍 Cartucho atual: ${shell === 'live' ? 'LIVE' : 'BLANK'}`
           : '🔍 Dealer usou a Lupa';
-        showMessage(msg, 2500, true);
+        showMessage(msg, 2500);
         setTimeout(() => setGame(prev => ({ ...prev, actionInProgress: false })), 2600);
         break;
       }
 
       case 'beer': {
         const ejected = currentShell;
+        setPlayerLastShell(prev => ({
+          ...prev,
+          [user]: ejected
+        }));
         setGame(prev => ({
           ...prev,
           currentShellIndex: prev.currentShellIndex + 1,
@@ -531,7 +556,6 @@ export default function SinglePlayer() {
         } else if (user === 'player') {
           setStealModalOpen(true);
         } else {
-          // Dealer steals random item
           const randomIdx = Math.floor(Math.random() * game.player.items.length);
           const stolenItem = game.player.items[randomIdx];
           setGame(prev => ({
@@ -548,16 +572,6 @@ export default function SinglePlayer() {
           showMessage(`💉 Dealer roubou ${stolenItem.emoji}`, 1200);
           setTimeout(() => {
             setGame(prev => ({ ...prev, actionInProgress: false }));
-            // Dealer uses the stolen item
-            setTimeout(() => {
-              setGame(prev => {
-                const idx = prev.dealer.items.findIndex(i => i.id === stolenItem.id);
-                if (idx !== -1) {
-                  // Will be used in dealer AI
-                }
-                return prev;
-              });
-            }, 500);
           }, 1300);
         }
         break;
@@ -590,9 +604,9 @@ export default function SinglePlayer() {
   }, [game, currentShell, applyDamage, applyHealing, showMessage, reloadIfNeeded, checkRoundEnd]);
 
   const handlePlayerUseItem = useCallback((itemIndex: number) => {
-    if (!canAct) return;
+    if (game.currentTurn !== 'player' || game.actionInProgress || hasActiveOverlay) return;
     useItem(itemIndex, 'player');
-  }, [canAct, useItem]);
+  }, [game.currentTurn, game.actionInProgress, hasActiveOverlay, useItem]);
 
   const handleStealItem = useCallback((itemIndex: number) => {
     const stolenItem = game.dealer.items[itemIndex];
@@ -614,9 +628,8 @@ export default function SinglePlayer() {
 
     setTimeout(() => {
       setGame(prev => ({ ...prev, actionInProgress: false }));
-      // Use the stolen item
       setTimeout(() => {
-        const newIdx = game.player.items.length; // It was just added
+        const newIdx = game.player.items.length;
         useItem(newIdx, 'player');
       }, 500);
     }, 1300);
@@ -624,7 +637,6 @@ export default function SinglePlayer() {
 
   const cancelSteal = useCallback(() => {
     setStealModalOpen(false);
-    // Give back the adrenaline item
     setGame(prev => ({
       ...prev,
       actionInProgress: false,
@@ -659,7 +671,6 @@ export default function SinglePlayer() {
     const items = game.dealer.items;
     if (items.length === 0) return false;
 
-    // 1. If doesn't know shell, use magnifying glass
     if (game.dealer.knownShell === null) {
       const magIdx = items.findIndex(i => i.id === 'magnifying_glass');
       if (magIdx !== -1) {
@@ -668,7 +679,6 @@ export default function SinglePlayer() {
       }
     }
 
-    // 2. If knows it's live and would shoot self, use beer
     if (game.dealer.knownShell === 'live') {
       const beerIdx = items.findIndex(i => i.id === 'beer');
       if (beerIdx !== -1 && shouldDealerShootSelf()) {
@@ -676,14 +686,12 @@ export default function SinglePlayer() {
         return true;
       }
 
-      // Use saw before shooting player
       const sawIdx = items.findIndex(i => i.id === 'hand_saw');
       if (sawIdx !== -1 && !game.dealer.sawedOff) {
         useItem(sawIdx, 'dealer');
         return true;
       }
 
-      // Use handcuffs
       const cuffIdx = items.findIndex(i => i.id === 'handcuffs');
       if (cuffIdx !== -1 && !game.player.handcuffed) {
         useItem(cuffIdx, 'dealer');
@@ -691,7 +699,6 @@ export default function SinglePlayer() {
       }
     }
 
-    // 3. If knows it's blank and would shoot player, use inverter
     if (game.dealer.knownShell === 'blank') {
       const invIdx = items.findIndex(i => i.id === 'inverter');
       if (invIdx !== -1 && !shouldDealerShootSelf()) {
@@ -700,7 +707,6 @@ export default function SinglePlayer() {
       }
     }
 
-    // 4. Use cigarettes if low HP
     if (game.dealer.hp < game.dealer.maxHp) {
       const cigIdx = items.findIndex(i => i.id === 'cigarettes');
       if (cigIdx !== -1) {
@@ -709,7 +715,6 @@ export default function SinglePlayer() {
       }
     }
 
-    // 5. Use medicine if very low HP
     if (game.dealer.hp === 1) {
       const medIdx = items.findIndex(i => i.id === 'expired_medicine');
       if (medIdx !== -1 && Math.random() < 0.5) {
@@ -732,7 +737,6 @@ export default function SinglePlayer() {
       setTimeout(() => performShot('dealer', 'player'), 1100);
     }
 
-    // Clear knowledge
     setGame(prev => ({
       ...prev,
       dealer: { ...prev.dealer, knownShell: null },
@@ -744,15 +748,14 @@ export default function SinglePlayer() {
 
     setTimeout(() => {
       if (dealerUseItems()) {
-        return; // Will continue after item use
+        return;
       }
       dealerShoot();
     }, 1000);
   }, [game.isGameOver, game.currentTurn, dealerUseItems, dealerShoot]);
 
-  // Trigger dealer turn when it becomes their turn
   useEffect(() => {
-    if (gameStarted && game.currentTurn === 'dealer' && !game.actionInProgress && !message) {
+    if (gameStarted && game.currentTurn === 'dealer' && !game.actionInProgress && !hasActiveOverlay) {
       dealerTimeoutRef.current = window.setTimeout(() => {
         dealerTurn();
       }, 1500);
@@ -763,7 +766,39 @@ export default function SinglePlayer() {
         clearTimeout(dealerTimeoutRef.current);
       }
     };
-  }, [gameStarted, game.currentTurn, game.actionInProgress, message, dealerTurn]);
+  }, [gameStarted, game.currentTurn, game.actionInProgress, hasActiveOverlay, dealerTurn]);
+
+  // ========================================
+  // PREPARE GAMEBOARD PROPS
+  // ========================================
+
+  const dealerAsOpponent: GamePlayer = {
+    id: 'dealer',
+    name: '🤖 DEALER',
+    hp: game.dealer.hp,
+    maxHp: game.dealer.maxHp,
+    items: game.dealer.items as GameItem[],
+    handcuffed: game.dealer.handcuffed,
+    sawedOff: game.dealer.sawedOff,
+    alive: game.dealer.hp > 0,
+  };
+
+  const meAsPlayer: GamePlayer = {
+    id: 'player',
+    name: 'Você',
+    hp: game.player.hp,
+    maxHp: game.player.maxHp,
+    items: game.player.items as GameItem[],
+    handcuffed: game.player.handcuffed,
+    sawedOff: game.player.sawedOff,
+    alive: game.player.hp > 0,
+  };
+
+  const stealModalData: StealModalData | null = stealModalOpen ? {
+    playerId: 'dealer',
+    playerName: 'Dealer',
+    items: game.dealer.items as GameItem[],
+  } : null;
 
   // ========================================
   // RENDER
@@ -771,202 +806,101 @@ export default function SinglePlayer() {
 
   if (!gameStarted) {
     return (
-      <div className="singleplayer-container">
-        <div className="game-area" style={{ justifyContent: 'center', alignItems: 'center' }}>
-          <h1 style={{ color: 'var(--red-live)', textShadow: '0 0 20px rgba(230, 57, 70, 0.5)', marginBottom: '2rem' }}>
-            BUCKSHOT ROULETTE
-          </h1>
-          <p style={{ color: 'var(--text-dim)', marginBottom: '2rem' }}>Single Player vs Dealer</p>
-          <button className="action-btn" onClick={startGame}>INICIAR JOGO</button>
-          <button className="back-btn" style={{ marginTop: '1rem' }} onClick={() => navigate('/')}>← Voltar</button>
+      <div className="singleplayer-page">
+        <div className="start-screen">
+          <h1 className="start-title">BUCKSHOT ROULETTE</h1>
+          <p className="start-subtitle">Single Player vs Dealer</p>
+          <button className="start-btn" onClick={startGame}>INICIAR JOGO</button>
+          <button className="back-to-menu-btn" onClick={() => navigate('/')}>← Voltar ao Menu</button>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="singleplayer-container">
-      <header className="game-header">
-        <button className="back-btn" onClick={() => navigate('/')}>← Voltar</button>
-        <div className="round-display">RODADA {game.currentRound}/3</div>
-        <div className="shell-count">
-          <span className="live">LIVE: {liveRemaining}</span>
-          <span className="blank">BLANK: {blankRemaining}</span>
-        </div>
-      </header>
+    <div className="singleplayer-page">
+      <GameBoard
+        round={game.currentRound}
+        maxRounds={3}
+        shells={{
+          total: liveRemaining + blankRemaining,
+          live: liveRemaining,
+          blank: blankRemaining,
+        }}
+        currentPlayerId={game.currentTurn === 'player' ? 'player' : 'dealer'}
+        myId="player"
+        opponents={[dealerAsOpponent]}
+        me={meAsPlayer}
+        myItems={game.player.items as GameItem[]}
+        isMyTurn={game.currentTurn === 'player'}
+        selectedTarget={selectedTarget}
+        revealedShell={game.revealedShell}
+        message={message}
+        roundAnnouncement={roundAnnouncement}
+        lastShotResult={lastShotResult}
+        stealModalData={stealModalData}
+        gameOverData={gameOverData ? (
+          <div className="game-over-overlay">
+            <div className="game-over-modal">
+              <h1 className="game-over-title">
+                {gameOverData.victory ? '🏆 VITÓRIA 🏆' : '💀 DERROTA 💀'}
+              </h1>
 
-      <main className="game-area">
-        {/* Dealer Area */}
-        <section className={`dealer-area ${dealerDamageFlash ? 'damage-flash' : ''} ${dealerHealFlash ? 'heal-flash' : ''}`}>
-          <div className="character-label dealer">O DEALER</div>
-          <div className="hp-display">
-            {Array.from({ length: game.dealer.maxHp }).map((_, i) => (
-              <span key={i} className={`hp-icon ${i < game.dealer.hp ? 'full' : 'empty'}`}>⚡</span>
-            ))}
-          </div>
-          <div className="status-indicator">
-            {game.dealer.handcuffed && '⛓️ Algemado '}
-            {game.dealer.sawedOff && '🪚 2x Dano '}
-          </div>
-          <div className="items-display">
-            {game.dealer.items.map((item, i) => (
-              <div key={i} className="item disabled">
-                {item.emoji}
-                <div className="item-tooltip">
-                  <strong>{item.name}</strong>
-                </div>
+              <div className="winner-section">
+                <span className="crown">{gameOverData.victory ? '👑' : '☠️'}</span>
+                <h2 className="winner-name">
+                  {gameOverData.victory ? 'Você venceu!' : 'O Dealer venceu!'}
+                </h2>
+                <p className="winner-rounds">
+                  {gameOverData.victory
+                    ? 'Parabéns! Você derrotou o Dealer.'
+                    : 'Tente novamente!'}
+                </p>
               </div>
-            ))}
-          </div>
-        </section>
 
-        {/* Center Area - Shotgun */}
-        <section className="center-area">
-          <div className={`shotgun ${shotgunShaking ? 'shake' : ''} ${game.player.sawedOff || game.dealer.sawedOff ? 'sawed-off' : ''}`}>
-            <div className={`shell-chamber ${game.revealedShell || ''}`}>
-              {game.revealedShell ? (game.revealedShell === 'live' ? 'L' : 'B') : '?'}
-            </div>
-          </div>
-          <div className={`turn-indicator ${game.currentTurn === 'dealer' ? 'dealer-turn' : ''}`}>
-            {game.currentTurn === 'player' ? 'SEU TURNO' : 'TURNO DO DEALER'}
-          </div>
-          <div className="action-buttons">
-            <button className="action-btn" onClick={shootDealer} disabled={!canAct}>
-              ATIRAR NO DEALER
-            </button>
-            <button className="action-btn secondary" onClick={shootSelf} disabled={!canAct}>
-              ATIRAR EM SI
-            </button>
-          </div>
-        </section>
-
-        {/* Player Area */}
-        <section className={`player-area ${playerDamageFlash ? 'damage-flash' : ''} ${playerHealFlash ? 'heal-flash' : ''}`}>
-          <div className="items-display">
-            {game.player.items.map((item, i) => (
-              <div
-                key={i}
-                className={`item ${!canAct ? 'disabled' : ''}`}
-                onClick={() => handlePlayerUseItem(i)}
+              <button className="back-to-lobby-btn" onClick={handleRestart}>
+                JOGAR NOVAMENTE
+              </button>
+              <button
+                className="back-to-menu-btn"
+                style={{ marginTop: '1rem' }}
+                onClick={() => navigate('/')}
               >
-                {item.emoji}
-                <div className="item-tooltip">
-                  <strong>{item.name}</strong>
-                  <span className="tooltip-desc">{item.description}</span>
+                Voltar ao Menu
+              </button>
+            </div>
+          </div>
+        ) : null}
+        shotAnimation={shotAnimation}
+        damagedPlayerId={playerDamageFlash ? 'player' : dealerDamageFlash ? 'dealer' : null}
+        healedPlayerId={playerHealFlash ? 'player' : dealerHealFlash ? 'dealer' : null}
+        playerLastShell={playerLastShell}
+        onSelectTarget={handleSelectTarget}
+        onShoot={handleShoot}
+        onShootSelf={shootSelf}
+        onUseItem={handlePlayerUseItem}
+        onStealItem={handleStealItem}
+        onCancelSteal={cancelSteal}
+        onBack={() => navigate('/')}
+      >
+        {/* Phone Modal */}
+        {phoneModal && (
+          <div className="steal-modal-overlay" onClick={() => setPhoneModal(null)}>
+            <div className="steal-modal" onClick={e => e.stopPropagation()}>
+              <h3>📱 CELULAR</h3>
+              <div className="phone-content">
+                <p>Posição {phoneModal.position - game.currentShellIndex + 1}:</p>
+                <div className={`phone-shell-result ${phoneModal.shell}`}>
+                  {phoneModal.shell === 'live' ? '🔴 LIVE' : '🔵 BLANK'}
                 </div>
               </div>
-            ))}
-          </div>
-          <div className="hp-display">
-            {Array.from({ length: game.player.maxHp }).map((_, i) => (
-              <span key={i} className={`hp-icon ${i < game.player.hp ? 'full' : 'empty'}`}>⚡</span>
-            ))}
-          </div>
-          <div className="status-indicator">
-            {game.player.handcuffed && '⛓️ Algemado '}
-            {game.player.sawedOff && '🪚 2x Dano '}
-          </div>
-          <div className="character-label player">VOCÊ</div>
-        </section>
-      </main>
-
-      {/* Message Overlay */}
-      {message && (
-        <div className="message-overlay" onClick={closeMessage}>
-          <div
-            className="message-content"
-            dangerouslySetInnerHTML={{ __html: message.text + '<br><span class="msg-hint">(clique para fechar)</span>' }}
-          />
-        </div>
-      )}
-
-      {/* Phone Modal */}
-      {phoneModal && (
-        <div className="message-overlay" onClick={() => setPhoneModal(null)}>
-          <div className="phone-modal">
-            <div className="phone-header">📱 CELULAR - POSIÇÕES</div>
-            <div className="phone-shells">
-              {game.shells.map((_, i) => {
-                const isUsed = i < game.currentShellIndex;
-                const isCurrent = i === game.currentShellIndex;
-                const isRevealed = i === phoneModal.position || (isCurrent && game.revealedShell);
-
-                let shellClass = 'phone-shell';
-                if (isUsed) shellClass += ' used';
-                if (isCurrent) shellClass += ' current';
-                if (isRevealed && !isUsed) shellClass += ` ${i === phoneModal.position ? phoneModal.shell : game.revealedShell}`;
-
-                return (
-                  <div key={i} className={shellClass}>
-                    <span className="shell-num">{i + 1}</span>
-                    <span className="shell-type">
-                      {isUsed ? '✕' : (isRevealed ? (i === phoneModal.position ? (phoneModal.shell === 'live' ? 'L' : 'B') : (game.revealedShell === 'live' ? 'L' : 'B')) : '?')}
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-            <div className="phone-info">
-              Posição {phoneModal.position - game.currentShellIndex + 1}: <span className={phoneModal.shell}>{phoneModal.shell === 'live' ? 'LIVE' : 'BLANK'}</span>
-            </div>
-            <div className="phone-legend">
-              <span className="current">◆ Atual</span>
-              <span className="live">● LIVE</span>
-              <span className="blank">● BLANK</span>
+              <button className="steal-cancel-btn" onClick={() => setPhoneModal(null)}>
+                Fechar
+              </button>
             </div>
           </div>
-        </div>
-      )}
-
-      {/* Steal Modal */}
-      {stealModalOpen && (
-        <div className="item-select-modal">
-          <div className="modal-content">
-            <h3>💉 ADRENALINA</h3>
-            <p>Escolha um item para roubar:</p>
-            <div className="steal-items">
-              {game.dealer.items.map((item, i) => (
-                <div
-                  key={i}
-                  className="item"
-                  onClick={() => handleStealItem(i)}
-                >
-                  {item.emoji}
-                  <div className="item-tooltip">
-                    <strong>{item.name}</strong>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <button className="cancel-btn" onClick={cancelSteal}>Cancelar</button>
-          </div>
-        </div>
-      )}
-
-      {/* Round End Screen */}
-      {roundEndScreen && (
-        <div className="round-end-screen">
-          <h2 className={`end-title ${roundEndScreen.victory ? 'victory' : 'defeat'}`}>
-            {roundEndScreen.victory ? 'RODADA VENCIDA' : 'RODADA PERDIDA'}
-          </h2>
-          <p className="end-message">Rodada {game.currentRound} completa!</p>
-          <button className="action-btn" onClick={handleNextRound}>PRÓXIMA RODADA</button>
-        </div>
-      )}
-
-      {/* Game Over Screen */}
-      {gameOverScreen && (
-        <div className="game-over-screen">
-          <h2 className={`end-title ${gameOverScreen.victory ? 'victory' : 'defeat'}`}>
-            {gameOverScreen.victory ? 'VOCÊ VENCEU' : 'VOCÊ PERDEU'}
-          </h2>
-          <p className="end-message">
-            {gameOverScreen.victory ? 'O Dealer foi derrotado.' : 'O Dealer venceu.'}
-          </p>
-          <button className="action-btn" onClick={handleRestart}>JOGAR NOVAMENTE</button>
-          <button className="back-btn" style={{ marginTop: '1rem' }} onClick={() => navigate('/')}>Voltar ao Menu</button>
-        </div>
-      )}
+        )}
+      </GameBoard>
     </div>
   );
 }

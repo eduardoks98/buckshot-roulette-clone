@@ -3,7 +3,7 @@
 // ==========================================
 
 import { useState, useEffect, useCallback } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import { useSocket } from '../../../context/SocketContext';
 import LevelBadge from '../../common/LevelBadge/LevelBadge';
@@ -24,7 +24,11 @@ export function PageLayout({
   showFooter = true,
 }: PageLayoutProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, logout } = useAuth();
+
+  // Esconder botao JOGAR na Home (ja tem ActiveRooms la)
+  const isHomePage = location.pathname === '/';
   const { socket, isConnected } = useSocket();
   const [onlineCount, setOnlineCount] = useState(0);
   const [showBugReport, setShowBugReport] = useState(false);
@@ -58,10 +62,6 @@ export function PageLayout({
     return () => { socket.off('onlineCount', handler); };
   }, [socket, isConnected]);
 
-  const handleMultiplayerClick = () => {
-    navigate('/multiplayer');
-  };
-
   return (
     <div className="page-layout">
       {/* ===== HEADER ===== */}
@@ -69,12 +69,14 @@ export function PageLayout({
         <header className="page-header">
           <div className="page-header__left">
             <span className="page-header__logo" onClick={() => navigate('/')}>BANG SHOT</span>
-            <button className="page-header__play-btn" onClick={handleMultiplayerClick}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <path d="M8 5v14l11-7z" fill="currentColor"/>
-              </svg>
-              JOGAR
-            </button>
+            {!isHomePage && (
+              <button className="page-header__play-btn" onClick={() => navigate('/')}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
+                  <path d="M8 5v14l11-7z" fill="currentColor"/>
+                </svg>
+                JOGAR
+              </button>
+            )}
           </div>
 
           <nav className="page-header__nav">
@@ -107,7 +109,7 @@ export function PageLayout({
               </svg>
               <span>Ranking</span>
             </button>
-            {user?.isAdmin && (
+            {user?.is_admin && (
               <button className="page-nav-item page-nav-item--admin" onClick={() => navigate('/admin')}>
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                   <circle cx="12" cy="12" r="3"/>
@@ -136,19 +138,31 @@ export function PageLayout({
             </button>
             <div className="page-header__user" onClick={() => navigate('/profile')}>
               <div className="page-header__avatar-wrapper">
-                {user?.avatarUrl ? (
-                  <img src={user.avatarUrl} alt={user.displayName} className="page-header__avatar" />
-                ) : (
-                  <div className="page-header__avatar page-header__avatar--placeholder">
-                    {user?.displayName.charAt(0).toUpperCase()}
-                  </div>
-                )}
+                {user?.avatar_url ? (
+                  <img
+                    src={user.avatar_url}
+                    alt={user.display_name}
+                    className="page-header__avatar"
+                    onError={(e) => {
+                      // Se a imagem falhar, esconder e mostrar placeholder
+                      e.currentTarget.style.display = 'none';
+                      const placeholder = e.currentTarget.nextElementSibling as HTMLElement;
+                      if (placeholder) placeholder.style.display = 'flex';
+                    }}
+                  />
+                ) : null}
+                <div
+                  className="page-header__avatar page-header__avatar--placeholder"
+                  style={{ display: user?.avatar_url ? 'none' : 'flex' }}
+                >
+                  {user?.display_name?.charAt(0)?.toUpperCase() || '?'}
+                </div>
                 <div className="page-header__level-badge">
-                  <LevelBadge totalXp={user?.totalXp || 0} size="sm" />
+                  <LevelBadge totalXp={user?.total_xp || 0} size="sm" />
                 </div>
               </div>
               <div className="page-header__user-info">
-                <span className="page-header__username">{user?.displayName}</span>
+                <span className="page-header__username">{user?.display_name}</span>
                 <span className="page-header__rank" style={{ color: getRankColor(user?.rank || '') }}>
                   {user?.rank}
                 </span>

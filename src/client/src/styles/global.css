@@ -53,16 +53,20 @@ h1, h2, h3, h4, h5, h6 {
 
 h1 {
   font-size: var(--fs-4xl);
-  letter-spacing: 0.05em;
+  letter-spacing: 0.02em;
   text-transform: uppercase;
-  background: linear-gradient(135deg, var(--gold-accent) 0%, #fff 50%, var(--gold-accent) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
+  color: var(--text-primary);
 }
 
-h2 { font-size: var(--fs-3xl); }
-h3 { font-size: var(--fs-2xl); }
+h2 {
+  font-size: var(--fs-3xl);
+  letter-spacing: 0.02em;
+}
+
+h3 {
+  font-size: var(--fs-2xl);
+}
+
 h4 { font-size: var(--fs-xl); }
 h5 { font-size: var(--fs-lg); }
 h6 { font-size: var(--fs-base); }

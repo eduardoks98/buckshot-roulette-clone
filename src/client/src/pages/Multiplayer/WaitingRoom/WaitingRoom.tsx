@@ -6,6 +6,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSocket } from '../../../context/SocketContext';
 import { useAuth } from '../../../context/AuthContext';
+import { PageLayout } from '../../../components/layout/PageLayout';
 import { PlayerPublicState } from '../../../../../shared/types';
 import { GAME_RULES } from '../../../../../shared/constants';
 import './WaitingRoom.css';
@@ -43,6 +44,7 @@ export default function WaitingRoom() {
   const [roomCode, setRoomCode] = useState(state?.roomCode || '');
   const [isHost, setIsHost] = useState(state?.isHost || false);
   const [players, setPlayers] = useState<PlayerPublicState[]>(state?.players || []);
+
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
@@ -186,16 +188,9 @@ export default function WaitingRoom() {
     };
   }, [socket, state, navigate, roomCode, players]);
 
-  // Cleanup: emit leaveRoom when component unmounts (navigation away)
-  // but NOT when game starts (we want to keep the connection)
-  useEffect(() => {
-    return () => {
-      if (!gameStarted.current && socket?.connected) {
-        localStorage.removeItem('buckshotSession');
-        socket.emit('leaveRoom');
-      }
-    };
-  }, [socket]);
+  // REMOVIDO: Cleanup automático causava problemas com React.StrictMode
+  // O usuário deve sair manualmente clicando no botão "Sair da Sala"
+  // Se o usuário fechar a aba/navegar, o servidor detecta a desconexão via socket.disconnect
 
   const handleStartGame = () => {
     if (!socket || !isHost) return;
@@ -229,82 +224,87 @@ export default function WaitingRoom() {
 
   if (!isConnected) {
     return (
-      <div className="waiting-room-container">
-        <p className="connecting-message">Conectando ao servidor...</p>
-      </div>
+      <PageLayout>
+        <div className="waiting-room-container">
+          <p className="connecting-message">Conectando ao servidor...</p>
+        </div>
+      </PageLayout>
     );
   }
 
   const canStart = players.length >= GAME_RULES.MIN_PLAYERS;
 
   return (
-    <div className="waiting-room-container">
-      <button className="back-btn" onClick={handleLeaveRoom}>
-        Sair da Sala
-      </button>
-
-      <h1 className="game-title">BUCKSHOT ROULETTE</h1>
-
-      <div className="room-code-display">
-        <span className="code-label">Codigo da Sala</span>
-        <div className="code-value" onClick={handleCopyCode}>
-          {roomCode}
-          <span className="copy-hint">{copied ? 'Copiado!' : 'Clique para copiar'}</span>
+    <PageLayout>
+      <div className="waiting-room-container">
+        <div className="waiting-room-header">
+          <h1 className="waiting-room-title">SALA DE ESPERA</h1>
+          <button className="leave-room-btn" onClick={handleLeaveRoom}>
+            Sair da Sala
+          </button>
         </div>
-      </div>
 
-      {error && <div className="error-message">{error}</div>}
-
-      <div className="players-section">
-        <h3>Jogadores ({players.length}/{GAME_RULES.MAX_PLAYERS})</h3>
-        <div className="players-list">
-          {players.map((player, index) => (
-            <div key={player.id} className="player-card">
-              <div className="player-avatar">
-                {player.name.charAt(0).toUpperCase()}
-              </div>
-              <div className="player-info">
-                <span className="player-name">{player.name}</span>
-                {index === 0 && <span className="host-badge">HOST</span>}
-              </div>
-            </div>
-          ))}
-
-          {/* Empty slots */}
-          {Array.from({ length: GAME_RULES.MAX_PLAYERS - players.length }).map((_, i) => (
-            <div key={`empty-${i}`} className="player-card empty">
-              <div className="player-avatar empty">?</div>
-              <div className="player-info">
-                <span className="player-name">Aguardando...</span>
-              </div>
-            </div>
-          ))}
+        <div className="room-code-display">
+          <span className="code-label">Codigo da Sala</span>
+          <div className="code-value" onClick={handleCopyCode}>
+            {roomCode}
+            <span className="copy-hint">{copied ? 'Copiado!' : 'Clique para copiar'}</span>
+          </div>
         </div>
-      </div>
 
-      <div className="game-rules-preview">
-        <h4>Regras</h4>
-        <ul>
-          <li>Melhor de {GAME_RULES.MAX_ROUNDS} rodadas</li>
-          <li>{GAME_RULES.MIN_PLAYERS}-{GAME_RULES.MAX_PLAYERS} jogadores</li>
-          <li>Max {GAME_RULES.ITEMS.MAX_PER_PLAYER} itens por jogador</li>
-          <li>{GAME_RULES.TIMERS.TURN_DURATION_MS / 1000}s por turno</li>
-        </ul>
-      </div>
+        {error && <div className="error-message">{error}</div>}
 
-      {isHost ? (
-        <button
-          className="start-btn"
-          onClick={handleStartGame}
-          disabled={!canStart}
-        >
-          {canStart
-            ? 'Iniciar Jogo'
-            : `Aguardando jogadores (min. ${GAME_RULES.MIN_PLAYERS})`}
-        </button>
-      ) : (
-        <p className="waiting-host">Aguardando o host iniciar o jogo...</p>
-      )}
-    </div>
+        <div className="players-section">
+          <h3>Jogadores ({players.length}/{GAME_RULES.MAX_PLAYERS})</h3>
+          <div className="players-list">
+            {players.map((player, index) => (
+              <div key={player.id} className="player-card">
+                <div className="player-avatar">
+                  {player.name.charAt(0).toUpperCase()}
+                </div>
+                <div className="player-info">
+                  <span className="player-name">{player.name}</span>
+                  {index === 0 && <span className="host-badge">HOST</span>}
+                </div>
+              </div>
+            ))}
+
+            {/* Empty slots */}
+            {Array.from({ length: GAME_RULES.MAX_PLAYERS - players.length }).map((_, i) => (
+              <div key={`empty-${i}`} className="player-card empty">
+                <div className="player-avatar empty">?</div>
+                <div className="player-info">
+                  <span className="player-name">Aguardando...</span>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div className="game-rules-preview">
+          <h4>Regras</h4>
+          <ul>
+            <li>Melhor de {GAME_RULES.MAX_ROUNDS} rodadas</li>
+            <li>{GAME_RULES.MIN_PLAYERS}-{GAME_RULES.MAX_PLAYERS} jogadores</li>
+            <li>Max {GAME_RULES.ITEMS.MAX_PER_PLAYER} itens por jogador</li>
+            <li>{GAME_RULES.TIMERS.TURN_DURATION_MS / 1000}s por turno</li>
+          </ul>
+        </div>
+
+        {isHost ? (
+          <button
+            className="start-btn"
+            onClick={handleStartGame}
+            disabled={!canStart}
+          >
+            {canStart
+              ? 'INICIAR JOGO'
+              : `AGUARDANDO JOGADORES (MIN. ${GAME_RULES.MIN_PLAYERS})`}
+          </button>
+        ) : (
+          <p className="waiting-host">Aguardando o host iniciar o jogo...</p>
+        )}
+      </div>
+    </PageLayout>
   );
 }

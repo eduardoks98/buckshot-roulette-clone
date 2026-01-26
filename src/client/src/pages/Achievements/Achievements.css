@@ -265,7 +265,11 @@
    RESPONSIVE
    ========================================== */
 
-@media (max-width: 700px) {
+@media (max-width: 768px) {
+  .page-title {
+    font-size: 2rem;
+  }
+
   .achievement-grid {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -274,6 +278,11 @@
 @media (max-width: 480px) {
   .achievements-container--login {
     padding: 1rem;
+  }
+
+  .page-title {
+    font-size: 1.75rem;
+    margin-bottom: 1rem;
   }
 
   .achievement-grid {
@@ -291,10 +300,50 @@
 
   .category-tabs {
     gap: 0.35rem;
+    justify-content: center;
   }
 
   .category-tab {
     padding: 0.4rem 0.9rem;
     font-size: 0.8rem;
+  }
+
+  .achievements-progress {
+    padding: 0.875rem 1rem;
+  }
+
+  .progress-text {
+    font-size: 0.85rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .page-title {
+    font-size: 1.5rem;
+  }
+
+  .achievement-grid {
+    gap: 0.5rem;
+  }
+
+  .achievement-card {
+    padding: 0.75rem 0.5rem;
+  }
+
+  .achievement-name {
+    font-size: 0.8rem;
+  }
+
+  .achievement-description {
+    font-size: 0.7rem;
+  }
+
+  .achievement-icon {
+    font-size: 1.75rem;
+  }
+
+  .category-tab {
+    padding: 0.35rem 0.6rem;
+    font-size: 0.7rem;
   }
 }

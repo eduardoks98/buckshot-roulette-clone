@@ -9,7 +9,9 @@
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
-  height: 100%;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .active-rooms__title {
@@ -28,9 +30,110 @@
   opacity: 0.8;
 }
 
+/* Header with refresh button */
+.active-rooms__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+.active-rooms__header .active-rooms__title {
+  margin: 0;
+}
+
+.refresh-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  color: rgba(255, 255, 255, 0.6);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s;
+}
+
+.refresh-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--gold-accent, #d4a418);
+  border-color: rgba(212, 164, 24, 0.3);
+}
+
+.refresh-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.refresh-btn.spinning svg {
+  animation: spin 0.5s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Join by code input */
+.join-by-code {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.join-by-code__input {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  color: #fff;
+  font-size: 0.9rem;
+  font-family: monospace;
+  letter-spacing: 1px;
+  text-transform: uppercase;
+}
+
+.join-by-code__input::placeholder {
+  color: rgba(255, 255, 255, 0.3);
+  text-transform: none;
+  letter-spacing: normal;
+  font-family: inherit;
+}
+
+.join-by-code__input:focus {
+  outline: none;
+  border-color: rgba(212, 164, 24, 0.5);
+}
+
+.join-by-code__btn {
+  padding: 0.75rem 1.25rem;
+  background: rgba(212, 164, 24, 0.15);
+  border: 1px solid rgba(212, 164, 24, 0.4);
+  color: var(--gold-accent, #d4a418);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
+}
+
+.join-by-code__btn:hover {
+  background: rgba(212, 164, 24, 0.25);
+}
+
+.join-by-code__error {
+  font-size: 0.8rem;
+  color: #e63946;
+  margin: -0.5rem 0 0.75rem;
+}
+
 .active-rooms__content {
   flex: 1;
-  min-height: 200px;
+  min-height: 0;
   overflow-y: auto;
 }
 
@@ -222,4 +325,113 @@
     width: 100%;
     margin-top: 0.5rem;
   }
+}
+
+/* ==========================================
+   PASSWORD MODAL
+   ========================================== */
+
+.password-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 1rem;
+}
+
+.password-modal {
+  background: linear-gradient(180deg, #1a1a2e 0%, #0f0f1a 100%);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 16px;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 350px;
+  text-align: center;
+}
+
+.password-modal h3 {
+  color: var(--gold-accent, #d4a418);
+  font-size: 1.1rem;
+  margin: 0 0 0.5rem;
+}
+
+.password-modal p {
+  color: rgba(255, 255, 255, 0.6);
+  font-size: 0.9rem;
+  margin: 0 0 1.25rem;
+}
+
+.password-modal__input {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  color: #fff;
+  font-size: 1rem;
+  margin-bottom: 1rem;
+}
+
+.password-modal__input:focus {
+  outline: none;
+  border-color: rgba(212, 164, 24, 0.5);
+}
+
+.password-modal__actions {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.password-modal__cancel,
+.password-modal__confirm {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.password-modal__cancel {
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.password-modal__cancel:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+
+.password-modal__confirm {
+  background: linear-gradient(135deg, var(--gold-accent, #d4a418) 0%, #b8860b 100%);
+  border: none;
+  color: #000;
+}
+
+.password-modal__confirm:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 15px rgba(212, 164, 24, 0.3);
+}
+
+.password-modal__confirm:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Disabled button state */
+.btn-primary:disabled,
+.btn-secondary:disabled,
+.room-card__join:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none !important;
+  box-shadow: none !important;
 }

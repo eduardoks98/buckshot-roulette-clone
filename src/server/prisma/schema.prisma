@@ -104,11 +104,16 @@ model Game {
   max_players  Int     @default(4)
   is_ranked    Boolean @default(false)
   has_password Boolean @default(false)
+  password     String?
 
   // Game state
   current_round Int     @default(1)
   max_rounds    Int     @default(3)
   winner_id     String?
+
+  // Full game state snapshot (JSON) - para recuperação após crash
+  game_state       String?   @db.LongText
+  game_state_updated_at DateTime?
 
   // Timestamps
   created_at DateTime  @default(now())

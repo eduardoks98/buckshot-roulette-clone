@@ -23,13 +23,13 @@ import { ItemId } from '../../../../../shared/types';
 import { getLevelInfo } from '../../../../../shared/utils/xpCalculator';
 import { BugReportModal, GameStateForReport } from '../../../components/common/BugReportModal';
 import { AchievementToast } from '../../../components/common';
+import { GameBoard, GamePlayer, GameItem, ShotResult, RoundAnnouncement, StealModalData } from '../../../components/game';
 import './MultiplayerGame.css';
 
 interface LocationState {
   roomCode: string;
   reconnected?: boolean;
   gameState?: RoundStartedPayload & {
-    // ReconnectedPayload has yourItems instead of itemsReceived, and yourHp instead of maxHp
     yourItems?: { id: string; emoji: string; name: string }[];
     yourHp?: number;
     roomCode?: string;
@@ -73,9 +73,8 @@ export default function MultiplayerGame() {
   const [shotAnimation, setShotAnimation] = useState<'live' | 'blank' | null>(null);
   const [damagedPlayerId, setDamagedPlayerId] = useState<string | null>(null);
   const [healedPlayerId, setHealedPlayerId] = useState<string | null>(null);
-  const [lastShotResult, setLastShotResult] = useState<{ type: 'live' | 'blank'; shooter: string; target: string; damage: number } | null>(null);
-  const [roundAnnouncement, setRoundAnnouncement] = useState<{ round: number; live: number; blank: number; hp: number } | null>(null);
-  // Mapa: playerId -> último cartucho disparado (mostra apenas 1 por jogador)
+  const [lastShotResult, setLastShotResult] = useState<ShotResult | null>(null);
+  const [roundAnnouncement, setRoundAnnouncement] = useState<RoundAnnouncement | null>(null);
   const [playerLastShell, setPlayerLastShell] = useState<Record<string, 'live' | 'blank'>>({});
   const [stealingFromPlayer, setStealingFromPlayer] = useState<{
     playerId: string;
@@ -94,7 +93,7 @@ export default function MultiplayerGame() {
     remainingTime: number;
   }[]>([]);
 
-  // Overlay queue system - prevents overlays from overlapping
+  // Overlay queue system
   interface PendingOverlay {
     type: 'round' | 'shot' | 'reload';
     data: unknown;
@@ -115,7 +114,7 @@ export default function MultiplayerGame() {
            stealingFromPlayer !== null;
   }, [roundAnnouncement, lastShotResult, gameOverData, stealingFromPlayer]);
 
-  // Ref to access current overlay state in socket handlers (avoids stale closures)
+  // Ref to access current overlay state in socket handlers
   const hasActiveOverlayRef = useRef(hasActiveOverlay);
   hasActiveOverlayRef.current = hasActiveOverlay;
 
@@ -125,17 +124,16 @@ export default function MultiplayerGame() {
       const [next, ...rest] = overlayQueue;
       setOverlayQueue(rest);
 
-      // Atualizar ref IMEDIATAMENTE para evitar race condition
       hasActiveOverlayRef.current = true;
 
       switch (next.type) {
         case 'round':
         case 'reload':
-          setRoundAnnouncement(next.data as { round: number; live: number; blank: number; hp: number });
+          setRoundAnnouncement(next.data as RoundAnnouncement);
           setTimeout(() => setRoundAnnouncement(null), next.duration);
           break;
         case 'shot':
-          setLastShotResult(next.data as { type: 'live' | 'blank'; shooter: string; target: string; damage: number });
+          setLastShotResult(next.data as ShotResult);
           setTimeout(() => setLastShotResult(null), next.duration);
           break;
       }
@@ -156,14 +154,11 @@ export default function MultiplayerGame() {
       setRound(gs.round);
       setShells(gs.shells);
 
-      // Suportar tanto RoundStartedPayload (itemsReceived) quanto ReconnectedPayload (yourItems)
       const items = gs.itemsReceived || gs.yourItems || [];
       setMyItems(items);
 
-      // maxHp pode vir de RoundStartedPayload ou ser derivado dos players (ReconnectedPayload)
       const maxHp = gs.maxHp || gs.yourHp || players.find(p => p.alive)?.maxHp || 4;
 
-      // Mostrar anúncio de rodada (mesmo overlay que aparece nas rodadas seguintes)
       if (!state.reconnected) {
         setRoundAnnouncement({
           round: gs.round,
@@ -179,9 +174,7 @@ export default function MultiplayerGame() {
     }
   }, [state, socket, navigate]);
 
-  // Auto-reconnect quando Socket.IO reconecta automaticamente (novo socket ID)
-  // Socket.IO pode reconectar sozinho (reconnectionAttempts: 5), mas o novo socket
-  // não está associado a nenhuma room. Precisamos emitir reconnectToGame.
+  // Auto-reconnect quando Socket.IO reconecta automaticamente
   useEffect(() => {
     if (!socket || !isConnected) return;
 
@@ -190,12 +183,9 @@ export default function MultiplayerGame() {
 
     try {
       const data = JSON.parse(saved);
-      // Verificar se o socket já está na room (players contém o myId atual)
       const alreadyInRoom = players.some(p => p.id === socket.id);
       if (alreadyInRoom) return;
 
-      // Se temos players mas nosso ID não está neles, significa que reconectamos
-      // com novo socket ID e precisamos re-associar
       if (players.length > 0) {
         console.log('[Game] Socket reconectou com novo ID, tentando reconexão automática...');
         socket.emit('reconnectToGame', {
@@ -223,16 +213,15 @@ export default function MultiplayerGame() {
       setRevealedShell(null);
       setSelectedTarget(null);
       setSelectedItem(null);
-      setPlayerLastShell({}); // Limpar balas gastas no início da rodada
+      setPlayerLastShell({});
 
-      const overlayData = {
+      const overlayData: RoundAnnouncement = {
         round: data.round,
         live: data.shells.live,
         blank: data.shells.blank,
         hp: data.maxHp,
       };
 
-      // Se há overlay ativo (ex: resultado do tiro), enfileirar o anúncio
       if (hasActiveOverlayRef.current) {
         setOverlayQueue(prev => [...prev, {
           type: 'round' as const,
@@ -240,9 +229,7 @@ export default function MultiplayerGame() {
           duration: 5000,
         }]);
       } else {
-        // Atualizar ref IMEDIATAMENTE para evitar race condition
         hasActiveOverlayRef.current = true;
-        // Mostrar anúncio de rodada em destaque (fica visível por 5 segundos)
         setRoundAnnouncement(overlayData);
         setTimeout(() => setRoundAnnouncement(null), 5000);
       }
@@ -259,10 +246,8 @@ export default function MultiplayerGame() {
       setSelectedItem(null);
       setTurnTimer(GAME_RULES.TIMERS.TURN_DURATION_MS / 1000);
 
-      // Sincronizar estado dos jogadores do servidor (corrige dessincronização de itens)
       if (updatedPlayers) {
         setPlayers(updatedPlayers);
-        // Sincronizar meus itens
         const myData = updatedPlayers.find(p => p.id === myId);
         if (myData) {
           setMyItems(myData.items);
@@ -277,21 +262,17 @@ export default function MultiplayerGame() {
 
     // Shot fired
     socket.on('shotFired', (data: ShotFiredPayload) => {
-      // Guardar apenas o ÚLTIMO cartucho do jogador que atirou
       setPlayerLastShell(prev => ({
         ...prev,
         [data.shooter]: data.shell
       }));
 
-      // Disparar animação de tiro
       setShotAnimation(data.shell);
       setTimeout(() => setShotAnimation(null), 600);
 
-      // Mostrar resultado do tiro em destaque (fica visível por 3 segundos)
       const shooterName = data.shooter === myId ? 'Você' : data.shooterName;
       const targetName = data.target === myId ? 'você' : data.targetName;
 
-      // Atualizar ref IMEDIATAMENTE para evitar race condition com roundStarted
       hasActiveOverlayRef.current = true;
 
       setLastShotResult({
@@ -302,22 +283,18 @@ export default function MultiplayerGame() {
       });
       setTimeout(() => setLastShotResult(null), 3000);
 
-      // Atualizar jogadores do servidor
       if (data.players) {
         setPlayers(data.players);
-        // Sincronizar meus itens
         const myData = data.players.find(p => p.id === myId);
         if (myData) {
           setMyItems(myData.items);
         }
       }
 
-      // shellsRemaining já é um ShellInfo (objeto)
       setShells(data.shellsRemaining);
 
       if (data.shell === 'live') {
         setMessage(`${shooterName} atirou em ${targetName}`);
-        // Mostrar efeito de dano no alvo
         setDamagedPlayerId(data.target);
         setTimeout(() => setDamagedPlayerId(null), 600);
       } else {
@@ -327,11 +304,9 @@ export default function MultiplayerGame() {
 
     // Item used
     socket.on('itemUsed', (data: ItemUsedPayload) => {
-      // Usar playerName que vem do servidor (não buscar em players que pode estar desatualizado)
       const userName = data.playerId === myId ? 'Você' : data.playerName;
       const item = ITEMS[data.itemId as ItemId];
 
-      // Adrenaline - mostrar o item roubado
       if (data.itemId === 'adrenaline' && data.stolenItem) {
         const stolenFrom = data.playerId === myId ? data.targetName : userName;
         const stolenBy = data.playerId === myId ? 'Você roubou' : `${userName} roubou`;
@@ -340,25 +315,21 @@ export default function MultiplayerGame() {
         setMessage(`${userName} usou ${item?.emoji} ${item?.name}`);
       }
 
-      // Handle specific item effects
       if (data.itemId === 'magnifying_glass' && data.revealedShell) {
         if (data.playerId === myId) {
           setRevealedShell(data.revealedShell);
         }
       }
 
-      // Phone - mostrar resultado apenas para quem usou
       if (data.itemId === 'phone' && data.phoneShell && data.playerId === myId) {
         setMessage(`📱 Cartucho #${data.phonePosition}: ${data.phoneShell === 'live' ? '🔴 LIVE' : '🔵 BLANK'}`);
       }
 
-      // Efeitos visuais de cura
       if (data.itemId === 'cigarettes' && data.healedAmount && data.healedAmount > 0) {
         setHealedPlayerId(data.playerId);
         setTimeout(() => setHealedPlayerId(null), 700);
       }
 
-      // Efeitos visuais de dano (expired medicine que deu errado)
       if (data.itemId === 'expired_medicine' && data.damagedAmount && data.damagedAmount > 0) {
         setDamagedPlayerId(data.playerId);
         setTimeout(() => setDamagedPlayerId(null), 600);
@@ -367,7 +338,6 @@ export default function MultiplayerGame() {
         setTimeout(() => setHealedPlayerId(null), 700);
       }
 
-      // Beer ejected a shell - mostrar para o jogador que usou
       if (data.ejectedShell) {
         setPlayerLastShell(prev => ({
           ...prev,
@@ -375,15 +345,12 @@ export default function MultiplayerGame() {
         }));
       }
 
-      // Atualizar shells se mudou
       if (data.shellsRemaining) {
         setShells(data.shellsRemaining);
       }
 
-      // Update players state from server response
       if (data.players) {
         setPlayers(data.players);
-        // Sync my items from server state
         const myData = data.players.find(p => p.id === myId);
         if (myData) {
           setMyItems(myData.items);
@@ -405,19 +372,18 @@ export default function MultiplayerGame() {
     socket.on('shellsReloaded', ({ shells: newShells, itemsDistributed }) => {
       setShells(newShells);
       setRevealedShell(null);
-      setPlayerLastShell({}); // Limpar balas gastas quando recarrega
+      setPlayerLastShell({});
 
       const myNewItems = itemsDistributed.find(d => d.playerId === myId)?.items || [];
       setMyItems(prev => [...prev, ...myNewItems].slice(0, GAME_RULES.ITEMS.MAX_PER_PLAYER));
 
-      const overlayData = {
+      const overlayData: RoundAnnouncement = {
         round: round,
         live: newShells.live,
         blank: newShells.blank,
         hp: me?.maxHp || 4,
       };
 
-      // Se há overlay ativo, enfileirar
       if (hasActiveOverlayRef.current) {
         setOverlayQueue(prev => [...prev, {
           type: 'reload' as const,
@@ -425,9 +391,7 @@ export default function MultiplayerGame() {
           duration: 4000,
         }]);
       } else {
-        // Atualizar ref IMEDIATAMENTE para evitar race condition
         hasActiveOverlayRef.current = true;
-        // Mostrar anúncio de recarga com LIVE/BLANK igual ao início de rodada
         setRoundAnnouncement(overlayData);
         setTimeout(() => setRoundAnnouncement(null), 4000);
       }
@@ -447,7 +411,6 @@ export default function MultiplayerGame() {
       const winner = players.find(p => p.id === winnerId);
       setMessage(`${winner?.name} venceu a rodada!`);
 
-      // Update round wins
       setPlayers(prev => prev.map(p => {
         const wins = roundWins.find(w => w.playerId === p.id);
         return wins ? { ...p, roundWins: wins.wins } : p;
@@ -456,15 +419,12 @@ export default function MultiplayerGame() {
 
     // Game over
     socket.on('gameOver', (data: GameOverPayload) => {
-      // Limpar sessões salvas
       localStorage.removeItem('buckshotSession');
       localStorage.removeItem('buckshotReconnect');
-
-      // Mostrar modal de fim de jogo com estatísticas
       setGameOverData(data);
     });
 
-    // Reconnected - quando auto-reconexão funciona (restaurar game state)
+    // Reconnected
     socket.on('reconnected', (data) => {
       console.log('[Game] Reconectado com sucesso ao jogo:', data.roomCode);
       setPlayers(data.players);
@@ -484,7 +444,7 @@ export default function MultiplayerGame() {
       setMessage(`Erro: ${data.message}`);
     });
 
-    // Reconnect credentials - salvar para possível reconexão
+    // Reconnect credentials
     socket.on('reconnectCredentials', (data: { roomCode: string; playerName: string; reconnectToken: string }) => {
       localStorage.setItem('buckshotReconnect', JSON.stringify({
         roomCode: data.roomCode,
@@ -505,7 +465,6 @@ export default function MultiplayerGame() {
     // Player disconnected
     socket.on('playerDisconnected', ({ playerId, playerName, gracePeriod }) => {
       setDisconnectedPlayers(prev => {
-        // Evitar duplicatas
         if (prev.find(p => p.playerId === playerId)) return prev;
         return [...prev, {
           playerId,
@@ -517,7 +476,6 @@ export default function MultiplayerGame() {
 
     // Player reconnected
     socket.on('playerReconnected', ({ playerName }) => {
-      // Filtrar por playerName pois o playerId muda após reconexão (novo socket.id)
       setDisconnectedPlayers(prev => prev.filter(p => p.playerName !== playerName));
       setMessage(`${playerName} reconectou!`);
     });
@@ -531,7 +489,7 @@ export default function MultiplayerGame() {
       });
     });
 
-    // Action error - fecha modal de roubo se estiver aberto
+    // Action error
     socket.on('actionError', (error) => {
       setStealingFromPlayer(null);
       setSelectedItem(null);
@@ -592,7 +550,7 @@ export default function MultiplayerGame() {
     return () => clearInterval(interval);
   }, [disconnectedPlayers.length]);
 
-  // Actions - blocked when overlay is active
+  // Actions
   const handleShoot = useCallback((targetId: string) => {
     if (!socket || !isMyTurn || hasActiveOverlay) return;
     socket.emit('shoot', { targetId });
@@ -603,8 +561,6 @@ export default function MultiplayerGame() {
     if (!socket || !isMyTurn || hasActiveOverlay || itemIndex >= myItems.length) return;
 
     const item = myItems[itemIndex];
-
-    // Items that need a target
     const needsTarget = ['handcuffs', 'adrenaline'].includes(item.id);
 
     if (needsTarget && !selectedTarget) {
@@ -613,11 +569,8 @@ export default function MultiplayerGame() {
       return;
     }
 
-    // Adrenaline: precisa abrir modal para escolher item do alvo
-    // Mesmo se já tem alvo selecionado, não pode enviar useItem direto
     if (item.id === 'adrenaline' && selectedTarget) {
       socket.emit('getPlayerItems', { targetId: selectedTarget });
-      // NÃO limpar selectedItem aqui - manter para caso de cancelamento
       return;
     }
 
@@ -637,14 +590,11 @@ export default function MultiplayerGame() {
     if (selectedItem !== null) {
       const item = myItems[selectedItem];
 
-      // Adrenaline: primeiro obter os itens do alvo antes de usar
-      // NÃO limpar selectedItem - manter para caso de cancelamento
       if (item.id === 'adrenaline') {
         socket.emit('getPlayerItems', { targetId: playerId });
         return;
       }
 
-      // Using item on target
       socket.emit('useItem', {
         itemId: item.id as ItemId,
         targetId: playerId,
@@ -657,16 +607,23 @@ export default function MultiplayerGame() {
     }
   };
 
-  if (!isConnected) {
-    return (
-      <div className="game-container">
-        <p className="connecting-message">Reconectando...</p>
-      </div>
-    );
-  }
+  const handleStealItem = useCallback((itemIndex: number) => {
+    if (!socket || !stealingFromPlayer) return;
+    socket.emit('useItem', {
+      itemId: 'adrenaline',
+      targetId: stealingFromPlayer.playerId,
+      itemIndex,
+    });
+    setStealingFromPlayer(null);
+    setSelectedItem(null);
+    setSelectedTarget(null);
+  }, [socket, stealingFromPlayer]);
 
-  const alivePlayers = players.filter(p => p.alive);
-  const otherPlayers = alivePlayers.filter(p => p.id !== myId);
+  const handleCancelSteal = useCallback(() => {
+    setStealingFromPlayer(null);
+    setSelectedItem(null);
+    setSelectedTarget(null);
+  }, []);
 
   // Helper to log events for bug reports
   const logEvent = useCallback((event: string) => {
@@ -685,445 +642,280 @@ export default function MultiplayerGame() {
     recentEvents,
   }), [state?.roomCode, round, players, currentPlayerId, shells, myItems, recentEvents]);
 
+  if (!isConnected) {
+    return (
+      <div className="multiplayer-game-page">
+        <p className="connecting-message">Reconectando...</p>
+      </div>
+    );
+  }
+
+  // Prepare props for GameBoard
+  const alivePlayers = players.filter(p => p.alive);
+  const otherPlayers = alivePlayers.filter(p => p.id !== myId);
+
+  const opponentsForBoard: GamePlayer[] = otherPlayers.map(p => ({
+    id: p.id,
+    name: p.name,
+    hp: p.hp,
+    maxHp: p.maxHp,
+    items: p.items as GameItem[],
+    handcuffed: p.handcuffed,
+    sawedOff: p.sawedOff,
+    alive: p.alive,
+    roundWins: p.roundWins,
+  }));
+
+  const meForBoard: GamePlayer | null = me ? {
+    id: me.id,
+    name: me.name,
+    hp: me.hp,
+    maxHp: me.maxHp,
+    items: me.items as GameItem[],
+    handcuffed: me.handcuffed,
+    sawedOff: me.sawedOff,
+    alive: me.alive,
+    roundWins: me.roundWins,
+  } : null;
+
+  const stealModalData: StealModalData | null = stealingFromPlayer ? {
+    playerId: stealingFromPlayer.playerId,
+    playerName: stealingFromPlayer.playerName,
+    items: stealingFromPlayer.items as GameItem[],
+  } : null;
+
   return (
-    <div className="game-container">
-      {/* Header */}
-      <div className="game-header">
-        <div className="round-info">Rodada {round}/{GAME_RULES.MAX_ROUNDS}</div>
-        <div className="shells-info">
-          <span className="shells-remaining">{shells.total} CARTUCHOS</span>
-        </div>
-        {isMyTurn && (
-          <div className={`turn-timer ${turnTimer <= 10 ? 'warning' : ''} ${turnTimer <= 30 ? 'caution' : ''}`}>
-            {turnTimer}s
-          </div>
-        )}
-      </div>
+    <div className="multiplayer-game-page">
+      <GameBoard
+        round={round}
+        maxRounds={GAME_RULES.MAX_ROUNDS}
+        shells={shells}
+        currentPlayerId={currentPlayerId}
+        myId={myId}
+        opponents={opponentsForBoard}
+        me={meForBoard}
+        myItems={myItems as GameItem[]}
+        isMyTurn={isMyTurn}
+        selectedTarget={selectedTarget}
+        revealedShell={revealedShell}
+        message={message}
+        turnTimer={turnTimer}
+        roundAnnouncement={roundAnnouncement}
+        lastShotResult={lastShotResult}
+        stealModalData={stealModalData}
+        gameOverData={gameOverData ? (
+          <div className="game-over-overlay">
+            <div className="game-over-modal">
+              <h1 className="game-over-title">🏆 FIM DE JOGO 🏆</h1>
 
-      {/* Disconnected Players Alert */}
-      {disconnectedPlayers.length > 0 && (
-        <div className="disconnected-players-container">
-          {disconnectedPlayers.map(dp => (
-            <div key={dp.playerId} className="disconnected-player-alert">
-              <span className="warning-icon">⚠️</span>
-              <span className="player-name">{dp.playerName} desconectou!</span>
-              <span className={`countdown ${dp.remainingTime <= 10 ? 'critical' : ''}`}>
-                {dp.remainingTime}s
-              </span>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {/* Round Announcement Overlay */}
-      {roundAnnouncement && !gameOverData && (
-        <div className="round-announcement-overlay">
-          <div className="round-announcement">
-            <h2>🎯 RODADA {roundAnnouncement.round}</h2>
-            <div className="shell-distribution">
-              {/* Shells visuais com cores */}
-              <div className="shells-visual-container">
-                {renderShellIcons(roundAnnouncement.live, roundAnnouncement.blank)}
+              {/* Winner */}
+              <div className="winner-section">
+                <span className="crown">👑</span>
+                <h2 className="winner-name">{gameOverData.winner?.name || 'Empate'}</h2>
+                {gameOverData.winner && (
+                  <p className="winner-rounds">Vencedor com {gameOverData.winner.roundWins} rounds!</p>
+                )}
               </div>
 
-              {/* Legenda abaixo */}
-              <div className="shell-legend">
-                <span className="legend-item live">🔴 {roundAnnouncement.live} LIVE</span>
-                <span className="legend-item blank">🔵 {roundAnnouncement.blank} BLANK</span>
-              </div>
-            </div>
-            <div className="hp-announcement">❤️ {roundAnnouncement.hp} HP cada</div>
-          </div>
-        </div>
-      )}
-
-      {/* Shot Result Overlay */}
-      {lastShotResult && !gameOverData && (
-        <div className={`shot-result-overlay ${lastShotResult.type}`}>
-          <div className="shot-result">
-            {lastShotResult.type === 'live' ? (
-              <>
-                <div className="shot-icon">💥</div>
-                <div className="shot-text">BALA REAL!</div>
-                <div className="shot-damage">-{lastShotResult.damage} HP</div>
-              </>
-            ) : (
-              <>
-                <div className="shot-icon">💨</div>
-                <div className="shot-text">VAZIA</div>
-                <div className="shot-info">Sem dano</div>
-              </>
-            )}
-            <div className="shot-details">
-              {lastShotResult.shooter} → {lastShotResult.target}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Message */}
-      {message && !roundAnnouncement && !lastShotResult && !gameOverData && <div className="game-message">{message}</div>}
-
-      {/* Revealed Shell */}
-      {revealedShell && !gameOverData && (
-        <div className={`revealed-shell ${revealedShell}`}>
-          Proximo cartucho: {revealedShell === 'live' ? 'VIVA' : 'VAZIA'}
-        </div>
-      )}
-
-      {/* Other Players */}
-      <div className="opponents-area">
-        {otherPlayers.map(player => (
-          <div
-            key={player.id}
-            className={`opponent-card ${player.id === currentPlayerId ? 'active' : ''} ${player.id === selectedTarget ? 'selected' : ''} ${!player.alive ? 'dead' : ''} ${player.id === damagedPlayerId ? 'damage' : ''} ${player.id === healedPlayerId ? 'heal' : ''}`}
-            onClick={() => player.alive && handleSelectTarget(player.id)}
-          >
-            <div className="opponent-name">
-              {player.name}
-              {player.roundWins > 0 && <span className="round-wins">🏆{player.roundWins}</span>}
-              {player.handcuffed && <span className="status-icon">🔗</span>}
-              {player.sawedOff && <span className="status-icon">🪚</span>}
-            </div>
-            <div className="opponent-hp">
-              {Array.from({ length: player.maxHp }).map((_, i) => (
-                <span
-                  key={i}
-                  className={`hp-heart ${i < player.hp ? 'full' : 'empty'}`}
-                >
-                  {i < player.hp ? '❤️' : '🖤'}
-                </span>
-              ))}
-            </div>
-            <div className="opponent-items">
-              {player.items.slice(0, 8).map((item, i) => (
-                <span key={i} className="item-icon">{item.emoji}</span>
-              ))}
-            </div>
-
-            {/* Cartucho gasto deste jogador (apenas o último) */}
-            {playerLastShell[player.id] && (
-              <div className={`player-spent-shell ${playerLastShell[player.id]}`} />
-            )}
-          </div>
-        ))}
-      </div>
-
-      {/* Shotgun Area */}
-      <div className="shotgun-area">
-        <div className={`shotgun ${isMyTurn ? 'active' : ''} ${shotAnimation ? `shot-${shotAnimation}` : ''}`}>
-          <div className="shotgun-barrel"></div>
-          <div className="shotgun-body"></div>
-          {shotAnimation && <div className={`muzzle-flash ${shotAnimation}`}></div>}
-        </div>
-
-        {isMyTurn && selectedTarget && (
-          <button
-            className={`shoot-btn ${hasActiveOverlay ? 'disabled' : ''}`}
-            onClick={() => handleShoot(selectedTarget)}
-            disabled={hasActiveOverlay}
-          >
-            ATIRAR
-          </button>
-        )}
-
-        {isMyTurn && !selectedTarget && (
-          <div className="shoot-options">
-            <button
-              className={`shoot-self-btn ${hasActiveOverlay ? 'disabled' : ''}`}
-              onClick={() => handleShoot(myId)}
-              disabled={hasActiveOverlay}
-            >
-              Atirar em Si
-            </button>
-            <p className="shoot-hint">ou selecione um oponente</p>
-          </div>
-        )}
-      </div>
-
-      {/* My Status */}
-      <div className={`my-status ${myId === damagedPlayerId ? 'damage' : ''} ${myId === healedPlayerId ? 'heal' : ''}`}>
-        {/* Meu cartucho gasto (apenas o último) */}
-        {playerLastShell[myId] && (
-          <div className={`my-spent-shell ${playerLastShell[myId]}`} />
-        )}
-        {me && me.roundWins > 0 && <span className="my-round-wins">🏆 {me.roundWins}</span>}
-        <div className="my-hp">
-          {Array.from({ length: me?.maxHp || 0 }).map((_, i) => (
-            <span
-              key={i}
-              className={`hp-heart ${i < (me?.hp || 0) ? 'full' : 'empty'}`}
-            >
-              {i < (me?.hp || 0) ? '❤️' : '🖤'}
-            </span>
-          ))}
-        </div>
-
-        {me?.handcuffed && <span className="my-status-effect">Algemado</span>}
-        {me?.sawedOff && <span className="my-status-effect">Serrada (2x dano)</span>}
-      </div>
-
-      {/* My Items */}
-      <div className="my-items">
-        {myItems.map((item, index) => (
-          <button
-            key={index}
-            className={`item-btn ${selectedItem === index ? 'selected' : ''} ${hasActiveOverlay ? 'disabled' : ''}`}
-            onClick={() => isMyTurn && handleUseItem(index)}
-            disabled={!isMyTurn || hasActiveOverlay}
-            title={item.name}
-          >
-            {item.emoji}
-          </button>
-        ))}
-        {myItems.length === 0 && (
-          <p className="no-items">Sem itens</p>
-        )}
-      </div>
-
-      {/* Turn Indicator */}
-      {!isMyTurn && (
-        <div className="waiting-turn">
-          Vez de {players.find(p => p.id === currentPlayerId)?.name}...
-        </div>
-      )}
-
-      {/* Steal Item Modal (Adrenaline) */}
-      {stealingFromPlayer && !gameOverData && (
-        <div className="steal-modal-overlay">
-          <div className="steal-modal">
-            <h3>💉 Roubar item de {stealingFromPlayer.playerName}</h3>
-            <p className="steal-instruction">Selecione um item para roubar e USAR IMEDIATAMENTE:</p>
-            <div className="steal-items">
-              {stealingFromPlayer.items.filter(item => item.id !== 'adrenaline').length > 0 ? (
-                stealingFromPlayer.items
-                  .map((item, index) => ({ item, originalIndex: index }))
-                  .filter(({ item }) => item.id !== 'adrenaline') // Não pode roubar outra Adrenalina
-                  .map(({ item, originalIndex }) => (
-                  <button
-                    key={originalIndex}
-                    className="steal-item-btn"
-                    onClick={() => {
-                      socket?.emit('useItem', {
-                        itemId: 'adrenaline',
-                        targetId: stealingFromPlayer.playerId,
-                        itemIndex: originalIndex,
-                      });
-                      setStealingFromPlayer(null);
-                      setSelectedItem(null);
-                      setSelectedTarget(null);
-                    }}
-                    title={`${item.name} (será usado imediatamente)`}
-                  >
-                    <span className="steal-item-emoji">{item.emoji}</span>
-                    <span className="steal-item-name">{item.name}</span>
-                  </button>
-                ))
-              ) : (
-                <p className="no-items-to-steal">Este jogador não tem itens roubáveis!</p>
-              )}
-            </div>
-            <button
-              className="steal-cancel-btn"
-              onClick={() => {
-                setStealingFromPlayer(null);
-                setSelectedItem(null);
-                setSelectedTarget(null);
-              }}
-            >
-              Cancelar
-            </button>
-          </div>
-        </div>
-      )}
-
-      {/* Bug Report Button */}
-      <button
-        className="bug-report-btn"
-        onClick={() => {
-          logEvent('Bug report opened');
-          setShowBugReport(true);
-        }}
-        title="Reportar Bug"
-      >
-        🐛
-      </button>
-
-      {/* Bug Report Modal */}
-      <BugReportModal
-        isOpen={showBugReport}
-        onClose={() => setShowBugReport(false)}
-        gameState={gameStateForReport}
-      />
-
-      {/* Achievement Toast */}
-      <AchievementToast
-        achievements={unlockedAchievements}
-        onDismiss={() => setUnlockedAchievements([])}
-      />
-
-      {/* Game Over Modal */}
-      {gameOverData && (
-        <div className="game-over-overlay">
-          <div className="game-over-modal">
-            <h1 className="game-over-title">🏆 FIM DE JOGO 🏆</h1>
-
-            {/* Winner */}
-            <div className="winner-section">
-              <span className="crown">👑</span>
-              <h2 className="winner-name">{gameOverData.winner?.name || 'Empate'}</h2>
-              {gameOverData.winner && (
-                <p className="winner-rounds">Vencedor com {gameOverData.winner.roundWins} rounds!</p>
-              )}
-            </div>
-
-            {/* Stats Table */}
-            {gameOverData.stats && gameOverData.stats.length > 0 && (
-              <div className="stats-section">
-                <h3>📊 ESTATÍSTICAS</h3>
-                <table className="stats-table">
-                  <thead>
-                    <tr>
-                      <th className="th-player">Jogador</th>
-                      <th className="th-stat" title="Rounds Vencidos">
-                        <span className="th-emoji">🏆</span>
-                        <span className="th-label">Rounds</span>
-                      </th>
-                      <th className="th-stat" title="Dano Causado">
-                        <span className="th-emoji">💥</span>
-                        <span className="th-label">Dano</span>
-                      </th>
-                      <th className="th-stat" title="Dano Sofrido">
-                        <span className="th-emoji">💔</span>
-                        <span className="th-label">Sofrido</span>
-                      </th>
-                      <th className="th-stat" title="Dano em Si Mesmo">
-                        <span className="th-emoji">🤕</span>
-                        <span className="th-label">Auto</span>
-                      </th>
-                      <th className="th-stat" title="Tiros Disparados">
-                        <span className="th-emoji">🔫</span>
-                        <span className="th-label">Tiros</span>
-                      </th>
-                      <th className="th-stat" title="Eliminações">
-                        <span className="th-emoji">☠️</span>
-                        <span className="th-label">Kills</span>
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {gameOverData.stats.map((stat: PlayerGameStats) => (
-                      <tr key={stat.odId} className={stat.odId === gameOverData.winner?.id ? 'winner-row' : ''}>
-                        <td className="player-name-cell">{stat.guestName}</td>
-                        <td>{stat.roundsWon}</td>
-                        <td>{stat.damageDealt}</td>
-                        <td>{stat.damageTaken}</td>
-                        <td>{stat.selfDamage}</td>
-                        <td>{stat.shotsFired}</td>
-                        <td>{stat.kills}</td>
+              {/* Stats Table */}
+              {gameOverData.stats && gameOverData.stats.length > 0 && (
+                <div className="stats-section">
+                  <h3>📊 ESTATÍSTICAS</h3>
+                  <table className="stats-table">
+                    <thead>
+                      <tr>
+                        <th className="th-player">Jogador</th>
+                        <th className="th-stat" title="Rounds Vencidos">
+                          <span className="th-emoji">🏆</span>
+                          <span className="th-label">Rounds</span>
+                        </th>
+                        <th className="th-stat" title="Dano Causado">
+                          <span className="th-emoji">💥</span>
+                          <span className="th-label">Dano</span>
+                        </th>
+                        <th className="th-stat" title="Dano Sofrido">
+                          <span className="th-emoji">💔</span>
+                          <span className="th-label">Sofrido</span>
+                        </th>
+                        <th className="th-stat" title="Dano em Si Mesmo">
+                          <span className="th-emoji">🤕</span>
+                          <span className="th-label">Auto</span>
+                        </th>
+                        <th className="th-stat" title="Tiros Disparados">
+                          <span className="th-emoji">🔫</span>
+                          <span className="th-label">Tiros</span>
+                        </th>
+                        <th className="th-stat" title="Eliminações">
+                          <span className="th-emoji">☠️</span>
+                          <span className="th-label">Kills</span>
+                        </th>
                       </tr>
+                    </thead>
+                    <tbody>
+                      {gameOverData.stats.map((stat: PlayerGameStats) => (
+                        <tr key={stat.odId} className={stat.odId === gameOverData.winner?.id ? 'winner-row' : ''}>
+                          <td className="player-name-cell">{stat.guestName}</td>
+                          <td>{stat.roundsWon}</td>
+                          <td>{stat.damageDealt}</td>
+                          <td>{stat.damageTaken}</td>
+                          <td>{stat.selfDamage}</td>
+                          <td>{stat.shotsFired}</td>
+                          <td>{stat.kills}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+
+              {/* Awards */}
+              {gameOverData.awards && gameOverData.awards.length > 0 && (
+                <div className="awards-section">
+                  <h3>🏅 TÍTULOS 🏅</h3>
+                  <div className="awards-list">
+                    {gameOverData.awards.map((award: GameAward) => (
+                      <div key={award.type} className={`award-item ${award.type}`}>
+                        <span className="award-icon">{getAwardIcon(award.type)}</span>
+                        <span className="award-title">{getAwardTitle(award.type)}</span>
+                        <span className="award-player">{award.playerName}</span>
+                        <span className="award-value">({award.value})</span>
+                      </div>
                     ))}
-                  </tbody>
-                </table>
-              </div>
-            )}
-
-            {/* Awards */}
-            {gameOverData.awards && gameOverData.awards.length > 0 && (
-              <div className="awards-section">
-                <h3>🏅 TÍTULOS 🏅</h3>
-                <div className="awards-list">
-                  {gameOverData.awards.map((award: GameAward) => (
-                    <div key={award.type} className={`award-item ${award.type}`}>
-                      <span className="award-icon">{getAwardIcon(award.type)}</span>
-                      <span className="award-title">{getAwardTitle(award.type)}</span>
-                      <span className="award-player">{award.playerName}</span>
-                      <span className="award-value">({award.value})</span>
-                    </div>
-                  ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* XP Results */}
-            {gameOverData.xpResults && gameOverData.xpResults.length > 0 && (
-              <div className="xp-results-section">
-                <h3>✨ EXPERIÊNCIA ✨</h3>
-                <div className="xp-results-list">
-                  {gameOverData.xpResults.map((xpResult: PlayerXpResult) => {
-                    const playerName = gameOverData.stats?.find(s => s.odId === xpResult.odId)?.guestName || 'Jogador';
-                    const levelInfo = getLevelInfo(xpResult.newTotalXp);
-                    const isMe = xpResult.odId === myId;
-                    const leveledUp = xpResult.newLevel > xpResult.previousLevel;
-                    const prestiged = xpResult.newPrestige > xpResult.previousPrestige;
-                    return (
-                      <div key={xpResult.odId} className={`xp-result-item ${isMe ? 'is-me' : ''} ${leveledUp ? 'leveled-up' : ''}`}>
-                        <div className="xp-result-header">
-                          <span className="xp-player-name">{playerName}</span>
-                          <span className="xp-earned">+{xpResult.xpEarned} XP</span>
+              {/* XP Results */}
+              {gameOverData.xpResults && gameOverData.xpResults.length > 0 && (
+                <div className="xp-results-section">
+                  <h3>✨ EXPERIÊNCIA ✨</h3>
+                  <div className="xp-results-list">
+                    {gameOverData.xpResults.map((xpResult: PlayerXpResult) => {
+                      const playerName = gameOverData.stats?.find(s => s.odId === xpResult.odId)?.guestName || 'Jogador';
+                      const levelInfo = getLevelInfo(xpResult.newTotalXp);
+                      const isMe = xpResult.odId === myId;
+                      const leveledUp = xpResult.newLevel > xpResult.previousLevel;
+                      const prestiged = xpResult.newPrestige > xpResult.previousPrestige;
+                      return (
+                        <div key={xpResult.odId} className={`xp-result-item ${isMe ? 'is-me' : ''} ${leveledUp ? 'leveled-up' : ''}`}>
+                          <div className="xp-result-header">
+                            <span className="xp-player-name">{playerName}</span>
+                            <span className="xp-earned">+{xpResult.xpEarned} XP</span>
+                          </div>
+                          {isMe && (
+                            <div className="xp-breakdown">
+                              {xpResult.breakdown.participation > 0 && <span className="xp-detail">Participação: +{xpResult.breakdown.participation}</span>}
+                              {xpResult.breakdown.positionBonus > 0 && <span className="xp-detail">Posição: +{xpResult.breakdown.positionBonus}</span>}
+                              {xpResult.breakdown.killXp > 0 && <span className="xp-detail">Kills: +{xpResult.breakdown.killXp}</span>}
+                              {xpResult.breakdown.roundWinXp > 0 && <span className="xp-detail">Rounds: +{xpResult.breakdown.roundWinXp}</span>}
+                              {xpResult.breakdown.damageXp > 0 && <span className="xp-detail">Dano: +{xpResult.breakdown.damageXp}</span>}
+                              {xpResult.breakdown.itemXp > 0 && <span className="xp-detail">Itens: +{xpResult.breakdown.itemXp}</span>}
+                              {xpResult.breakdown.survivalXp > 0 && <span className="xp-detail">Sobrevivência: +{xpResult.breakdown.survivalXp}</span>}
+                              {xpResult.breakdown.cleanPlayBonus > 0 && <span className="xp-detail">Jogo Limpo: +{xpResult.breakdown.cleanPlayBonus}</span>}
+                            </div>
+                          )}
+                          <div className="xp-level-bar">
+                            <div className="xp-level-info">
+                              <span className="xp-level">Nv. {levelInfo.displayLevel}</span>
+                              {levelInfo.prestigeLevel > 0 && (
+                                <span className="xp-prestige">{'⭐'.repeat(Math.min(levelInfo.prestigeLevel, 5))}</span>
+                              )}
+                            </div>
+                            <div className="xp-progress-bar">
+                              <div
+                                className="xp-progress-fill"
+                                style={{ width: `${Math.round(levelInfo.xpProgress * 100)}%` }}
+                              />
+                            </div>
+                          </div>
+                          {leveledUp && <div className="level-up-alert">LEVEL UP! Nv. {xpResult.newLevel}</div>}
+                          {prestiged && <div className="prestige-alert">⭐ PRESTÍGIO {xpResult.newPrestige}! ⭐</div>}
                         </div>
-                        {isMe && (
-                          <div className="xp-breakdown">
-                            {xpResult.breakdown.participation > 0 && <span className="xp-detail">Participação: +{xpResult.breakdown.participation}</span>}
-                            {xpResult.breakdown.positionBonus > 0 && <span className="xp-detail">Posição: +{xpResult.breakdown.positionBonus}</span>}
-                            {xpResult.breakdown.killXp > 0 && <span className="xp-detail">Kills: +{xpResult.breakdown.killXp}</span>}
-                            {xpResult.breakdown.roundWinXp > 0 && <span className="xp-detail">Rounds: +{xpResult.breakdown.roundWinXp}</span>}
-                            {xpResult.breakdown.damageXp > 0 && <span className="xp-detail">Dano: +{xpResult.breakdown.damageXp}</span>}
-                            {xpResult.breakdown.itemXp > 0 && <span className="xp-detail">Itens: +{xpResult.breakdown.itemXp}</span>}
-                            {xpResult.breakdown.survivalXp > 0 && <span className="xp-detail">Sobrevivência: +{xpResult.breakdown.survivalXp}</span>}
-                            {xpResult.breakdown.cleanPlayBonus > 0 && <span className="xp-detail">Jogo Limpo: +{xpResult.breakdown.cleanPlayBonus}</span>}
-                          </div>
-                        )}
-                        <div className="xp-level-bar">
-                          <div className="xp-level-info">
-                            <span className="xp-level">Nv. {levelInfo.displayLevel}</span>
-                            {levelInfo.prestigeLevel > 0 && (
-                              <span className="xp-prestige">{'⭐'.repeat(Math.min(levelInfo.prestigeLevel, 5))}</span>
-                            )}
-                          </div>
-                          <div className="xp-progress-bar">
-                            <div
-                              className="xp-progress-fill"
-                              style={{ width: `${Math.round(levelInfo.xpProgress * 100)}%` }}
-                            />
-                          </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
+              {/* Badges */}
+              {gameOverData.badges && gameOverData.badges.length > 0 && (
+                <div className="badges-section">
+                  <h3>🎖️ BADGES 🎖️</h3>
+                  <div className="badges-list">
+                    {gameOverData.badges.map((badge: MatchBadgeAwarded, index: number) => (
+                      <div key={`${badge.badgeId}-${index}`} className="badge-item">
+                        <span className="badge-icon">{badge.icon}</span>
+                        <div className="badge-info">
+                          <span className="badge-name">{badge.name}</span>
+                          <span className="badge-player">{badge.playerName}</span>
                         </div>
-                        {leveledUp && <div className="level-up-alert">LEVEL UP! Nv. {xpResult.newLevel}</div>}
-                        {prestiged && <div className="prestige-alert">⭐ PRESTÍGIO {xpResult.newPrestige}! ⭐</div>}
                       </div>
-                    );
-                  })}
+                    ))}
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Badges */}
-            {gameOverData.badges && gameOverData.badges.length > 0 && (
-              <div className="badges-section">
-                <h3>🎖️ BADGES 🎖️</h3>
-                <div className="badges-list">
-                  {gameOverData.badges.map((badge: MatchBadgeAwarded, index: number) => (
-                    <div key={`${badge.badgeId}-${index}`} className="badge-item">
-                      <span className="badge-icon">{badge.icon}</span>
-                      <div className="badge-info">
-                        <span className="badge-name">{badge.name}</span>
-                        <span className="badge-player">{badge.playerName}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <button
-              className="back-to-lobby-btn"
-              onClick={() => navigate('/multiplayer')}
-            >
-              Voltar ao Lobby
-            </button>
+              <button
+                className="back-to-lobby-btn"
+                onClick={() => navigate('/multiplayer')}
+              >
+                Voltar ao Lobby
+              </button>
+            </div>
           </div>
-        </div>
-      )}
+        ) : null}
+        shotAnimation={shotAnimation}
+        damagedPlayerId={damagedPlayerId}
+        healedPlayerId={healedPlayerId}
+        playerLastShell={playerLastShell}
+        onSelectTarget={handleSelectTarget}
+        onShoot={handleShoot}
+        onShootSelf={() => handleShoot(myId)}
+        onUseItem={handleUseItem}
+        onStealItem={handleStealItem}
+        onCancelSteal={handleCancelSteal}
+        onBack={() => navigate('/multiplayer')}
+      >
+        {/* Disconnected Players Alert */}
+        {disconnectedPlayers.length > 0 && (
+          <div className="disconnected-players-container">
+            {disconnectedPlayers.map(dp => (
+              <div key={dp.playerId} className="disconnected-player-alert">
+                <span className="warning-icon">⚠️</span>
+                <span className="player-name">{dp.playerName} desconectou!</span>
+                <span className={`countdown ${dp.remainingTime <= 10 ? 'critical' : ''}`}>
+                  {dp.remainingTime}s
+                </span>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* Bug Report Button */}
+        <button
+          className="bug-report-btn"
+          onClick={() => {
+            logEvent('Bug report opened');
+            setShowBugReport(true);
+          }}
+          title="Reportar Bug"
+        >
+          🐛
+        </button>
+
+        {/* Bug Report Modal */}
+        <BugReportModal
+          isOpen={showBugReport}
+          onClose={() => setShowBugReport(false)}
+          gameState={gameStateForReport}
+        />
+
+        {/* Achievement Toast */}
+        <AchievementToast
+          achievements={unlockedAchievements}
+          onDismiss={() => setUnlockedAchievements([])}
+        />
+      </GameBoard>
     </div>
   );
 }
@@ -1151,31 +943,4 @@ function getAwardTitle(type: string): string {
     'most_kills': 'Exterminador',
   };
   return titles[type] || type;
-}
-
-// Renderiza shells visuais coloridas - em sequência (LIVE primeiro, BLANK depois)
-// NOTA: A ordem de disparo é aleatória (determinada pelo servidor), mas a visualização
-// mostra apenas a COMPOSIÇÃO do pente, não a ordem real
-function renderShellIcons(live: number, blank: number): JSX.Element {
-  const shells: JSX.Element[] = [];
-
-  // Primeiro todas as LIVE (vermelhas)
-  for (let i = 0; i < live; i++) {
-    shells.push(
-      <div key={`live-${i}`} className="shell-icon live" title="LIVE">
-        <div className="shell-tip"></div>
-      </div>
-    );
-  }
-
-  // Depois todas as BLANK (azuis)
-  for (let i = 0; i < blank; i++) {
-    shells.push(
-      <div key={`blank-${i}`} className="shell-icon blank" title="BLANK">
-        <div className="shell-tip"></div>
-      </div>
-    );
-  }
-
-  return <div className="shells-visual">{shells}</div>;
 }

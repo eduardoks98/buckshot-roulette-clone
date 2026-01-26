@@ -71,6 +71,9 @@ export interface ServerToClientEvents {
   roomCreated: (data: RoomCreatedPayload) => void;
   roomJoined: (data: RoomJoinedPayload) => void;
   roomList: (data: RoomInfo[]) => void;
+  roomListUpdated: () => void;
+  roomDeleted: (data: { code: string }) => void;
+  roomUpdated: (data: { code: string }) => void;
   playerJoined: (data: PlayerJoinedPayload) => void;
   playerLeft: (data: PlayerLeftPayload) => void;
   hostChanged: (data: HostChangedPayload) => void;

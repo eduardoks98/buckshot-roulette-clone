@@ -228,6 +228,9 @@ export function registerRoomHandlers(
         hasPassword: !!password,
       });
 
+      // Notificar todos os clientes que uma nova sala foi criada
+      io.emit('roomListUpdated');
+
       console.log(`[Room] Sala ${result.room.code} criada por ${playerName}`);
     } catch (error) {
       console.error('[Room] Erro ao criar sala:', error);
@@ -289,16 +292,21 @@ export function registerRoomHandlers(
 
       if (result) {
         socket.leave(result.code);
+        console.log(`[Room] Jogador saiu da sala ${result.code}`);
 
         if (result.deleted) {
           // Sala foi deletada - deletar game do banco também
           gamePersistenceService.deleteGame(result.code)
             .catch(err => console.error('[DB] Erro ao deletar jogo:', err));
           console.log(`[Room] Sala ${result.code} deletada - game removido do banco`);
+          // Notificar todos os clientes que a sala foi deletada (para atualizar lista)
+          io.emit('roomDeleted', { code: result.code });
         } else {
           io.to(result.code).emit('playerLeft', {
             players: result.players,
           });
+          // Notificar todos os clientes que a sala foi atualizada
+          io.emit('roomUpdated', { code: result.code });
         }
       }
 

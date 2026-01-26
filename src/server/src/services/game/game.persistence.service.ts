@@ -465,6 +465,125 @@ export class GamePersistenceService {
       console.error('[DB] Erro ao abandonar jogo:', error);
     }
   }
+
+  // ==========================================
+  // GAME STATE SNAPSHOT (for crash recovery)
+  // ==========================================
+
+  // Save full game state snapshot (chamado após cada ação)
+  async saveGameState(roomCode: string, gameState: object): Promise<void> {
+    try {
+      await prisma.game.update({
+        where: { room_code: roomCode },
+        data: {
+          game_state: JSON.stringify(gameState),
+          game_state_updated_at: new Date(),
+        },
+      });
+      // Log silencioso para não poluir
+    } catch (error) {
+      console.error('[DB] Erro ao salvar estado do jogo:', error);
+    }
+  }
+
+  // Get all in-progress games for server recovery
+  async getInProgressGames(): Promise<Array<{
+    roomCode: string;
+    gameState: object | null;
+    participants: Array<{
+      odUserId: string | null;
+      guestName: string | null;
+      socketId: string | null;
+      reconnectToken: string | null;
+    }>;
+  }>> {
+    try {
+      const games = await prisma.game.findMany({
+        where: {
+          status: GameStatus.IN_PROGRESS,
+          game_state: { not: null },
+        },
+        select: {
+          room_code: true,
+          game_state: true,
+          participants: {
+            select: {
+              user_id: true,
+              guest_name: true,
+              socket_id: true,
+              reconnect_token: true,
+            },
+          },
+        },
+      });
+
+      return games.map(game => ({
+        roomCode: game.room_code,
+        gameState: game.game_state ? JSON.parse(game.game_state) : null,
+        participants: game.participants.map(p => ({
+          odUserId: p.user_id,
+          guestName: p.guest_name,
+          socketId: p.socket_id,
+          reconnectToken: p.reconnect_token,
+        })),
+      }));
+    } catch (error) {
+      console.error('[DB] Erro ao buscar jogos em progresso:', error);
+      return [];
+    }
+  }
+
+  // Update participant socket info (for reconnection tracking)
+  async updateParticipantSocket(
+    gameId: string,
+    odUserId: string | undefined,
+    guestName: string | undefined,
+    socketId: string,
+    reconnectToken: string
+  ): Promise<void> {
+    try {
+      if (odUserId) {
+        await prisma.gameParticipant.updateMany({
+          where: {
+            game_id: gameId,
+            user_id: odUserId,
+          },
+          data: {
+            socket_id: socketId,
+            reconnect_token: reconnectToken,
+          },
+        });
+      } else if (guestName) {
+        await prisma.gameParticipant.updateMany({
+          where: {
+            game_id: gameId,
+            guest_name: guestName,
+          },
+          data: {
+            socket_id: socketId,
+            reconnect_token: reconnectToken,
+          },
+        });
+      }
+    } catch (error) {
+      console.error('[DB] Erro ao atualizar socket do participante:', error);
+    }
+  }
+
+  // Clear game state (when game ends normally)
+  async clearGameState(roomCode: string): Promise<void> {
+    try {
+      await prisma.game.update({
+        where: { room_code: roomCode },
+        data: {
+          game_state: null,
+          game_state_updated_at: null,
+        },
+      });
+    } catch (error) {
+      console.error('[DB] Erro ao limpar estado do jogo:', error);
+    }
+  }
 }
 
 export const gamePersistenceService = new GamePersistenceService();

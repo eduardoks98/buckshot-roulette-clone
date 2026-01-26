@@ -25,6 +25,41 @@
   opacity: 0.8;
 }
 
+/* Loading state */
+.changelog__loading {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.5);
+  padding: 2rem;
+  font-size: 0.85rem;
+}
+
+/* Error state */
+.changelog__error {
+  text-align: center;
+  padding: 1.5rem;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.changelog__error p {
+  margin: 0 0 1rem;
+  font-size: 0.85rem;
+}
+
+.changelog__error button {
+  background: rgba(212, 164, 24, 0.2);
+  border: 1px solid var(--gold-accent, #d4a418);
+  color: var(--gold-accent, #d4a418);
+  padding: 0.5rem 1rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all 0.2s;
+}
+
+.changelog__error button:hover {
+  background: rgba(212, 164, 24, 0.3);
+}
+
 /* Changelog List */
 .changelog__list {
   display: flex;

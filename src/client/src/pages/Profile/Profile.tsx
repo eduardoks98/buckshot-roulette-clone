@@ -78,8 +78,8 @@ export default function Profile() {
   };
 
   const getActiveTitleInfo = () => {
-    if (!user?.activeTitleId) return null;
-    return getTitleById(user.activeTitleId) || null;
+    if (!user?.active_title_id) return null;
+    return getTitleById(user.active_title_id) || null;
   };
 
   // Loading state
@@ -141,8 +141,8 @@ export default function Profile() {
   }
 
   // Logged in
-  const winRate = calculateWinRate(user.gamesWon, user.gamesPlayed).toFixed(1);
-  const kd = calculateKD(user.totalKills, user.totalDeaths);
+  const winRate = calculateWinRate(user.games_won, user.games_played).toFixed(1);
+  const kd = calculateKD(user.total_kills, user.total_deaths);
 
   return (
     <PageLayout>
@@ -152,14 +152,14 @@ export default function Profile() {
         {/* User Card */}
         <div className="user-card">
           <div className="user-avatar">
-            {user.avatarUrl ? (
-              <img src={user.avatarUrl} alt={user.displayName} />
+            {user.avatar_url ? (
+              <img src={user.avatar_url} alt={user.display_name || ''} />
             ) : (
-              user.displayName.charAt(0).toUpperCase()
+              user.display_name?.charAt(0)?.toUpperCase() || '?'
             )}
           </div>
           <div className="user-info">
-            <h2 className="user-name">{user.displayName}</h2>
+            <h2 className="user-name">{user.display_name}</h2>
             <span className="user-username">@{user.username}</span>
             {(() => {
               const titleInfo = getActiveTitleInfo();
@@ -182,29 +182,29 @@ export default function Profile() {
             <span className="rank-value" style={{ color: getRankColor(user.rank) }}>
               {user.rank}
             </span>
-            <span className="elo-value">{user.eloRating} ELO</span>
+            <span className="elo-value">{user.elo_rating} ELO</span>
           </div>
         </div>
 
         {/* XP / Level Section */}
         <div className="xp-section">
           <div className="xp-section-header">
-            <LevelBadge totalXp={user.totalXp} size="lg" />
+            <LevelBadge totalXp={user.total_xp} size="lg" />
             <div className="xp-section-info">
-              <span className="xp-total">{user.totalXp.toLocaleString()} XP Total</span>
+              <span className="xp-total">{user.total_xp.toLocaleString()} XP Total</span>
             </div>
           </div>
-          <XpBar totalXp={user.totalXp} size="lg" showLevel={false} />
+          <XpBar totalXp={user.total_xp} size="lg" showLevel={false} />
         </div>
 
         {/* Stats Grid */}
         <div className="stats-grid">
           <div className="stat-card">
-            <span className="stat-value">{user.gamesPlayed}</span>
+            <span className="stat-value">{user.games_played}</span>
             <span className="stat-label">Partidas</span>
           </div>
           <div className="stat-card">
-            <span className="stat-value">{user.gamesWon}</span>
+            <span className="stat-value">{user.games_won}</span>
             <span className="stat-label">Vitorias</span>
           </div>
           <div className="stat-card">
@@ -212,11 +212,11 @@ export default function Profile() {
             <span className="stat-label">Win Rate</span>
           </div>
           <div className="stat-card">
-            <span className="stat-value">{user.roundsWon}</span>
+            <span className="stat-value">{user.rounds_won}</span>
             <span className="stat-label">Rodadas</span>
           </div>
           <div className="stat-card">
-            <span className="stat-value">{user.totalKills}</span>
+            <span className="stat-value">{user.total_kills}</span>
             <span className="stat-label">Kills</span>
           </div>
           <div className="stat-card">
@@ -232,7 +232,7 @@ export default function Profile() {
               <h3 className="title-selector-header">Selecionar Titulo</h3>
               <div className="title-selector-list">
                 <button
-                  className={`title-selector-item ${!user.activeTitleId ? 'selected' : ''}`}
+                  className={`title-selector-item ${!user.active_title_id ? 'selected' : ''}`}
                   onClick={() => handleSelectTitle(null)}
                   disabled={titleLoading}
                 >

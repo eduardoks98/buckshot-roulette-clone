@@ -8,19 +8,19 @@ interface User {
   id: string;
   email: string;
   username: string;
-  displayName: string;
-  avatarUrl: string | null;
-  gamesPlayed: number;
-  gamesWon: number;
-  roundsPlayed: number;
-  roundsWon: number;
-  totalKills: number;
-  totalDeaths: number;
-  eloRating: number;
+  display_name: string;
+  avatar_url: string | null;
+  games_played: number;
+  games_won: number;
+  rounds_played: number;
+  rounds_won: number;
+  total_kills: number;
+  total_deaths: number;
+  elo_rating: number;
   rank: string;
-  totalXp: number;
-  isAdmin: boolean;
-  activeTitleId: string | null;
+  total_xp: number;
+  is_admin: boolean;
+  active_title_id: string | null;
 }
 
 const TOKEN_KEY = 'buckshot_auth_token';
@@ -145,7 +145,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     user,
     token: getToken(),
     isAuthenticated: !!user,
-    isAdmin: user?.isAdmin ?? false,
+    isAdmin: user?.is_admin ?? false,
     isLoading,
     authError,
     login,

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSocket } from '../../../context/SocketContext';
 import { useAuth } from '../../../context/AuthContext';
+import { PageLayout } from '../../../components/layout/PageLayout';
 import type { RoomInfo } from '../../../../../shared/types/socket-events.types';
 import './Lobby.css';
 
@@ -26,7 +27,7 @@ export default function Lobby() {
   }, [isLoading, isAuthenticated, navigate]);
 
   // Nome do usuário logado (obrigatório agora)
-  const playerName = user?.displayName || '';
+  const playerName = user?.display_name || '';
   const [roomCode, setRoomCode] = useState('');
   const [roomPassword, setRoomPassword] = useState('');
   const [joinPassword, setJoinPassword] = useState('');
@@ -214,9 +215,11 @@ export default function Lobby() {
   // Loading state
   if (isLoading) {
     return (
-      <div className="mp-lobby-container">
-        <div className="loading-message">Carregando...</div>
-      </div>
+      <PageLayout>
+        <div className="mp-lobby-container">
+          <div className="loading-message">Carregando...</div>
+        </div>
+      </PageLayout>
     );
   }
 
@@ -226,149 +229,134 @@ export default function Lobby() {
   }
 
   return (
-    <div className="mp-lobby-container">
-      <button className="back-btn" onClick={() => navigate('/')}>
-        Voltar
-      </button>
+    <PageLayout>
+      <div className="mp-lobby-container">
+        <h1 className="game-title">CRIAR OU ENTRAR EM SALA</h1>
+        <p className="subtitle">2-4 Jogadores Online</p>
 
-      <h1 className="game-title">MULTIPLAYER</h1>
-      <p className="subtitle">2-4 Jogadores Online</p>
+        {error && <div className="error-message">{error}</div>}
 
-      {/* User Info */}
-      <div className="lobby-user-info">
-        <div className="lobby-avatar">
-          {user.avatarUrl ? (
-            <img src={user.avatarUrl} alt={user.displayName} />
-          ) : (
-            user.displayName.charAt(0).toUpperCase()
-          )}
-        </div>
-        <span className="lobby-username">{user.displayName}</span>
-        <span className="lobby-elo">{user.eloRating} ELO</span>
-      </div>
-
-      {error && <div className="error-message">{error}</div>}
-
-      {/* Banner de jogo ativo */}
-      {activeGame && (
-        <div className="active-game-banner">
-          <div className="active-game-info">
-            <span className="active-game-icon">!</span>
-            <div className="active-game-text">
-              <strong>Partida em andamento!</strong>
-              <p>Sala: {activeGame.roomCode} - {activeGame.playerName}</p>
+        {/* Banner de jogo ativo */}
+        {activeGame && (
+          <div className="active-game-banner">
+            <div className="active-game-info">
+              <span className="active-game-icon">!</span>
+              <div className="active-game-text">
+                <strong>Partida em andamento!</strong>
+                <p>Sala: {activeGame.roomCode} - {activeGame.playerName}</p>
+              </div>
+            </div>
+            <div className="active-game-actions">
+              <button
+                className="reconnect-btn"
+                onClick={handleReconnect}
+                disabled={isReconnecting || !isConnected}
+              >
+                {isReconnecting ? 'Reconectando...' : 'VOLTAR AO JOGO'}
+              </button>
+              <button
+                className="abandon-btn"
+                onClick={handleAbandonGame}
+                disabled={isReconnecting}
+              >
+                DESISTIR
+              </button>
             </div>
           </div>
-          <div className="active-game-actions">
-            <button
-              className="reconnect-btn"
-              onClick={handleReconnect}
-              disabled={isReconnecting || !isConnected}
-            >
-              {isReconnecting ? 'Reconectando...' : 'VOLTAR AO JOGO'}
-            </button>
-            <button
-              className="abandon-btn"
-              onClick={handleAbandonGame}
-              disabled={isReconnecting}
-            >
-              DESISTIR
-            </button>
+        )}
+
+        {!isConnected && (
+          <div className="connecting-message">
+            Conectando ao servidor...
           </div>
-        </div>
-      )}
+        )}
 
-      {!isConnected && (
-        <div className="connecting-message">
-          Conectando ao servidor...
-        </div>
-      )}
-
-      <div className="lobby-form">
-        {/* Criar Sala */}
-        <div className="create-section">
-          <h3>Criar Sala</h3>
-          <input
-            type="password"
-            placeholder="Senha (opcional)"
-            value={roomPassword}
-            onChange={(e) => setRoomPassword(e.target.value)}
-            maxLength={20}
-            className="lobby-input"
-          />
-          <button
-            className="main-btn"
-            onClick={handleCreateRoom}
-            disabled={!isConnected}
-          >
-            CRIAR SALA
-          </button>
-        </div>
-
-        {/* Entrar com Código */}
-        <div className="join-section">
-          <h3>Entrar com Código</h3>
-          <input
-            type="text"
-            placeholder="CÓDIGO"
-            value={roomCode}
-            onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-            maxLength={6}
-            className="lobby-input code-input"
-          />
-          <input
-            type="password"
-            placeholder="Senha (se tiver)"
-            value={joinPassword}
-            onChange={(e) => setJoinPassword(e.target.value)}
-            maxLength={20}
-            className="lobby-input"
-          />
-          <button
-            className="main-btn secondary"
-            onClick={handleJoinRoom}
-            disabled={!isConnected}
-          >
-            ENTRAR
-          </button>
-        </div>
-
-        {/* Lista de Salas */}
-        <div className="rooms-section">
-          <div className="rooms-header">
-            <h3>SALAS DISPONÍVEIS</h3>
+        <div className="lobby-form">
+          {/* Criar Sala */}
+          <div className="create-section">
+            <h3>Criar Sala</h3>
+            <input
+              type="password"
+              placeholder="Senha (opcional)"
+              value={roomPassword}
+              onChange={(e) => setRoomPassword(e.target.value)}
+              maxLength={20}
+              className="lobby-input"
+            />
             <button
-              className="refresh-btn"
-              onClick={handleRefreshRooms}
+              className="main-btn"
+              onClick={handleCreateRoom}
               disabled={!isConnected}
             >
-              🔄
+              CRIAR SALA
             </button>
           </div>
-          <div className="room-list">
-            {rooms.length === 0 ? (
-              <p className="no-rooms">Clique em 🔄 para atualizar</p>
-            ) : (
-              rooms.map((room) => (
-                <div key={room.code} className="room-item">
-                  <span className="room-host">{room.hostName}</span>
-                  <span className="room-code">{room.code}</span>
-                  <span className="room-players">
-                    {room.playerCount}/{room.maxPlayers}
-                  </span>
-                  {room.hasPassword && <span className="room-lock">🔒</span>}
-                  <button
-                    className="join-btn"
-                    onClick={() => handleJoinFromList(room.code, room.hasPassword)}
-                  >
-                    ENTRAR
-                  </button>
-                </div>
-              ))
-            )}
+
+          {/* Entrar com Código */}
+          <div className="join-section">
+            <h3>Entrar com Código</h3>
+            <input
+              type="text"
+              placeholder="CÓDIGO"
+              value={roomCode}
+              onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
+              maxLength={6}
+              className="lobby-input code-input"
+            />
+            <input
+              type="password"
+              placeholder="Senha (se tiver)"
+              value={joinPassword}
+              onChange={(e) => setJoinPassword(e.target.value)}
+              maxLength={20}
+              className="lobby-input"
+            />
+            <button
+              className="main-btn secondary"
+              onClick={handleJoinRoom}
+              disabled={!isConnected}
+            >
+              ENTRAR
+            </button>
+          </div>
+
+          {/* Lista de Salas */}
+          <div className="rooms-section">
+            <div className="rooms-header">
+              <h3>SALAS DISPONÍVEIS</h3>
+              <button
+                className="refresh-btn"
+                onClick={handleRefreshRooms}
+                disabled={!isConnected}
+              >
+                🔄
+              </button>
+            </div>
+            <div className="room-list">
+              {rooms.length === 0 ? (
+                <p className="no-rooms">Nenhuma sala disponível</p>
+              ) : (
+                rooms.map((room) => (
+                  <div key={room.code} className="room-item">
+                    <span className="room-host">{room.hostName}</span>
+                    <span className="room-code">{room.code}</span>
+                    <span className="room-players">
+                      {room.playerCount}/{room.maxPlayers}
+                    </span>
+                    {room.hasPassword && <span className="room-lock">🔒</span>}
+                    <button
+                      className="join-btn"
+                      onClick={() => handleJoinFromList(room.code, room.hasPassword)}
+                    >
+                      ENTRAR
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </div>
       </div>
-    </div>
+    </PageLayout>
   );
 }

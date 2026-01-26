@@ -1,27 +1,27 @@
 // ==========================================
-// PRIVACY POLICY PAGE (dinamico)
+// COOKIE POLICY PAGE (dinamico)
 // ==========================================
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import './PrivacyPolicy.css';
+import '../PrivacyPolicy/PrivacyPolicy.css';
 
 const GAME_CODE = import.meta.env.VITE_GAME_CODE || 'BANGSHOT';
 const ADMIN_API_URL = import.meta.env.VITE_ADMIN_API_URL || '';
 
-export default function PrivacyPolicy() {
+export default function CookiePolicy() {
   const navigate = useNavigate();
   const [content, setContent] = useState<string | null>(null);
-  const [title, setTitle] = useState<string>('Politica de Privacidade');
+  const [title, setTitle] = useState<string>('Politica de Cookies');
   const [effectiveDate, setEffectiveDate] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    fetchPrivacyPolicy();
+    fetchCookiePolicy();
   }, []);
 
-  const fetchPrivacyPolicy = async () => {
+  const fetchCookiePolicy = async () => {
     if (!ADMIN_API_URL) {
       setError('API nao configurada');
       setLoading(false);
@@ -29,26 +29,26 @@ export default function PrivacyPolicy() {
     }
 
     try {
-      const response = await fetch(`${ADMIN_API_URL}/api/games/${GAME_CODE}/legal/privacy`);
+      const response = await fetch(`${ADMIN_API_URL}/api/games/${GAME_CODE}/legal/cookies`);
       const data = await response.json();
 
       if (!response.ok) {
-        setError(data.error || 'Erro ao carregar politica de privacidade');
+        setError(data.error || 'Erro ao carregar politica de cookies');
         setLoading(false);
         return;
       }
 
       if (!data.content) {
-        setError('Politica de privacidade nao encontrada');
+        setError('Politica de cookies nao encontrada');
         setLoading(false);
         return;
       }
 
-      setTitle(data.title || 'Politica de Privacidade');
+      setTitle(data.title || 'Politica de Cookies');
       setContent(data.content);
       setEffectiveDate(data.effective_date || data.updated_at);
     } catch (err) {
-      console.error('Error fetching privacy policy:', err);
+      console.error('Error fetching cookie policy:', err);
       setError('Erro ao conectar com o servidor');
     } finally {
       setLoading(false);
@@ -66,7 +66,7 @@ export default function PrivacyPolicy() {
             </svg>
             Voltar
           </button>
-          <h1>Politica de Privacidade</h1>
+          <h1>Politica de Cookies</h1>
           <p className="loading-text">Carregando...</p>
         </div>
       </div>
@@ -84,10 +84,10 @@ export default function PrivacyPolicy() {
             </svg>
             Voltar
           </button>
-          <h1>Politica de Privacidade</h1>
+          <h1>Politica de Cookies</h1>
           <div className="legal-error">
             <p>{error || 'Conteudo nao disponivel'}</p>
-            <button className="retry-button" onClick={() => { setLoading(true); setError(null); fetchPrivacyPolicy(); }}>
+            <button className="retry-button" onClick={() => { setLoading(true); setError(null); fetchCookiePolicy(); }}>
               Tentar novamente
             </button>
           </div>

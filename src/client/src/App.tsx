@@ -1,15 +1,15 @@
-import { Routes, Route } from 'react-router-dom';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import Home from './pages/Home/Home';
 import SinglePlayer from './pages/SinglePlayer/SinglePlayer';
-import Lobby from './pages/Multiplayer/Lobby/Lobby';
 import WaitingRoom from './pages/Multiplayer/WaitingRoom/WaitingRoom';
 import MultiplayerGame from './pages/Multiplayer/Game/MultiplayerGame';
 import Leaderboard from './pages/Leaderboard/Leaderboard';
 import Profile from './pages/Profile/Profile';
 import History from './pages/History/History';
 import Achievements from './pages/Achievements/Achievements';
-import PrivacyPolicy from './pages/PrivacyPolicy';
-import TermsOfService from './pages/TermsOfService';
+import PrivacyPolicy from './pages/PrivacyPolicy/PrivacyPolicy';
+import TermsOfService from './pages/TermsOfService/TermsOfService';
+import CookiePolicy from './pages/CookiePolicy/CookiePolicy';
 
 function App() {
   return (
@@ -17,7 +17,8 @@ function App() {
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/singleplayer" element={<SinglePlayer />} />
-        <Route path="/multiplayer" element={<Lobby />} />
+        {/* /multiplayer agora redireciona para Home - criacao de sala eh feita la */}
+        <Route path="/multiplayer" element={<Navigate to="/" replace />} />
         <Route path="/multiplayer/room" element={<WaitingRoom />} />
         <Route path="/multiplayer/game" element={<MultiplayerGame />} />
         <Route path="/leaderboard" element={<Leaderboard />} />
@@ -26,6 +27,7 @@ function App() {
         <Route path="/achievements" element={<Achievements />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<TermsOfService />} />
+        <Route path="/cookies" element={<CookiePolicy />} />
       </Routes>
     </div>
   );
