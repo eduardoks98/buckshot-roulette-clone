@@ -31,6 +31,101 @@
   animation: announcement-scale 0.5s ease;
 }
 
+/* ==========================================
+   REVOLVER ANIMATION AREA - Side/Top view container
+   ========================================== */
+
+.revolver-animation-area {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 280px;
+  margin: 1rem 0;
+  perspective: 1000px;
+}
+
+/* Side view container */
+.side-view-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.side-view-container.entrance {
+  animation: revolver-entrance 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes revolver-entrance {
+  0% {
+    opacity: 0;
+    transform: translateX(-100px) scale(0.85) rotate(-5deg);
+  }
+  60% {
+    opacity: 1;
+    transform: translateX(10px) scale(1.02) rotate(1deg);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1) rotate(0deg);
+  }
+}
+
+.side-view-container.cylinder-open {
+  animation: none;
+}
+
+/* Exiting side view (transition phase) */
+.side-view-container.exiting {
+  position: absolute;
+  animation: side-view-exit 0.7s cubic-bezier(0.55, 0, 1, 0.45) forwards;
+}
+
+@keyframes side-view-exit {
+  0% {
+    opacity: 1;
+    transform: perspective(800px) rotateX(0deg) scale(1);
+  }
+  40% {
+    opacity: 0.8;
+    transform: perspective(800px) rotateX(-35deg) scale(0.95);
+  }
+  100% {
+    opacity: 0;
+    transform: perspective(800px) rotateX(-90deg) scale(0.6);
+  }
+}
+
+/* Top view container entering */
+.top-view-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2rem;
+}
+
+.top-view-container.entering {
+  animation: top-view-enter 0.7s cubic-bezier(0, 0.55, 0.45, 1) forwards;
+  animation-delay: 0.2s;
+  opacity: 0;
+}
+
+@keyframes top-view-enter {
+  0% {
+    opacity: 0;
+    transform: perspective(800px) rotateX(90deg) scale(0.6);
+  }
+  60% {
+    opacity: 0.8;
+    transform: perspective(800px) rotateX(-10deg) scale(1.02);
+  }
+  100% {
+    opacity: 1;
+    transform: perspective(800px) rotateX(0deg) scale(1);
+  }
+}
+
 @keyframes announcement-scale {
   from { transform: scale(0.8); opacity: 0; }
   to { transform: scale(1); opacity: 1; }

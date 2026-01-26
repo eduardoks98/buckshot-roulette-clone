@@ -48,7 +48,7 @@ export default function MultiplayerGame() {
   const navigate = useNavigate();
   const location = useLocation();
   const { socket, isConnected } = useSocket();
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   const state = location.state as LocationState | null;
 
@@ -880,7 +880,8 @@ export default function MultiplayerGame() {
 
               {/* XP Results - Apenas o meu */}
               {gameOverData.xpResults && gameOverData.xpResults.length > 0 && (() => {
-                const myXpResult = gameOverData.xpResults.find((xp: PlayerXpResult) => xp.odId === myId);
+                const myOdId = user?.id;
+                const myXpResult = gameOverData.xpResults.find((xp: PlayerXpResult) => xp.odId === myOdId);
                 if (!myXpResult) return null;
 
                 const levelInfo = getLevelInfo(myXpResult.newTotalXp);
