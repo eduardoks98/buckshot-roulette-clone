@@ -1956,7 +1956,7 @@
   color: var(--gold-accent, #d4a418);
 }
 
-/* Awards Section - Compact */
+/* Awards Section - Com ícones SVG */
 .game-over-modal .awards-section {
   margin-bottom: 1.5rem;
 }
@@ -1966,36 +1966,65 @@
   font-size: 0.9rem;
   margin: 0 0 0.75rem 0;
   text-align: center;
+  font-weight: 600;
 }
 
 .game-over-modal .awards-list {
   display: flex;
-  flex-wrap: wrap;
+  flex-direction: column;
   gap: 0.5rem;
-  justify-content: center;
 }
 
 .game-over-modal .award-item {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
-  padding: 0.4rem 0.75rem;
+  gap: 0.75rem;
+  padding: 0.6rem 0.75rem;
   background: rgba(255, 255, 255, 0.05);
-  border-radius: 6px;
-  font-size: 0.8rem;
+  border-radius: 8px;
+  width: 100%;
 }
 
 .game-over-modal .award-icon {
-  font-size: 1rem;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.game-over-modal .award-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
 }
 
 .game-over-modal .award-title {
-  color: rgba(255, 255, 255, 0.7);
+  font-weight: 600;
+  color: #fff;
+  font-size: 0.85rem;
+}
+
+.game-over-modal .award-description {
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.game-over-modal .award-winner {
+  text-align: right;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  flex-shrink: 0;
 }
 
 .game-over-modal .award-player {
   color: var(--gold-accent, #d4a418);
   font-weight: 500;
+  font-size: 0.85rem;
 }
 
 .game-over-modal .award-value {

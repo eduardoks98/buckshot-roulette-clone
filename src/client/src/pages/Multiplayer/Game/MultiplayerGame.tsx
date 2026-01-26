@@ -16,7 +16,6 @@ import {
   GameAward,
   AchievementUnlocked,
   PlayerXpResult,
-  MatchBadgeAwarded,
 } from '../../../../../shared/types';
 import { GAME_RULES, ITEMS } from '../../../../../shared/constants';
 import { ItemId } from '../../../../../shared/types';
@@ -24,6 +23,7 @@ import { getLevelInfo } from '../../../../../shared/utils/xpCalculator';
 import { BugReportModal, GameStateForReport } from '../../../components/common/BugReportModal';
 import { AchievementToast } from '../../../components/common';
 import { GameBoard, GamePlayer, GameItem, ShotResult, RoundAnnouncement, StealModalData, ItemActionModal, TurnDirection } from '../../../components/game';
+import { AWARD_ICONS } from '../../../components/icons';
 import './MultiplayerGame.css';
 
 interface LocationState {
@@ -851,59 +851,67 @@ export default function MultiplayerGame() {
                 </table>
               )}
 
-              {/* Awards - Compact */}
+              {/* Awards - Com ícones SVG */}
               {gameOverData.awards && gameOverData.awards.length > 0 && (
                 <div className="awards-section">
-                  <h4>🏅 TÍTULOS 🏅</h4>
+                  <h4>TÍTULOS</h4>
                   <div className="awards-list">
-                    {gameOverData.awards.map((award: GameAward) => (
-                      <div key={award.type} className="award-item">
-                        <span className="award-icon">{getAwardIcon(award.type)}</span>
-                        <span className="award-title">{getAwardTitle(award.type)}</span>
-                        <span className="award-player">{award.playerName}</span>
-                        <span className="award-value">({award.value})</span>
-                      </div>
-                    ))}
+                    {gameOverData.awards.map((award: GameAward) => {
+                      const IconComponent = AWARD_ICONS[award.type as keyof typeof AWARD_ICONS];
+                      return (
+                        <div key={award.type} className="award-item">
+                          <div className="award-icon">
+                            {IconComponent && <IconComponent size="md" color="var(--gold-accent)" />}
+                          </div>
+                          <div className="award-info">
+                            <span className="award-title">{getAwardTitle(award.type)}</span>
+                            <span className="award-description">{getAwardDescription(award.type)}</span>
+                          </div>
+                          <div className="award-winner">
+                            <span className="award-player">{award.playerName}</span>
+                            <span className="award-value">{award.value}</span>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </div>
               )}
 
-              {/* XP Results - Compact */}
-              {gameOverData.xpResults && gameOverData.xpResults.length > 0 && (
-                <div className="xp-section">
-                  <h4>✨ EXPERIÊNCIA ✨</h4>
-                  {gameOverData.xpResults.map((xpResult: PlayerXpResult) => {
-                    const playerName = gameOverData.stats?.find(s => s.odId === xpResult.odId)?.guestName || 'Jogador';
-                    const levelInfo = getLevelInfo(xpResult.newTotalXp);
-                    const isMe = xpResult.odId === myId;
-                    return (
-                      <div key={xpResult.odId} className={`xp-item ${isMe ? 'is-me' : ''}`}>
-                        <div className="xp-header">
-                          <span className="xp-name">{playerName}</span>
-                          <span className="xp-earned">+{xpResult.xpEarned} XP</span>
+              {/* XP Results - Apenas o meu */}
+              {gameOverData.xpResults && gameOverData.xpResults.length > 0 && (() => {
+                const myXpResult = gameOverData.xpResults.find((xp: PlayerXpResult) => xp.odId === myId);
+                if (!myXpResult) return null;
+
+                const levelInfo = getLevelInfo(myXpResult.newTotalXp);
+                return (
+                  <div className="xp-section">
+                    <h4>EXPERIÊNCIA</h4>
+                    <div className="xp-item is-me">
+                      <div className="xp-header">
+                        <span className="xp-earned">+{myXpResult.xpEarned} XP</span>
+                      </div>
+                      {myXpResult.breakdown && (
+                        <div className="xp-breakdown">
+                          {myXpResult.breakdown.participation > 0 && <span>Participação: +{myXpResult.breakdown.participation}</span>}
+                          {myXpResult.breakdown.positionBonus > 0 && <span>Posição: +{myXpResult.breakdown.positionBonus}</span>}
+                          {myXpResult.breakdown.killXp > 0 && <span>Kills: +{myXpResult.breakdown.killXp}</span>}
+                          {myXpResult.breakdown.roundWinXp > 0 && <span>Rounds: +{myXpResult.breakdown.roundWinXp}</span>}
+                          {myXpResult.breakdown.damageXp > 0 && <span>Dano: +{myXpResult.breakdown.damageXp}</span>}
+                          {myXpResult.breakdown.itemXp > 0 && <span>Itens: +{myXpResult.breakdown.itemXp}</span>}
+                          {myXpResult.breakdown.survivalXp > 0 && <span>Sobrevivência: +{myXpResult.breakdown.survivalXp}</span>}
                         </div>
-                        {isMe && xpResult.breakdown && (
-                          <div className="xp-breakdown">
-                            {xpResult.breakdown.participation > 0 && <span>Participação: +{xpResult.breakdown.participation}</span>}
-                            {xpResult.breakdown.positionBonus > 0 && <span>Posição: +{xpResult.breakdown.positionBonus}</span>}
-                            {xpResult.breakdown.killXp > 0 && <span>Kills: +{xpResult.breakdown.killXp}</span>}
-                            {xpResult.breakdown.roundWinXp > 0 && <span>Rounds: +{xpResult.breakdown.roundWinXp}</span>}
-                            {xpResult.breakdown.damageXp > 0 && <span>Dano: +{xpResult.breakdown.damageXp}</span>}
-                            {xpResult.breakdown.itemXp > 0 && <span>Itens: +{xpResult.breakdown.itemXp}</span>}
-                            {xpResult.breakdown.survivalXp > 0 && <span>Sobrevivência: +{xpResult.breakdown.survivalXp}</span>}
-                          </div>
-                        )}
-                        <div className="xp-bar">
-                          <span className="xp-level">Nv. {levelInfo.displayLevel}</span>
-                          <div className="xp-progress">
-                            <div className="xp-fill" style={{ width: `${Math.round(levelInfo.xpProgress * 100)}%` }} />
-                          </div>
+                      )}
+                      <div className="xp-bar">
+                        <span className="xp-level">Nv. {levelInfo.displayLevel}</span>
+                        <div className="xp-progress">
+                          <div className="xp-fill" style={{ width: `${Math.round(levelInfo.xpProgress * 100)}%` }} />
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+                    </div>
+                  </div>
+                );
+              })()}
 
               <button className="back-btn" onClick={() => navigate('/multiplayer')}>
                 Voltar ao Lobby
@@ -968,18 +976,6 @@ export default function MultiplayerGame() {
 }
 
 // Helper functions for awards
-function getAwardIcon(type: string): string {
-  const icons: Record<string, string> = {
-    'most_damage': '💥',
-    'most_damage_taken': '🛡️',
-    'most_passive': '🕊️',
-    'most_self_damage': '🤕',
-    'most_items_used': '🎒',
-    'most_kills': '☠️',
-  };
-  return icons[type] || '🏅';
-}
-
 function getAwardTitle(type: string): string {
   const titles: Record<string, string> = {
     'most_damage': 'Mais Dano',
@@ -990,4 +986,16 @@ function getAwardTitle(type: string): string {
     'most_kills': 'Exterminador',
   };
   return titles[type] || type;
+}
+
+function getAwardDescription(type: string): string {
+  const descriptions: Record<string, string> = {
+    'most_damage': 'Causou mais dano total',
+    'most_damage_taken': 'Recebeu mais dano',
+    'most_passive': 'Atirou menos vezes',
+    'most_self_damage': 'Mais dano em si mesmo',
+    'most_items_used': 'Usou mais itens',
+    'most_kills': 'Mais eliminações',
+  };
+  return descriptions[type] || '';
 }

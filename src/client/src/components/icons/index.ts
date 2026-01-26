@@ -18,6 +18,9 @@ export * from './shells';
 // UI icons
 export * from './ui';
 
+// Award icons
+export * from './awards';
+
 // ==========================================
 // ITEM ICON MAP - For dynamic rendering
 // ==========================================
