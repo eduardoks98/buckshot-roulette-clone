@@ -26,6 +26,8 @@ export interface ClientToServerEvents {
 
   // Reconnection
   reconnectToGame: (data: ReconnectPayload) => void;
+  rejoinGame: (data: RejoinGamePayload) => void;
+  abandonGame: (data: AbandonGamePayload) => void;
 
   // Online count
   requestOnlineCount: () => void;
@@ -60,6 +62,14 @@ export interface ReconnectPayload {
   roomCode: string;
   playerName: string;
   reconnectToken: string;
+}
+
+export interface RejoinGamePayload {
+  roomCode: string;
+}
+
+export interface AbandonGamePayload {
+  roomCode: string;
 }
 
 // ==========================================
@@ -104,6 +114,7 @@ export interface ServerToClientEvents {
   reconnected: (data: ReconnectedPayload) => void;
   reconnectError: (data: ReconnectErrorPayload) => void;
   reconnectCredentials: (data: ReconnectCredentialsPayload) => void;
+  gameAbandoned: () => void;
 
   // Achievement events
   achievementsUnlocked: (data: AchievementUnlocked[]) => void;

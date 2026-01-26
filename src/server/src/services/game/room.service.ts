@@ -677,6 +677,140 @@ export class RoomService {
   }
 
   // ==========================================
+  // REJOIN BY USER ID (Backend-first approach)
+  // ==========================================
+  rejoinByUserId(
+    roomCode: string,
+    newSocketId: string,
+    odUserId: string
+  ): { gameState?: ReconnectedPayload; gameStarted: boolean; playerName: string } | { error: string } {
+    const room = this.rooms.get(roomCode);
+    if (!room) return { error: 'Sala não encontrada' };
+
+    // Encontrar jogador pelo odUserId
+    const player = room.players.find(p => p.odUserId === odUserId);
+    if (!player) return { error: 'Você não está nesta sala' };
+
+    // Atualizar socket ID
+    const oldSocketId = player.id;
+    player.id = newSocketId;
+    player.disconnected = false;
+    player.disconnectTime = null;
+    // Gerar novo token para possível reconexão futura
+    player.reconnectToken = this.generateReconnectToken();
+
+    // Atualizar host se necessário
+    if (room.host === oldSocketId) {
+      room.host = newSocketId;
+      console.log(`[Room] Host ${player.name} reconectou - atualizando room.host para ${newSocketId}`);
+    }
+
+    if (room.started) {
+      // Jogo em andamento - retornar estado completo
+      const shellsRemaining = room.shells.length - room.currentShellIndex;
+
+      return {
+        gameStarted: true,
+        playerName: player.name,
+        gameState: {
+          roomCode: room.code,
+          players: room.players.map(p => this.toPublicPlayer(p)),
+          currentPlayer: room.players[room.currentPlayerIndex]?.id || '',
+          round: room.currentRound,
+          shells: {
+            total: shellsRemaining,
+            live: room.shells.slice(room.currentShellIndex).filter(s => s === 'live').length,
+            blank: room.shells.slice(room.currentShellIndex).filter(s => s === 'blank').length,
+          },
+          yourItems: player.items,
+          yourHp: player.hp,
+        },
+      };
+    } else {
+      // WaitingRoom - sem gameState
+      return {
+        gameStarted: false,
+        playerName: player.name,
+      };
+    }
+  }
+
+  // ==========================================
+  // REMOVE PLAYER BY USER ID (Abandon game)
+  // ==========================================
+  removePlayerByUserId(
+    roomCode: string,
+    odUserId: string
+  ): { deleted: boolean; players: PlayerPublicState[] } | null {
+    const room = this.rooms.get(roomCode);
+    if (!room) return null;
+
+    // Encontrar jogador pelo odUserId
+    const playerIndex = room.players.findIndex(p => p.odUserId === odUserId);
+    if (playerIndex === -1) return null;
+
+    const player = room.players[playerIndex];
+    const playerName = player.name;
+
+    // Se jogo em andamento, marcar como morto ao invés de remover
+    if (room.started) {
+      player.alive = false;
+      player.disconnected = true;
+
+      // Verificar se sobrou apenas 1 jogador vivo
+      const alivePlayers = room.players.filter(p => p.alive);
+      if (alivePlayers.length === 1) {
+        // Vitória por WO
+        const winner = alivePlayers[0];
+        this.onPlayerWonByDefault?.(roomCode, winner, room);
+        this.rooms.delete(roomCode);
+        return { deleted: true, players: [] };
+      }
+
+      // Se era a vez do jogador que abandonou, passar para o próximo
+      if (room.currentPlayerIndex === playerIndex) {
+        this.advanceToNextPlayer(room);
+      }
+
+      console.log(`[Room] ${playerName} abandonou partida em andamento`);
+      return { deleted: false, players: room.players.map(p => this.toPublicPlayer(p)) };
+    } else {
+      // WaitingRoom - remover jogador
+      room.players.splice(playerIndex, 1);
+
+      // Se não sobrou ninguém, deletar sala
+      if (room.players.length === 0) {
+        this.rooms.delete(roomCode);
+        console.log(`[Room] Sala ${roomCode} deletada - último jogador abandonou`);
+        return { deleted: true, players: [] };
+      }
+
+      // Atualizar host se necessário
+      if (room.host === player.id) {
+        room.host = room.players[0].id;
+        this.onHostChanged?.(roomCode, room.players[0].name);
+      }
+
+      console.log(`[Room] ${playerName} abandonou WaitingRoom ${roomCode}`);
+      return { deleted: false, players: room.players.map(p => this.toPublicPlayer(p)) };
+    }
+  }
+
+  // Helper para avançar para próximo jogador
+  private advanceToNextPlayer(room: Room): void {
+    const alivePlayers = room.players.filter(p => p.alive && !p.disconnected);
+    if (alivePlayers.length === 0) return;
+
+    // Encontrar próximo jogador vivo
+    let nextIndex = room.currentPlayerIndex;
+    do {
+      nextIndex = (nextIndex + room.turnDirection + room.players.length) % room.players.length;
+    } while (!room.players[nextIndex].alive || room.players[nextIndex].disconnected);
+
+    room.currentPlayerIndex = nextIndex;
+  }
+
+  // ==========================================
   // GETTERS
   // ==========================================
 

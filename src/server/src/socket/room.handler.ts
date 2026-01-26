@@ -618,4 +618,118 @@ export function registerRoomHandlers(
       socket.emit('reconnectError', { message: 'Erro ao reconectar' });
     }
   });
+
+  // ==========================================
+  // REJOIN GAME (Backend-first - sem token do cliente)
+  // ==========================================
+  socket.on('rejoinGame', ({ roomCode }) => {
+    try {
+      const userData = socketUserMap.get(socket.id);
+      if (!userData?.odUserId) {
+        socket.emit('joinError', 'Não autenticado');
+        return;
+      }
+
+      const result = roomService.rejoinByUserId(roomCode, socket.id, userData.odUserId);
+
+      if ('error' in result) {
+        socket.emit('joinError', result.error);
+        return;
+      }
+
+      socket.join(roomCode);
+
+      if (result.gameStarted && result.gameState) {
+        // Jogo em andamento - enviar estado completo
+        socket.emit('reconnected', result.gameState);
+
+        // Enviar novas credenciais de reconexão
+        const room = roomService.getRoom(roomCode);
+        const player = room?.players.find(p => p.id === socket.id);
+        if (player?.reconnectToken) {
+          socket.emit('reconnectCredentials', {
+            roomCode,
+            playerName: player.name,
+            reconnectToken: player.reconnectToken,
+          });
+        }
+
+        // Notificar outros jogadores
+        io.to(roomCode).emit('playerReconnected', {
+          playerId: socket.id,
+          playerName: result.playerName,
+        });
+
+        // Sincronizar todos os clientes
+        io.to(roomCode).emit('turnChanged', {
+          currentPlayer: result.gameState.currentPlayer,
+          reason: 'reconnected',
+          players: result.gameState.players,
+          turnStartTime: room?.turnStartTime || Date.now(),
+        });
+
+        console.log(`[Room] ${result.playerName} reconectou ao jogo ${roomCode} via rejoinGame`);
+      } else {
+        // WaitingRoom - enviar dados da sala
+        const room = roomService.getRoom(roomCode);
+        if (room) {
+          socket.emit('roomJoined', {
+            code: roomCode,
+            players: room.players.map(toPublicPlayer),
+            isHost: room.host === socket.id,
+          });
+
+          // Notificar outros jogadores
+          io.to(roomCode).emit('playerReconnected', {
+            playerId: socket.id,
+            playerName: result.playerName,
+          });
+
+          console.log(`[Room] ${result.playerName} reconectou à WaitingRoom ${roomCode} via rejoinGame`);
+        }
+      }
+    } catch (error) {
+      console.error('[Room] Erro ao rejoin:', error);
+      socket.emit('joinError', 'Erro ao reconectar');
+    }
+  });
+
+  // ==========================================
+  // ABANDON GAME (sair definitivamente da sala)
+  // ==========================================
+  socket.on('abandonGame', ({ roomCode }) => {
+    try {
+      const userData = socketUserMap.get(socket.id);
+      if (!userData?.odUserId) {
+        socket.emit('gameAbandoned');
+        return;
+      }
+
+      const result = roomService.removePlayerByUserId(roomCode, userData.odUserId);
+
+      if (result) {
+        socket.leave(roomCode);
+
+        // Notificar outros jogadores
+        if (!result.deleted) {
+          io.to(roomCode).emit('playerLeft', {
+            players: result.players,
+          });
+        }
+
+        // Se sala foi deletada, notificar todos
+        if (result.deleted) {
+          io.emit('roomDeleted', { code: roomCode });
+        }
+
+        io.emit('roomListUpdated');
+      }
+
+      socket.emit('gameAbandoned');
+      console.log(`[Room] Jogador abandonou sala ${roomCode} via abandonGame`);
+    } catch (error) {
+      console.error('[Room] Erro ao abandonar:', error);
+      socket.emit('gameAbandoned'); // Ainda confirma para limpar estado do cliente
+    }
+  });
 }

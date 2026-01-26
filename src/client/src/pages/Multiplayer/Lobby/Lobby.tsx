@@ -6,11 +6,10 @@ import { PageLayout } from '../../../components/layout/PageLayout';
 import type { RoomInfo } from '../../../../../shared/types/socket-events.types';
 import './Lobby.css';
 
-interface ReconnectData {
+// Interface simplificada - servidor é a fonte da verdade
+interface ActiveGameData {
   roomCode: string;
-  playerName: string;
-  reconnectToken: string;
-  timestamp: number;
+  gameStarted: boolean;
 }
 
 export default function Lobby() {
@@ -33,7 +32,7 @@ export default function Lobby() {
   const [joinPassword, setJoinPassword] = useState('');
   const [rooms, setRooms] = useState<RoomInfo[]>([]);
   const [error, setError] = useState('');
-  const [activeGame, setActiveGame] = useState<ReconnectData | null>(null);
+  const [activeGame, setActiveGame] = useState<ActiveGameData | null>(null);
   const [isReconnecting, setIsReconnecting] = useState(false);
 
   // Conectar ao servidor ao montar (apenas se autenticado)
@@ -50,26 +49,8 @@ export default function Lobby() {
     }
   }, [socket, isConnected]);
 
-  // Verificar se há jogo ativo para reconexão
-  useEffect(() => {
-    const saved = localStorage.getItem('bangshotReconnect');
-    if (saved) {
-      try {
-        const data: ReconnectData = JSON.parse(saved);
-        // Verificar se não expirou (10 minutos - tempo máximo razoável de um jogo)
-        // O servidor é quem controla o grace period real de 60s após disconnect
-        const elapsed = Date.now() - data.timestamp;
-        if (elapsed < 10 * 60 * 1000) {
-          setActiveGame(data);
-        } else {
-          // Expirado - limpar
-          localStorage.removeItem('bangshotReconnect');
-        }
-      } catch {
-        localStorage.removeItem('bangshotReconnect');
-      }
-    }
-  }, []);
+  // Servidor vai notificar se usuário já está em um jogo via evento 'alreadyInGame'
+  // Não precisamos mais verificar localStorage
 
   // Registrar eventos do socket
   useEffect(() => {
@@ -77,13 +58,7 @@ export default function Lobby() {
 
     socket.on('roomCreated', (data) => {
       console.log('Sala criada:', data.code);
-      // Salvar dados da sessão no localStorage
-      localStorage.setItem('bangshotSession', JSON.stringify({
-        roomCode: data.code,
-        playerName: playerName.trim(),
-        isHost: data.isHost,
-        timestamp: Date.now(),
-      }));
+      // Servidor gerencia o estado - não precisa salvar no localStorage
       navigate('/multiplayer/room', {
         state: {
           roomCode: data.code,
@@ -95,13 +70,7 @@ export default function Lobby() {
 
     socket.on('roomJoined', (data) => {
       console.log('Entrou na sala:', data.code);
-      // Salvar dados da sessão no localStorage
-      localStorage.setItem('bangshotSession', JSON.stringify({
-        roomCode: data.code,
-        playerName: playerName.trim(),
-        isHost: data.isHost,
-        timestamp: Date.now(),
-      }));
+      // Servidor gerencia o estado - não precisa salvar no localStorage
       navigate('/multiplayer/room', {
         state: {
           roomCode: data.code,
@@ -142,49 +111,25 @@ export default function Lobby() {
       console.log('Erro ao reconectar:', data.message);
       setIsReconnecting(false);
       setActiveGame(null);
-      localStorage.removeItem('bangshotReconnect');
       setError(data.message);
       setTimeout(() => setError(''), 3000);
     });
 
-    // Evento: usuário já está em um jogo (abriu outra aba)
+    // Evento quando o jogador abandona o jogo com sucesso
+    socket.on('gameAbandoned', () => {
+      console.log('Jogo abandonado com sucesso');
+      setActiveGame(null);
+    });
+
+    // Evento: usuário já está em um jogo
+    // NÃO navegar automaticamente - mostrar banner com opções
     socket.on('alreadyInGame', (data) => {
       console.log('Usuário já está em um jogo:', data.roomCode, 'gameStarted:', data.gameStarted);
-      if (data.gameStarted) {
-        // Jogo em andamento - tentar reconectar
-        const reconnectData = localStorage.getItem('bangshotReconnect');
-        if (reconnectData) {
-          try {
-            const parsed = JSON.parse(reconnectData);
-            if (parsed.roomCode === data.roomCode) {
-              // Temos token de reconexão - usar
-              socket.emit('reconnectToGame', {
-                roomCode: parsed.roomCode,
-                playerName: parsed.playerName,
-                reconnectToken: parsed.reconnectToken,
-              });
-              return;
-            }
-          } catch {
-            // Ignora erro de parse
-          }
-        }
-        // Sem token - redirecionar para game e deixar reconectar via socket
-        navigate('/multiplayer/game', {
-          state: {
-            roomCode: data.roomCode,
-            needsReconnect: true,
-          },
-        });
-      } else {
-        // Ainda na waiting room - redirecionar
-        navigate('/multiplayer/room', {
-          state: {
-            roomCode: data.roomCode,
-            fromAlreadyInGame: true,
-          },
-        });
-      }
+      // Mostrar banner de reconexão ao invés de navegar automaticamente
+      setActiveGame({
+        roomCode: data.roomCode,
+        gameStarted: data.gameStarted,
+      });
     });
 
     return () => {
@@ -195,6 +140,7 @@ export default function Lobby() {
       socket.off('joinError');
       socket.off('reconnected');
       socket.off('reconnectError');
+      socket.off('gameAbandoned');
       socket.off('alreadyInGame');
     };
   }, [socket, navigate]);
@@ -204,9 +150,6 @@ export default function Lobby() {
       setError('Voce precisa estar logado');
       return;
     }
-
-    // Limpar sessão antiga antes de criar nova sala
-    localStorage.removeItem('bangshotSession');
 
     socket?.emit('createRoom', {
       playerName: playerName,
@@ -257,16 +200,15 @@ export default function Lobby() {
     if (!activeGame || !socket) return;
 
     setIsReconnecting(true);
-    socket.emit('reconnectToGame', {
-      roomCode: activeGame.roomCode,
-      playerName: activeGame.playerName,
-      reconnectToken: activeGame.reconnectToken,
-    });
+    // Servidor sabe quem somos pelo odUserId - não precisa de token
+    socket.emit('rejoinGame', { roomCode: activeGame.roomCode });
   };
 
   const handleAbandonGame = () => {
-    localStorage.removeItem('bangshotReconnect');
-    setActiveGame(null);
+    if (!activeGame || !socket) return;
+    // Notificar servidor para remover jogador da sala
+    socket.emit('abandonGame', { roomCode: activeGame.roomCode });
+    // O estado será limpo quando receber 'gameAbandoned'
   };
 
   // Loading state
@@ -299,8 +241,8 @@ export default function Lobby() {
             <div className="active-game-info">
               <span className="active-game-icon">!</span>
               <div className="active-game-text">
-                <strong>Partida em andamento!</strong>
-                <p>Sala: {activeGame.roomCode} - {activeGame.playerName}</p>
+                <strong>{activeGame.gameStarted ? 'Partida em andamento!' : 'Você está em uma sala!'}</strong>
+                <p>Sala: {activeGame.roomCode}</p>
               </div>
             </div>
             <div className="active-game-actions">
@@ -309,14 +251,14 @@ export default function Lobby() {
                 onClick={handleReconnect}
                 disabled={isReconnecting || !isConnected}
               >
-                {isReconnecting ? 'Reconectando...' : 'VOLTAR AO JOGO'}
+                {isReconnecting ? 'Reconectando...' : 'VOLTAR'}
               </button>
               <button
                 className="abandon-btn"
                 onClick={handleAbandonGame}
                 disabled={isReconnecting}
               >
-                DESISTIR
+                SAIR DA SALA
               </button>
             </div>
           </div>
