@@ -100,6 +100,7 @@ export interface GameBoardProps {
   isMyTurn: boolean;
   selectedTarget: string | null;
   revealedShell: 'live' | 'blank' | null;
+  phoneRevealedPositions?: { position: number; type: 'live' | 'blank' }[];
   message: string;
   turnTimer?: number;
 
@@ -206,6 +207,7 @@ export default function GameBoard({
   isMyTurn,
   selectedTarget,
   revealedShell,
+  phoneRevealedPositions,
   message,
   turnTimer,
   roundAnnouncement,
@@ -308,7 +310,12 @@ export default function GameBoard({
           totalChambers={shells.initialTotal || shells.total}
           remainingShells={shells.total}
           currentPosition={shells.currentPosition || 0}
-          revealedChambers={revealedShell ? [{ position: shells.currentPosition || 0, type: revealedShell }] : []}
+          revealedChambers={[
+            // Lupa - revela posição atual
+            ...(revealedShell ? [{ position: shells.currentPosition || 0, type: revealedShell }] : []),
+            // Phone - revela posições específicas
+            ...(phoneRevealedPositions || [])
+          ]}
           spentChambers={Array.from({ length: (shells.initialTotal || shells.total) - shells.total }, (_, i) => i)}
           isSpinning={shotAnimation !== null}
           isActive={isMyTurn}

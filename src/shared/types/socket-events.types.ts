@@ -28,6 +28,7 @@ export interface ClientToServerEvents {
   reconnectToGame: (data: ReconnectPayload) => void;
   rejoinGame: (data: RejoinGamePayload) => void;
   abandonGame: (data: AbandonGamePayload) => void;
+  checkActiveGame: () => void;
 
   // Online count
   requestOnlineCount: () => void;
@@ -174,6 +175,7 @@ export interface RoundStartedPayload {
   currentPlayer: string;
   turnDirection: TurnDirection;
   itemsReceived?: Item[];
+  turnStartTime?: number;
 }
 
 export interface ShotFiredPayload {

@@ -93,13 +93,12 @@ export function RevolverCylinder({
 
   // Animate rotation when position changes
   useEffect(() => {
-    if (prevPositionRef.current !== currentPosition && !isSpinning) {
-      // Calculate rotation to bring current position to top (firing position)
-      const newRotation = currentPosition * anglePerChamber;
-      setDisplayRotation(newRotation);
-    }
+    // Calculate rotation to bring current position to top (firing position)
+    // Chamber 0 starts at top (-90°), so we rotate by currentPosition * anglePerChamber
+    const newRotation = currentPosition * anglePerChamber;
+    setDisplayRotation(newRotation);
     prevPositionRef.current = currentPosition;
-  }, [currentPosition, anglePerChamber, isSpinning]);
+  }, [currentPosition, anglePerChamber]);
 
   // Handle shot animation sequence
   useEffect(() => {

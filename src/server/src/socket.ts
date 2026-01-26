@@ -88,6 +88,16 @@ export function setupSocketIO(httpServer: HttpServer): TypedIOServer {
         if (user) {
           socketUserMap.set(socket.id, { odUserId: user.id, displayName: user.display_name });
           console.log(`[Auth] Socket ${socket.id} autenticado como ${user.display_name}`);
+
+          // Verificar se usuário já está em um jogo ativo
+          const existingGame = roomService.getRoomByUserId(user.id);
+          if (existingGame) {
+            console.log(`[Auth] ${user.display_name} já está em jogo ativo: ${existingGame.code}`);
+            socket.emit('alreadyInGame', {
+              roomCode: existingGame.code,
+              gameStarted: existingGame.room.started,
+            });
+          }
         }
       } catch (error) {
         console.log(`[Auth] Token inválido para socket ${socket.id}`);

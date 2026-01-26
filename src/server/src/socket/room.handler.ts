@@ -476,6 +476,9 @@ export function registerRoomHandlers(
         shellsBlank: roundData.shells.blank,
       }).catch(err => console.error('[DB] Erro ao salvar round:', err));
 
+      // Start turn timer BEFORE emitting to ensure turnStartTime is set
+      startTurnTimer(io, result.room as RoomWithTimer, result.room.code, roomService);
+
       // Emit to each player with their items and reconnect credentials
       result.room.players.forEach(player => {
         const playerSocket = io.sockets.sockets.get(player.id);
@@ -483,6 +486,7 @@ export function registerRoomHandlers(
           playerSocket.emit('roundStarted', {
             ...roundData,
             itemsReceived: player.items as Item[],
+            turnStartTime: result.room.turnStartTime || undefined,
           });
 
           // Enviar credenciais de reconexão
@@ -496,9 +500,6 @@ export function registerRoomHandlers(
           }
         }
       });
-
-      // Start turn timer for the first player
-      startTurnTimer(io, result.room as RoomWithTimer, result.room.code, roomService);
 
       console.log(`[Room] Jogo iniciado na sala ${result.room.code}`);
     } catch (error) {
@@ -730,6 +731,25 @@ export function registerRoomHandlers(
     } catch (error) {
       console.error('[Room] Erro ao abandonar:', error);
       socket.emit('gameAbandoned'); // Ainda confirma para limpar estado do cliente
+    }
+  });
+
+  // ==========================================
+  // CHECK ACTIVE GAME
+  // ==========================================
+  socket.on('checkActiveGame', () => {
+    const userData = socketUserMap.get(socket.id);
+    if (!userData?.odUserId) {
+      return;
+    }
+
+    const existingGame = roomService.getRoomByUserId(userData.odUserId);
+    if (existingGame) {
+      socket.emit('alreadyInGame', {
+        roomCode: existingGame.code,
+        gameStarted: existingGame.room.started,
+      });
+      console.log(`[Room] checkActiveGame: ${userData.displayName} está em ${existingGame.code}`);
     }
   });
 }

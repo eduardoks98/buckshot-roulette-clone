@@ -445,3 +445,111 @@
   transform: none !important;
   box-shadow: none !important;
 }
+
+/* ==========================================
+   ACTIVE GAME BANNER
+   ========================================== */
+
+.active-game-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  margin-bottom: 1rem;
+  background: linear-gradient(135deg, rgba(212, 164, 24, 0.15) 0%, rgba(184, 134, 11, 0.1) 100%);
+  border: 2px solid rgba(212, 164, 24, 0.5);
+  border-radius: 12px;
+  animation: banner-pulse 2s ease-in-out infinite;
+}
+
+@keyframes banner-pulse {
+  0%, 100% { border-color: rgba(212, 164, 24, 0.5); }
+  50% { border-color: rgba(212, 164, 24, 0.8); }
+}
+
+.active-game-banner__info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.active-game-banner__icon {
+  font-size: 1.5rem;
+}
+
+.active-game-banner__text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+
+.active-game-banner__text strong {
+  color: var(--gold-accent, #d4a418);
+  font-size: 0.9rem;
+}
+
+.active-game-banner__text span {
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.8rem;
+}
+
+.active-game-banner__actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.active-game-banner__btn {
+  padding: 0.5rem 1rem;
+  border-radius: 8px;
+  font-size: 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.active-game-banner__btn--primary {
+  background: linear-gradient(135deg, var(--gold-accent, #d4a418) 0%, #b8860b 100%);
+  border: none;
+  color: #000;
+}
+
+.active-game-banner__btn--primary:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(212, 164, 24, 0.4);
+}
+
+.active-game-banner__btn--secondary {
+  background: rgba(239, 68, 68, 0.2);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #ef4444;
+}
+
+.active-game-banner__btn--secondary:hover:not(:disabled) {
+  background: rgba(239, 68, 68, 0.3);
+}
+
+.active-game-banner__btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 480px) {
+  .active-game-banner {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+    padding: 0.75rem;
+  }
+
+  .active-game-banner__actions {
+    justify-content: stretch;
+  }
+
+  .active-game-banner__btn {
+    flex: 1;
+    padding: 0.6rem;
+  }
+}

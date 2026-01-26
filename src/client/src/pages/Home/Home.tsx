@@ -2,10 +2,8 @@
 // HOME PAGE - Landing + LoL-Style Lobby
 // ==========================================
 
-import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { useSocket } from '../../context/SocketContext';
 import { Header } from '../../components/layout/Header';
 import { Footer } from '../../components/layout/Footer';
 import { ActiveRooms } from '../../components/home/ActiveRooms';
@@ -18,50 +16,6 @@ import './Home.css';
 export default function Home() {
   const navigate = useNavigate();
   const { isAuthenticated, isLoading, login, authError, clearAuthError } = useAuth();
-  const { socket, isConnected } = useSocket();
-
-  // Verificar se há uma sessão de jogo pendente para reconexão
-  useEffect(() => {
-    const saved = localStorage.getItem('bangshotReconnect');
-    console.log('[Home] Verificando reconexão pendente:', {
-      isAuthenticated,
-      isConnected,
-      hasSavedSession: !!saved,
-    });
-
-    if (!isAuthenticated || !socket || !isConnected) return;
-    if (!saved) return;
-
-    try {
-      const data = JSON.parse(saved);
-      const timeSinceDisconnect = Date.now() - data.timestamp;
-
-      console.log('[Home] Sessão encontrada:', {
-        roomCode: data.roomCode,
-        playerName: data.playerName,
-        timeSinceDisconnect: `${Math.round(timeSinceDisconnect / 1000)}s`,
-      });
-
-      // Verificar se a sessão não expirou (60 segundos - grace period do servidor)
-      if (timeSinceDisconnect > 60 * 1000) {
-        console.log('[Home] Sessão expirada, removendo...');
-        localStorage.removeItem('bangshotReconnect');
-        return;
-      }
-
-      // Redirecionar para a página do jogo para tentar reconexão
-      console.log('[Home] Redirecionando para reconexão...');
-      navigate('/multiplayer/game', {
-        state: {
-          roomCode: data.roomCode,
-          reconnected: true,
-        },
-      });
-    } catch (e) {
-      console.log('[Home] Erro ao processar sessão:', e);
-      localStorage.removeItem('bangshotReconnect');
-    }
-  }, [isAuthenticated, socket, isConnected, navigate]);
 
   // ==========================================
   // LOADING STATE

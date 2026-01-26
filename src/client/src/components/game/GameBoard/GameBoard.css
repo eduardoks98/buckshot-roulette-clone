@@ -3,9 +3,10 @@
    ========================================== */
 
 .game-board {
-  height: 100vh;
-  max-height: 100vh;
-  overflow: hidden;
+  height: 100dvh;
+  max-height: 100dvh;
+  overflow-y: auto;
+  overflow-x: hidden;
   padding: 0.5rem;
   display: flex;
   flex-direction: column;
@@ -213,6 +214,101 @@
 @keyframes reveal-pulse {
   0%, 100% { transform: scale(1); }
   50% { transform: scale(1.02); }
+}
+
+/* ==========================================
+   REVEALED SHELL BADGE (Compact - Mobile friendly)
+   ========================================== */
+.revealed-shell-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  border-radius: 20px;
+  font-weight: bold;
+  font-size: 1rem;
+  animation: badge-pulse 1.5s ease-in-out infinite;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.revealed-shell-badge.live {
+  background: rgba(239, 68, 68, 0.25);
+  border: 2px solid #ef4444;
+  color: #ef4444;
+  box-shadow: 0 0 15px rgba(239, 68, 68, 0.4);
+}
+
+.revealed-shell-badge.blank {
+  background: rgba(59, 130, 246, 0.25);
+  border: 2px solid #3b82f6;
+  color: #3b82f6;
+  box-shadow: 0 0 15px rgba(59, 130, 246, 0.4);
+}
+
+.revealed-shell-badge__icon {
+  font-size: 1.2rem;
+}
+
+.revealed-shell-badge__text {
+  font-size: 0.9rem;
+}
+
+@keyframes badge-pulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 15px rgba(255, 255, 255, 0.2);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 25px rgba(255, 255, 255, 0.3);
+  }
+}
+
+.revealed-shell-badge.live {
+  animation: badge-pulse-live 1.5s ease-in-out infinite;
+}
+
+.revealed-shell-badge.blank {
+  animation: badge-pulse-blank 1.5s ease-in-out infinite;
+}
+
+@keyframes badge-pulse-live {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 15px rgba(239, 68, 68, 0.4);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 25px rgba(239, 68, 68, 0.6);
+  }
+}
+
+@keyframes badge-pulse-blank {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 0 15px rgba(59, 130, 246, 0.4);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 0 25px rgba(59, 130, 246, 0.6);
+  }
+}
+
+@media (max-width: 480px) {
+  .revealed-shell-badge {
+    padding: 0.4rem 0.8rem;
+    gap: 0.4rem;
+  }
+
+  .revealed-shell-badge__icon {
+    font-size: 1rem;
+  }
+
+  .revealed-shell-badge__text {
+    font-size: 0.8rem;
+  }
 }
 
 /* ==========================================
@@ -926,12 +1022,48 @@
 }
 
 @media (max-width: 480px) {
+  .game-board {
+    padding: 0.25rem;
+  }
+
+  .game-header {
+    padding: 0.3rem 0.5rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .round-info {
+    font-size: 0.9rem;
+  }
+
+  .shells-remaining {
+    font-size: 1rem;
+  }
+
+  .turn-timer {
+    font-size: 1rem;
+    padding: 0.3rem 0.6rem;
+    min-width: 50px;
+  }
+
+  .game-message {
+    padding: 0.4rem 0.8rem;
+    margin-bottom: 0.25rem;
+    font-size: 0.85rem;
+  }
+
   .opponents-area {
     grid-template-columns: 1fr 1fr;
+    padding: 0.25rem;
+    gap: 0.25rem;
+    margin-bottom: 0.25rem;
   }
 
   .opponent-card {
-    padding: 0.5rem;
+    padding: 0.4rem;
+  }
+
+  .opponent-name {
+    font-size: 0.75rem;
   }
 
   .shotgun {
@@ -939,15 +1071,72 @@
   }
 
   .revolver-area {
-    padding: 1rem;
-    margin: 0.75rem 0;
-    gap: 1rem;
+    padding: 0.5rem;
+    margin: 0.25rem 0;
+    gap: 0.5rem;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .my-status {
+    padding: 0.4rem;
+    margin-top: 0.25rem;
+  }
+
+  .my-items {
+    padding: 0.25rem;
+    gap: 0.25rem;
+    margin-bottom: 0.25rem;
   }
 
   .item-btn {
-    width: 42px;
-    height: 42px;
-    font-size: 1.2rem;
+    width: 38px;
+    height: 38px;
+    font-size: 1.1rem;
+  }
+
+  .shoot-btn,
+  .shoot-self-btn {
+    padding: 0.6rem 1.5rem;
+    font-size: 0.9rem;
+  }
+
+  .waiting-turn {
+    padding: 0.5rem;
+    font-size: 0.85rem;
+  }
+}
+
+/* Extra small screens */
+@media (max-width: 380px) {
+  .game-board {
+    padding: 0.15rem;
+  }
+
+  .opponents-area {
+    gap: 0.15rem;
+  }
+
+  .opponent-card {
+    padding: 0.3rem;
+  }
+
+  .revolver-area {
+    padding: 0.25rem;
+    margin: 0.15rem 0;
+    gap: 0.25rem;
+  }
+
+  .item-btn {
+    width: 34px;
+    height: 34px;
+    font-size: 1rem;
+  }
+
+  .shoot-btn,
+  .shoot-self-btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.8rem;
   }
 }
 

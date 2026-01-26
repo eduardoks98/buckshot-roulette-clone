@@ -260,19 +260,39 @@
 
 @media (max-width: 480px) {
   .revolver-cylinder {
-    transform: scale(0.6);
+    transform: scale(0.55);
   }
 
   .revolver-cylinder--sm {
-    transform: scale(0.45);
+    transform: scale(0.4);
   }
 
   .revolver-cylinder--lg {
-    transform: scale(0.75);
+    transform: scale(0.7);
   }
 
   .revolver-muzzle-flash {
     width: 60px;
     height: 45px;
+  }
+}
+
+/* Extra small screens */
+@media (max-width: 380px) {
+  .revolver-cylinder {
+    transform: scale(0.45);
+  }
+
+  .revolver-cylinder--sm {
+    transform: scale(0.35);
+  }
+
+  .revolver-cylinder--lg {
+    transform: scale(0.6);
+  }
+
+  .revolver-muzzle-flash {
+    width: 50px;
+    height: 38px;
   }
 }

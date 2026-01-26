@@ -40,6 +40,8 @@ interface ShellInfo {
   total: number;
   live: number;
   blank: number;
+  initialTotal?: number;
+  currentPosition?: number;
 }
 
 export default function MultiplayerGame() {
@@ -64,6 +66,7 @@ export default function MultiplayerGame() {
   const [shells, setShells] = useState<ShellInfo>({ total: 0, live: 0, blank: 0 });
   const [myItems, setMyItems] = useState<{ id: string; emoji: string; name: string }[]>([]);
   const [revealedShell, setRevealedShell] = useState<'live' | 'blank' | null>(null);
+  const [phoneRevealedPositions, setPhoneRevealedPositions] = useState<{ position: number; type: 'live' | 'blank' }[]>([]);
 
   // UI state
   const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
@@ -230,6 +233,7 @@ export default function MultiplayerGame() {
       setShells(data.shells);
       setMyItems(data.itemsReceived || []);
       setRevealedShell(null);
+      setPhoneRevealedPositions([]);
       setSelectedTarget(null);
       setSelectedItem(null);
       setPlayerLastShell({});
@@ -255,7 +259,15 @@ export default function MultiplayerGame() {
       }
 
       setMessage('');
-      setTurnTimer(GAME_RULES.TIMERS.TURN_DURATION_MS / 1000);
+
+      // Sincronizar timer com servidor
+      if (data.turnStartTime) {
+        const elapsed = Math.floor((Date.now() - data.turnStartTime) / 1000);
+        const remaining = Math.max(0, (GAME_RULES.TIMERS.TURN_DURATION_MS / 1000) - elapsed);
+        setTurnTimer(remaining);
+      } else {
+        setTurnTimer(GAME_RULES.TIMERS.TURN_DURATION_MS / 1000);
+      }
     });
 
     // Turn changed
@@ -315,6 +327,14 @@ export default function MultiplayerGame() {
         }
       }
 
+      // Remover posição revelada do Phone que foi gasta (a posição atual antes do tiro)
+      // A posição gasta é calculada como: total inicial - total restante - 1
+      const spentPosition = (shells.initialTotal || shells.total) - data.shellsRemaining.total - 1;
+      setPhoneRevealedPositions(prev => prev.filter(p => p.position !== spentPosition));
+
+      // Limpar revelação da lupa quando cartucho é usado
+      setRevealedShell(null);
+
       setShells(data.shellsRemaining);
 
       if (data.shell === 'live') {
@@ -336,8 +356,13 @@ export default function MultiplayerGame() {
         if (data.itemId === 'magnifying_glass' && data.revealedShell) {
           extraInfo = data.revealedShell === 'live' ? '🔴 VIVA' : '🔵 VAZIA';
           setRevealedShell(data.revealedShell);
-        } else if (data.itemId === 'phone' && data.phoneShell) {
+        } else if (data.itemId === 'phone' && data.phoneShell && data.phonePosition) {
           extraInfo = `#${data.phonePosition}: ${data.phoneShell === 'live' ? '🔴 LIVE' : '🔵 BLANK'}`;
+          // Adicionar posição revelada ao estado (phonePosition é 1-indexed, converter para 0-indexed)
+          setPhoneRevealedPositions(prev => [
+            ...prev.filter(p => p.position !== data.phonePosition! - 1),
+            { position: data.phonePosition! - 1, type: data.phoneShell! }
+          ]);
         } else if (data.itemId === 'beer' && data.ejectedShell) {
           extraInfo = data.ejectedShell === 'live' ? '🔴 VIVA' : '🔵 VAZIA';
         } else if (data.itemId === 'expired_medicine') {
@@ -409,6 +434,14 @@ export default function MultiplayerGame() {
           ...prev,
           [data.playerId]: data.ejectedShell!
         }));
+
+        // Beer ejetou um cartucho - remover posição revelada do Phone que foi ejetada
+        if (data.shellsRemaining) {
+          const ejectedPosition = (shells.initialTotal || shells.total) - data.shellsRemaining.total - 1;
+          setPhoneRevealedPositions(prev => prev.filter(p => p.position !== ejectedPosition));
+          // Limpar revelação da lupa também
+          setRevealedShell(null);
+        }
       }
 
       if (data.shellsRemaining) {
@@ -438,6 +471,8 @@ export default function MultiplayerGame() {
     socket.on('shellsReloaded', ({ shells: newShells, itemsDistributed }) => {
       setShells(newShells);
       setRevealedShell(null);
+      // Limpar posições do Phone apenas no reload (novos cartuchos = novas posições)
+      setPhoneRevealedPositions([]);
       setPlayerLastShell({});
 
       const myNewItems = itemsDistributed.find(d => d.playerId === myId)?.items || [];
@@ -769,6 +804,7 @@ export default function MultiplayerGame() {
         isMyTurn={isMyTurn}
         selectedTarget={selectedTarget}
         revealedShell={revealedShell}
+        phoneRevealedPositions={phoneRevealedPositions}
         message={message}
         turnTimer={turnTimer}
         roundAnnouncement={roundAnnouncement}

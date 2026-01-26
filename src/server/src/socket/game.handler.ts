@@ -53,7 +53,7 @@ export function registerGameHandlers(
 
       // Check round end
       if (result.roundOver) {
-        handleRoundEnd(io, room, code, result.winner?.id);
+        handleRoundEnd(io, room, code, roomService, result.winner?.id);
         return;
       }
 
@@ -148,7 +148,7 @@ export function registerGameHandlers(
 
                 const roundEnd = gameService.checkRoundEnd(room);
                 if (roundEnd.ended) {
-                  handleRoundEnd(io, room, code, roundEnd.winnerId);
+                  handleRoundEnd(io, room, code, roomService, roundEnd.winnerId);
                 } else {
                   // Jogador morreu mas a rodada continua - avançar turno
                   const nextPlayerId = gameService.advanceTurn(room, false, false);
@@ -189,7 +189,7 @@ export function registerGameHandlers(
 
           const roundEnd = gameService.checkRoundEnd(room);
           if (roundEnd.ended) {
-            handleRoundEnd(io, room, code, roundEnd.winnerId);
+            handleRoundEnd(io, room, code, roomService, roundEnd.winnerId);
           } else {
             // Jogador morreu mas a rodada continua - avançar turno
             const nextPlayerId = gameService.advanceTurn(room, false, false);
@@ -415,6 +415,7 @@ async function handleRoundEnd(
   io: TypedIOServer,
   room: RoomWithTimer,
   code: string,
+  roomService: RoomService,
   winnerId?: string
 ): Promise<void> {
   // Clear turn timeout
@@ -598,6 +599,9 @@ async function handleRoundEnd(
       shellsBlank: roundData.shells.blank,
     }).catch(err => console.error('[DB] Erro ao salvar round:', err));
 
+    // Start turn timer BEFORE emitting to ensure turnStartTime is set
+    startTurnTimer(io, room, code, roomService);
+
     // Emit to each player with their items
     room.players.forEach(player => {
       const playerSocket = io.sockets.sockets.get(player.id);
@@ -605,6 +609,7 @@ async function handleRoundEnd(
         playerSocket.emit('roundStarted', {
           ...roundData,
           itemsReceived: player.items,
+          turnStartTime: room.turnStartTime || undefined,
         });
       }
     });
@@ -643,7 +648,7 @@ function handleTurnTimeout(
 
   // Continue game flow
   if (result.roundOver) {
-    handleRoundEnd(io, room, code, result.winner?.id);
+    handleRoundEnd(io, room, code, roomService, result.winner?.id);
     return;
   }
 

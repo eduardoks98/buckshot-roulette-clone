@@ -30,6 +30,8 @@ export function ActiveRooms() {
   const [joining, setJoining] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [pendingRoomCode, setPendingRoomCode] = useState('');
+  const [activeGame, setActiveGame] = useState<{ roomCode: string; gameStarted: boolean } | null>(null);
+  const [isReconnecting, setIsReconnecting] = useState(false);
 
   // Conectar ao socket se necessario
   useEffect(() => {
@@ -142,40 +144,32 @@ export function ActiveRooms() {
     };
 
     // Listener para quando usuário já está em um jogo (outra aba ou F5)
+    // NÃO navegar automaticamente - mostrar banner com opções
     const handleAlreadyInGame = (data: { roomCode: string; gameStarted: boolean }) => {
       console.log('[ActiveRooms] alreadyInGame:', data);
       setCreating(false);
       setJoining(false);
+      // Mostrar banner ao invés de navegar automaticamente
+      setActiveGame({
+        roomCode: data.roomCode,
+        gameStarted: data.gameStarted,
+      });
+    };
 
-      if (data.gameStarted) {
-        // Jogo em andamento - tentar reconectar
-        const reconnectData = localStorage.getItem('bangshotReconnect');
-        if (reconnectData) {
-          try {
-            const parsed = JSON.parse(reconnectData);
-            if (parsed.roomCode === data.roomCode) {
-              // Temos token de reconexão - usar
-              socket.emit('reconnectToGame', {
-                roomCode: parsed.roomCode,
-                playerName: parsed.playerName,
-                reconnectToken: parsed.reconnectToken,
-              });
-              return;
-            }
-          } catch {
-            // Ignora erro de parse
-          }
-        }
-        // Sem token válido - redirecionar para game e deixar reconectar via socket
-        navigate('/multiplayer/game', {
-          state: { roomCode: data.roomCode, needsReconnect: true },
-        });
-      } else {
-        // Ainda na waiting room - redirecionar
-        navigate('/multiplayer/room', {
-          state: { roomCode: data.roomCode, fromAlreadyInGame: true },
-        });
-      }
+    // Listener para reconexão bem-sucedida
+    const handleReconnected = (data: { roomCode: string }) => {
+      console.log('[ActiveRooms] reconnected:', data.roomCode);
+      setIsReconnecting(false);
+      setActiveGame(null);
+      navigate('/multiplayer/game', {
+        state: { roomCode: data.roomCode, reconnected: true, gameState: data },
+      });
+    };
+
+    // Listener para abandono bem-sucedido
+    const handleGameAbandoned = () => {
+      console.log('[ActiveRooms] gameAbandoned');
+      setActiveGame(null);
     };
 
     socket.on('roomList', handleRoomList);
@@ -187,9 +181,14 @@ export function ActiveRooms() {
     socket.on('joinError', handleJoinError);
     socket.on('leftRoom', handleLeftRoom);
     socket.on('alreadyInGame', handleAlreadyInGame);
+    socket.on('reconnected', handleReconnected);
+    socket.on('gameAbandoned', handleGameAbandoned);
 
     // Solicitar lista inicial
     socket.emit('listRooms');
+
+    // Verificar se usuario ja esta em um jogo ativo
+    socket.emit('checkActiveGame');
 
     // Atualizar a cada 3 segundos (mais frequente)
     const interval = setInterval(() => {
@@ -206,6 +205,8 @@ export function ActiveRooms() {
       socket.off('joinError', handleJoinError);
       socket.off('leftRoom', handleLeftRoom);
       socket.off('alreadyInGame', handleAlreadyInGame);
+      socket.off('reconnected', handleReconnected);
+      socket.off('gameAbandoned', handleGameAbandoned);
       clearInterval(interval);
     };
   }, [socket, isConnected, navigate, user]);
@@ -294,8 +295,52 @@ export function ActiveRooms() {
     setJoinPassword('');
   };
 
+  // Reconectar ao jogo ativo
+  const handleReconnect = useCallback(() => {
+    if (!activeGame || !socket) return;
+    setIsReconnecting(true);
+    // Servidor sabe quem somos pelo odUserId - não precisa de token
+    socket.emit('rejoinGame', { roomCode: activeGame.roomCode });
+  }, [activeGame, socket]);
+
+  // Abandonar jogo ativo
+  const handleAbandonGame = useCallback(() => {
+    if (!activeGame || !socket) return;
+    // Notificar servidor para remover jogador da sala
+    socket.emit('abandonGame', { roomCode: activeGame.roomCode });
+  }, [activeGame, socket]);
+
   return (
     <div className="active-rooms">
+      {/* Banner de jogo ativo */}
+      {activeGame && (
+        <div className="active-game-banner">
+          <div className="active-game-banner__info">
+            <span className="active-game-banner__icon">⚠️</span>
+            <div className="active-game-banner__text">
+              <strong>{activeGame.gameStarted ? 'Partida em andamento!' : 'Você está em uma sala!'}</strong>
+              <span>Sala: {activeGame.roomCode}</span>
+            </div>
+          </div>
+          <div className="active-game-banner__actions">
+            <button
+              className="active-game-banner__btn active-game-banner__btn--primary"
+              onClick={handleReconnect}
+              disabled={isReconnecting || !isConnected}
+            >
+              {isReconnecting ? 'Reconectando...' : 'RECONECTAR'}
+            </button>
+            <button
+              className="active-game-banner__btn active-game-banner__btn--secondary"
+              onClick={handleAbandonGame}
+              disabled={isReconnecting}
+            >
+              ABANDONAR
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Header with title and refresh button */}
       <div className="active-rooms__header">
         <h2 className="active-rooms__title">

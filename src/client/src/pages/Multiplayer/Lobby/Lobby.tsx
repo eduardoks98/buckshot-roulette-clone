@@ -251,14 +251,14 @@ export default function Lobby() {
                 onClick={handleReconnect}
                 disabled={isReconnecting || !isConnected}
               >
-                {isReconnecting ? 'Reconectando...' : 'VOLTAR'}
+                {isReconnecting ? 'Reconectando...' : 'RECONECTAR'}
               </button>
               <button
                 className="abandon-btn"
                 onClick={handleAbandonGame}
                 disabled={isReconnecting}
               >
-                SAIR DA SALA
+                ABANDONAR
               </button>
             </div>
           </div>
