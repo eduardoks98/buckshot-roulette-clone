@@ -41,7 +41,7 @@ export function RevolverCylinder({
   size = 'md',
   className = '',
 }: RevolverCylinderProps) {
-  const [animationPhase, setAnimationPhase] = useState<'idle' | 'spinning' | 'stopping' | 'result'>('idle');
+  const [animationPhase, setAnimationPhase] = useState<'idle' | 'spinning' | 'result'>('idle');
   const [showMuzzleFlash, setShowMuzzleFlash] = useState(false);
   const [displayRotation, setDisplayRotation] = useState(0);
   const prevPositionRef = useRef(currentPosition);
@@ -105,28 +105,21 @@ export function RevolverCylinder({
     if (isSpinning && animationPhase === 'idle') {
       setAnimationPhase('spinning');
 
-      // After spin, stop dramatically
+      // After spin, show result and stop at the correct position
       const spinTimer = setTimeout(() => {
-        setAnimationPhase('stopping');
+        setAnimationPhase('result');
+        if (shotResult) {
+          setShowMuzzleFlash(true);
+          setTimeout(() => setShowMuzzleFlash(false), 200);
+        }
 
-        // Show result
-        const stopTimer = setTimeout(() => {
-          setAnimationPhase('result');
-          if (shotResult) {
-            setShowMuzzleFlash(true);
-            setTimeout(() => setShowMuzzleFlash(false), 200);
-          }
+        // Reset after showing result
+        const resetTimer = setTimeout(() => {
+          setAnimationPhase('idle');
+        }, 800);
 
-          // Reset after showing result
-          const resetTimer = setTimeout(() => {
-            setAnimationPhase('idle');
-          }, 800);
-
-          return () => clearTimeout(resetTimer);
-        }, 300);
-
-        return () => clearTimeout(stopTimer);
-      }, 500);
+        return () => clearTimeout(resetTimer);
+      }, 600);
 
       return () => clearTimeout(spinTimer);
     }
@@ -145,17 +138,29 @@ export function RevolverCylinder({
     `revolver-cylinder--${size}`,
     isActive ? 'revolver-cylinder--active' : '',
     animationPhase === 'spinning' ? 'revolver-cylinder--spinning' : '',
-    animationPhase === 'stopping' ? 'revolver-cylinder--stopping' : '',
     animationPhase === 'result' && shotResult === 'live' ? 'revolver-cylinder--shot-live' : '',
     animationPhase === 'result' && shotResult === 'blank' ? 'revolver-cylinder--shot-blank' : '',
     className,
   ].filter(Boolean).join(' ');
 
   // Calculate rotation style for the cylinder
-  const cylinderRotationStyle = animationPhase === 'idle' ? {
-    transform: `rotate(-${displayRotation}deg)`,
-    transition: 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)',
-  } : {};
+  // During spinning, we animate with CSS but end at the correct position
+  const targetRotation = currentPosition * anglePerChamber;
+
+  const cylinderRotationStyle = (() => {
+    if (animationPhase === 'spinning') {
+      // Spin animation: 2 full rotations (720deg) + final position
+      return {
+        transform: `rotate(-${720 + targetRotation}deg)`,
+        transition: 'transform 0.6s cubic-bezier(0.25, 0.1, 0.25, 1)',
+      };
+    }
+    // Idle or result: just show the current position
+    return {
+      transform: `rotate(-${displayRotation}deg)`,
+      transition: animationPhase === 'idle' ? 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
+    };
+  })();
 
   return (
     <div className={cylinderClasses}>
