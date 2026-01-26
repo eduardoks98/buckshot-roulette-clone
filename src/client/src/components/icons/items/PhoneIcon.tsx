@@ -7,25 +7,30 @@ export function PhoneIcon({ size, color = DEFAULT_ICON_COLOR, className, style, 
       width={s}
       height={s}
       viewBox="0 0 24 24"
-      fill={color}
+      fill="none"
       className={className}
       style={style}
       aria-hidden={!title}
       role={title ? 'img' : undefined}
     >
       {title && <title>{title}</title>}
+
       {/* Corpo do celular */}
-      <rect x="6" y="2" width="12" height="20" rx="2" fill={color} opacity="0.9" />
-      {/* Tela */}
-      <rect x="7.5" y="4" width="9" height="13" rx="0.5" fill="none" stroke={color} strokeWidth="0.5" opacity="0.3" />
-      {/* Botao home */}
-      <circle cx="12" cy="19" r="1.2" fill="none" stroke={color} strokeWidth="1" opacity="0.5" />
-      {/* Camera frontal */}
-      <circle cx="12" cy="3.2" r="0.5" fill={color} opacity="0.4" />
-      {/* Linhas na tela */}
-      <line x1="9" y1="7" x2="15" y2="7" stroke={color} strokeWidth="0.5" opacity="0.3" />
-      <line x1="9" y1="9" x2="14" y2="9" stroke={color} strokeWidth="0.5" opacity="0.3" />
-      <line x1="9" y1="11" x2="13" y2="11" stroke={color} strokeWidth="0.5" opacity="0.3" />
+      <rect x="5" y="1" width="14" height="22" rx="2" fill={color} />
+
+      {/* Tela - area escura */}
+      <rect x="7" y="3" width="10" height="12" rx="1" fill="#1a1a1a" />
+
+      {/* Antena no topo */}
+      <rect x="10" y="0" width="4" height="2" rx="1" fill={color} />
+
+      {/* Teclado numerico - grid 3x3 */}
+      <rect x="7" y="16" width="3" height="2" rx="0.5" fill="#1a1a1a" />
+      <rect x="10.5" y="16" width="3" height="2" rx="0.5" fill="#1a1a1a" />
+      <rect x="14" y="16" width="3" height="2" rx="0.5" fill="#1a1a1a" />
+      <rect x="7" y="19" width="3" height="2" rx="0.5" fill="#1a1a1a" />
+      <rect x="10.5" y="19" width="3" height="2" rx="0.5" fill="#1a1a1a" />
+      <rect x="14" y="19" width="3" height="2" rx="0.5" fill="#1a1a1a" />
     </svg>
   );
 }

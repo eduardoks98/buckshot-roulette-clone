@@ -80,6 +80,7 @@ export interface ServerToClientEvents {
   joinError: (message: string) => void;
   startError: (message: string) => void;
   leftRoom: () => void;
+  alreadyInGame: (data: AlreadyInGamePayload) => void;
 
   // Game events
   roundStarted: (data: RoundStartedPayload) => void;
@@ -149,6 +150,11 @@ export interface HostChangedPayload {
   newHost: string;
 }
 
+export interface AlreadyInGamePayload {
+  roomCode: string;
+  gameStarted: boolean;
+}
+
 export interface RoundStartedPayload {
   round: number;
   maxHp: number;
@@ -188,6 +194,7 @@ export interface TurnChangedPayload {
   currentPlayer: string;
   reason: 'shot' | 'timeout' | 'playerDisconnected' | 'handcuffs' | 'reconnected' | 'elimination';
   players: PlayerPublicState[];
+  turnStartTime: number; // Timestamp when turn started (for sync)
 }
 
 export interface TurnTimerStartedPayload {
@@ -261,6 +268,7 @@ export interface PlayerDisconnectedPayload {
 export interface PlayerReconnectedPayload {
   playerId: string;
   playerName: string;
+  newSocketId?: string; // Novo socket ID após reconexão (usado na WaitingRoom)
 }
 
 export interface PlayerEliminatedPayload {

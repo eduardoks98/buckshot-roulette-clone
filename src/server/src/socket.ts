@@ -26,8 +26,25 @@ export const socketUserMap = new Map<string, { odUserId: string; displayName: st
 let ioInstance: Server<ClientToServerEvents, ServerToClientEvents> | null = null;
 
 export function getOnlineCount(): { total: number; inQueue: number } {
+  if (!ioInstance) {
+    return { total: 0, inQueue: 0 };
+  }
+
+  // Contar usuários únicos (por odUserId) + conexões anônimas
+  const uniqueUserIds = new Set<string>();
+  let anonymousCount = 0;
+
+  for (const [, userData] of socketUserMap) {
+    if (userData?.odUserId) {
+      uniqueUserIds.add(userData.odUserId);
+    } else {
+      // Conexão sem autenticação (guest ou não logado)
+      anonymousCount++;
+    }
+  }
+
   return {
-    total: ioInstance ? ioInstance.engine.clientsCount : 0,
+    total: uniqueUserIds.size + anonymousCount,
     inQueue: 0, // Futuro: matchmaking queue
   };
 }

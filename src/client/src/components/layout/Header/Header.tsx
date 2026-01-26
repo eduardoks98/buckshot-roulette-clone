@@ -99,7 +99,8 @@ export function Header({ variant = 'full' }: HeaderProps) {
         <div className="app-header__right">
           <div className="app-header__online">
             <span className="online-dot" />
-            <span>{onlineCount} online</span>
+            <span className="online-count">{onlineCount}</span>
+            <span className="online-label">online</span>
           </div>
           <button
             className="app-header__bug-btn"

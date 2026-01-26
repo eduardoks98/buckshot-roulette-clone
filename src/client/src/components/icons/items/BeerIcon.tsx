@@ -7,35 +7,38 @@ export function BeerIcon({ size, color = DEFAULT_ICON_COLOR, className, style, t
       width={s}
       height={s}
       viewBox="0 0 24 24"
-      fill={color}
+      fill="none"
       className={className}
       style={style}
       aria-hidden={!title}
       role={title ? 'img' : undefined}
     >
       {title && <title>{title}</title>}
-      {/* Caneca */}
+
+      {/* Corpo da caneca */}
       <path
-        d="M6 6h10v12a2 2 0 01-2 2H8a2 2 0 01-2-2V6z"
+        d="M4 6h12v14a2 2 0 01-2 2H6a2 2 0 01-2-2V6z"
         fill={color}
-        opacity="0.9"
       />
-      {/* Alca */}
+
+      {/* Cerveja dentro - area escura */}
+      <rect x="5" y="8" width="10" height="11" fill="#1a1a1a" />
+
+      {/* Espuma no topo - bolhas grandes */}
+      <circle cx="6" cy="5" r="2.5" fill={color} />
+      <circle cx="10" cy="4" r="3" fill={color} />
+      <circle cx="14" cy="5" r="2.5" fill={color} />
+      <circle cx="8" cy="3" r="2" fill={color} />
+      <circle cx="12" cy="3" r="2" fill={color} />
+
+      {/* Alca da caneca */}
       <path
-        d="M16 8h2a2 2 0 012 2v4a2 2 0 01-2 2h-2"
+        d="M16 8h2a3 3 0 013 3v2a3 3 0 01-3 3h-2"
         fill="none"
         stroke={color}
-        strokeWidth="2"
+        strokeWidth="3"
         strokeLinecap="round"
       />
-      {/* Espuma */}
-      <ellipse cx="11" cy="6" rx="6" ry="2" fill={color} />
-      <circle cx="8" cy="4" r="1.5" fill={color} />
-      <circle cx="11" cy="3.5" r="1.2" fill={color} />
-      <circle cx="14" cy="4" r="1" fill={color} />
-      {/* Bolhas */}
-      <circle cx="9" cy="12" r="0.8" fill="none" stroke={color} strokeWidth="0.5" opacity="0.5" />
-      <circle cx="12" cy="14" r="0.6" fill="none" stroke={color} strokeWidth="0.5" opacity="0.5" />
     </svg>
   );
 }

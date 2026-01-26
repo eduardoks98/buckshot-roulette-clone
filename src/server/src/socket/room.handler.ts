@@ -3,7 +3,7 @@
 // ==========================================
 
 import { TypedIOServer, TypedSocket, socketUserMap } from '../socket';
-import { RoomService, Player } from '../services/game/room.service';
+import { RoomService, Player, Room } from '../services/game/room.service';
 import { GameService } from '../services/game/game.service';
 import { gamePersistenceService } from '../services/game/game.persistence.service';
 import { achievementService, PlayerEndGameStats } from '../services/achievement.service';
@@ -46,9 +46,8 @@ export function setupRoomCallbacks(
   };
 
   // Callback quando jogador vence por WO
-  roomService.onPlayerWonByDefault = async (roomCode: string, player: Player) => {
-    const room = roomService.getRoom(roomCode);
-    if (!room) return;
+  roomService.onPlayerWonByDefault = async (roomCode: string, player: Player, room: Room) => {
+    // Room is now passed as parameter (room is deleted after this callback)
 
     // Build player stats
     const sortedPlayers = [...room.players].sort((a, b) => b.roundWins - a.roundWins);
@@ -198,6 +197,40 @@ export function setupRoomCallbacks(
     console.log(`[Room] Sala ${roomCode} deletada após grace period de 60s`);
   };
 
+  // Callback quando jogador desconecta temporariamente na WaitingRoom (F5)
+  roomService.onPlayerDisconnected = (roomCode: string, playerId: string, playerName: string) => {
+    io.to(roomCode).emit('playerDisconnected', {
+      playerId,
+      playerName,
+      gracePeriod: 10000, // 10 segundos para WaitingRoom
+      canReconnect: true,
+    });
+    console.log(`[Room] ${playerName} desconectou da WaitingRoom ${roomCode} - vaga reservada por 10s`);
+  };
+
+  // Callback quando jogador reconecta na WaitingRoom
+  roomService.onPlayerReconnected = (roomCode: string, oldSocketId: string, newSocketId: string, playerName: string) => {
+    io.to(roomCode).emit('playerReconnected', {
+      playerId: oldSocketId,
+      newSocketId,
+      playerName,
+    });
+    console.log(`[Room] ${playerName} reconectou na WaitingRoom ${roomCode}`);
+  };
+
+  // Callback quando jogador sai definitivamente (após grace period expirar)
+  roomService.onPlayerLeft = (roomCode: string, players: PlayerPublicState[]) => {
+    io.to(roomCode).emit('playerLeft', { players });
+    io.emit('roomListUpdated');
+    console.log(`[Room] Jogador removido da sala ${roomCode} após grace period`);
+  };
+
+  // Callback quando host muda
+  roomService.onHostChanged = (roomCode: string, newHostName: string) => {
+    io.to(roomCode).emit('hostChanged', { newHost: newHostName });
+    console.log(`[Room] Novo host na sala ${roomCode}: ${newHostName}`);
+  };
+
   console.log('[Room] Callbacks do room service configurados');
 }
 
@@ -211,12 +244,35 @@ export function registerRoomHandlers(
   // ==========================================
   socket.on('createRoom', async ({ playerName, password }) => {
     try {
-      const result = roomService.createRoom(socket.id, playerName, password);
+      const userData = socketUserMap.get(socket.id);
+
+      // Validação por userId: se usuário está logado, verificar se já está em algum jogo
+      if (userData?.odUserId) {
+        const existingByUserId = roomService.getRoomByUserId(userData.odUserId);
+        if (existingByUserId) {
+          // Já está em um jogo - emitir evento para redirecionar
+          socket.emit('alreadyInGame', {
+            roomCode: existingByUserId.code,
+            gameStarted: existingByUserId.room.started,
+          });
+          console.log(`[Room] ${playerName} (userId: ${userData.odUserId}) já está em ${existingByUserId.code} - emitindo alreadyInGame`);
+          return;
+        }
+      }
+
+      // Validação por socket.id (fallback para guests)
+      const existingRoom = roomService.getRoomByPlayer(socket.id);
+      if (existingRoom) {
+        socket.emit('joinError', `Você já está na sala ${existingRoom.code}. Saia primeiro.`);
+        console.log(`[Room] ${playerName} tentou criar sala mas já está em ${existingRoom.code}`);
+        return;
+      }
+
+      const result = roomService.createRoom(socket.id, playerName, password, userData?.odUserId);
 
       socket.join(result.room.code);
 
       // Persistir no banco de dados
-      const userData = socketUserMap.get(socket.id);
       gamePersistenceService.createGame({
         roomCode: result.room.code,
         hostUserId: userData?.odUserId,
@@ -246,7 +302,43 @@ export function registerRoomHandlers(
   // ==========================================
   socket.on('joinRoom', async ({ code, playerName, password }) => {
     try {
-      const result = roomService.joinRoom(code.toUpperCase(), socket.id, playerName, password);
+      const userData = socketUserMap.get(socket.id);
+
+      // Validação por userId: se usuário está logado, verificar se já está em algum jogo
+      if (userData?.odUserId) {
+        const existingByUserId = roomService.getRoomByUserId(userData.odUserId);
+        if (existingByUserId) {
+          // Se está na mesma sala que está tentando entrar, permite reconexão
+          if (existingByUserId.code === code.toUpperCase()) {
+            console.log(`[Room] ${playerName} (userId: ${userData.odUserId}) reconectando à sala ${code}`);
+          } else {
+            // Está em outra sala - emitir evento para redirecionar
+            socket.emit('alreadyInGame', {
+              roomCode: existingByUserId.code,
+              gameStarted: existingByUserId.room.started,
+            });
+            console.log(`[Room] ${playerName} (userId: ${userData.odUserId}) já está em ${existingByUserId.code} - emitindo alreadyInGame`);
+            return;
+          }
+        }
+      }
+
+      // Validação por socket.id (fallback para guests)
+      const existingRoom = roomService.getRoomByPlayer(socket.id);
+      if (existingRoom) {
+        // Se já está na mesma sala, permite reconexão
+        if (existingRoom.code === code.toUpperCase()) {
+          // Reconexão à mesma sala - continuar normalmente
+          console.log(`[Room] ${playerName} reconectando à sala ${code}`);
+        } else {
+          // Tentando entrar em sala diferente - bloquear
+          socket.emit('joinError', `Você já está na sala ${existingRoom.code}. Saia primeiro.`);
+          console.log(`[Room] ${playerName} tentou entrar em ${code} mas já está em ${existingRoom.code}`);
+          return;
+        }
+      }
+
+      const result = roomService.joinRoom(code.toUpperCase(), socket.id, playerName, password, userData?.odUserId);
 
       if ('error' in result) {
         socket.emit('joinError', result.error);
@@ -256,7 +348,6 @@ export function registerRoomHandlers(
       socket.join(code.toUpperCase());
 
       // Persistir participante no banco de dados
-      const userData = socketUserMap.get(socket.id);
       const gameId = await gamePersistenceService.getGameId(code.toUpperCase());
       if (gameId) {
         gamePersistenceService.addParticipant({
@@ -295,25 +386,46 @@ export function registerRoomHandlers(
 
       if (result) {
         socket.leave(result.code);
-        console.log(`[Room] Jogador saiu da sala ${result.code}`);
+        console.log(`[Room] Jogador ${result.playerName || 'desconhecido'} saiu da sala ${result.code}`);
 
-        if (result.deleted) {
-          // Sala foi deletada imediatamente (jogo em andamento)
-          gamePersistenceService.deleteGame(result.code)
-            .catch(err => console.error('[DB] Erro ao deletar jogo:', err));
-          console.log(`[Room] Sala ${result.code} deletada - game removido do banco`);
-          io.emit('roomDeleted', { code: result.code });
-        } else if (result.gracePeriodStarted) {
-          // Sala vazia em waiting room - grace period iniciado (60s)
-          console.log(`[Room] Sala ${result.code} em grace period de 60s`);
-          // Não notificar roomDeleted ainda - será feito pelo callback onRoomDeleted
-          io.emit('roomUpdated', { code: result.code });
+        // Se jogo estava em andamento
+        if (result.gameInProgress) {
+          if (result.winner) {
+            // Vitória por WO - callbacks (onPlayerWonByDefault) já cuidaram de:
+            // - Persistir no banco (endGame)
+            // - Emitir gameOver
+            // - Deletar a sala
+            console.log(`[Room] ${result.winner.name} venceu por WO - callbacks já processaram`);
+            io.emit('roomDeleted', { code: result.code });
+          } else if (result.deleted) {
+            // Todos desistiram - jogo cancelado (callback onGameCancelled já foi chamado)
+            console.log(`[Room] Jogo cancelado - todos desistiram`);
+            io.emit('roomDeleted', { code: result.code });
+          } else {
+            // Jogador desistiu mas ainda tem outros jogando
+            // Emitir playerEliminated foi feito pelo callback onPlayerEliminated
+            io.to(result.code).emit('playerLeft', {
+              players: result.players,
+            });
+          }
         } else {
-          // Sala ainda tem jogadores
-          io.to(result.code).emit('playerLeft', {
-            players: result.players,
-          });
-          io.emit('roomUpdated', { code: result.code });
+          // Jogo não estava em andamento (WaitingRoom)
+          if (result.deleted) {
+            // Sala foi deletada
+            gamePersistenceService.deleteGame(result.code)
+              .catch(err => console.error('[DB] Erro ao deletar jogo:', err));
+            io.emit('roomDeleted', { code: result.code });
+          } else if (result.gracePeriodStarted) {
+            // Sala vazia em waiting room - grace period iniciado (60s)
+            console.log(`[Room] Sala ${result.code} em grace period de 60s`);
+            io.emit('roomListUpdated');
+          } else {
+            // Sala ainda tem jogadores
+            io.to(result.code).emit('playerLeft', {
+              players: result.players,
+            });
+            io.emit('roomListUpdated');
+          }
         }
       }
 
@@ -403,7 +515,13 @@ export function registerRoomHandlers(
     console.log(`[Room] Rooms do socket antes de processar:`, Array.from(socket.rooms));
     try {
       const result = roomService.handleDisconnect(socket.id);
-      console.log(`[Room] handleDisconnect result:`, result ? { code: result.code, gameInProgress: result.gameInProgress, playerName: result.playerName, deleted: result.deleted } : null);
+      console.log(`[Room] handleDisconnect result:`, result ? {
+        code: result.code,
+        gameInProgress: result.gameInProgress,
+        playerName: result.playerName,
+        deleted: result.deleted,
+        playerDisconnected: result.playerDisconnected
+      } : null);
 
       if (result && result.room) {
         if (result.deleted) {
@@ -414,21 +532,30 @@ export function registerRoomHandlers(
           // Notificar todos os clientes que a sala foi deletada
           io.emit('roomDeleted', { code: result.code });
         } else if (result.gameInProgress) {
-          // Notificar sobre desconexão durante jogo
-          console.log(`[Room] Emitindo playerDisconnected para sala ${result.code}: ${result.playerName}`);
+          // Notificar sobre desconexão durante jogo (grace period 60s)
+          console.log(`[Room] Emitindo playerDisconnected para sala ${result.code}: ${result.playerName} (jogo em andamento)`);
           io.to(result.code).emit('playerDisconnected', {
             playerId: socket.id,
             playerName: result.playerName,
             gracePeriod: 60000, // 60 segundos
             canReconnect: true,
           });
+        } else if (result.playerDisconnected) {
+          // Desconexão temporária na WaitingRoom (F5) - vaga reservada por 10s
+          // O callback onPlayerDisconnected já foi chamado pelo room.service
+          // Apenas atualizar lista de salas
+          io.emit('roomListUpdated');
         } else {
+          // Jogador foi removido imediatamente (não deveria acontecer na WaitingRoom agora)
           io.to(result.code).emit('playerLeft', {
             players: result.players,
           });
+          io.emit('roomListUpdated');
         }
 
-        if (result.newHost) {
+        // Host changed é tratado pelo callback onHostChanged se necessário
+        // Mas se veio no result, também emitir (para casos de jogo em andamento)
+        if (result.newHost && result.gameInProgress) {
           io.to(result.code).emit('hostChanged', {
             newHost: result.newHost,
           });
@@ -482,6 +609,7 @@ export function registerRoomHandlers(
         currentPlayer: result.gameState.currentPlayer,
         reason: 'reconnected',
         players: result.gameState.players,
+        turnStartTime: room!.turnStartTime!,
       });
 
       console.log(`[Room] ${playerName} reconectou à sala ${roomCode}`);

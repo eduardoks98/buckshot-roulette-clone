@@ -1,4 +1,4 @@
-# Buckshot Roulette - Regras do Jogo
+# Bang Shot - Regras do Jogo
 
 > Documentacao baseada nas regras oficiais do jogo Buckshot Roulette
 
@@ -19,7 +19,7 @@
 
 ## Visao Geral
 
-Buckshot Roulette e um jogo de horror indie que simula uma versao modificada da roleta russa, usando uma espingarda pump-action de 8 cartuchos em vez do revolver tradicional.
+Bang Shot e um jogo de horror indie que simula uma versao modificada da roleta russa, usando uma espingarda pump-action de 8 cartuchos em vez do revolver tradicional.
 
 ### Modos de Jogo
 
@@ -66,11 +66,11 @@ Buckshot Roulette e um jogo de horror indie que simula uma versao modificada da 
 
 ### Itens Base
 
-#### Lupa (Magnifying Glass)
+#### 🔍 Lupa (Magnifying Glass)
 
 | Propriedade | Valor |
 |-------------|-------|
-| Emoji | `o` |
+| Emoji | 🔍 |
 | Efeito | Revela o cartucho ATUAL (LIVE ou BLANK) |
 | Restricoes | Nenhuma |
 | Pode usar multiplas vezes | Sim |
@@ -84,11 +84,11 @@ Buckshot Roulette e um jogo de horror indie que simula uma versao modificada da 
 
 ---
 
-#### Cerveja (Beer)
+#### 🍺 Cerveja (Beer)
 
 | Propriedade | Valor |
 |-------------|-------|
-| Emoji | `o` |
+| Emoji | 🍺 |
 | Efeito | Ejeta o cartucho atual SEM atirar (revela o que era) |
 | Restricoes | **NAO pode usar se nao ha cartuchos** |
 
@@ -101,11 +101,11 @@ Buckshot Roulette e um jogo de horror indie que simula uma versao modificada da 
 
 ---
 
-#### Cigarro (Cigarettes)
+#### 🚬 Cigarro (Cigarettes)
 
 | Propriedade | Valor |
 |-------------|-------|
-| Emoji | `o` |
+| Emoji | 🚬 |
 | Efeito | Restaura 1 HP |
 | Restricoes | Nenhuma |
 | Pode usar com HP maximo | **SIM** (so remove do inventario) |
@@ -116,11 +116,11 @@ Buckshot Roulette e um jogo de horror indie que simula uma versao modificada da 
 
 ---
 
-#### Algemas (Handcuffs)
+#### ⛓️ Algemas (Handcuffs)
 
 | Propriedade | Valor |
 |-------------|-------|
-| Emoji | `o` |
+| Emoji | ⛓️ |
 | Efeito | O alvo pula o PROXIMO turno dele |
 | Restricoes | **NAO pode algemar quem ja esta algemado** |
 | Alvo | Qualquer oponente vivo |
@@ -135,11 +135,11 @@ Buckshot Roulette e um jogo de horror indie que simula uma versao modificada da 
 
 ---
 
-#### Serra (Hand Saw)
+#### 🪚 Serra (Hand Saw)
 
 | Propriedade | Valor |
 |-------------|-------|
-| Emoji | `o` |
+| Emoji | 🪚 |
 | Efeito | Proximo tiro causa DANO DOBRADO (2 em vez de 1) |
 | Restricoes | **NAO pode usar se cano ja esta serrado** |
 | Duracao | Ate o proximo tiro ou ejecao |
@@ -155,11 +155,11 @@ Buckshot Roulette e um jogo de horror indie que simula uma versao modificada da 
 
 ### Itens Double or Nothing
 
-#### Celular (Burner Phone)
+#### 📱 Celular (Burner Phone)
 
 | Propriedade | Valor |
 |-------------|-------|
-| Emoji | `o` |
+| Emoji | 📱 |
 | Efeito | Revela um cartucho FUTURO aleatorio (nao o atual) |
 | Restricoes | **NAO pode usar se so resta 1 cartucho** |
 | Informacao | Mostra posicao e tipo (ex: "Cartucho #3: LIVE") |
@@ -170,11 +170,11 @@ Buckshot Roulette e um jogo de horror indie que simula uma versao modificada da 
 
 ---
 
-#### Inversor (Inverter)
+#### 🔄 Inversor (Inverter)
 
 | Propriedade | Valor |
 |-------------|-------|
-| Emoji | `o` |
+| Emoji | 🔄 |
 | Efeito | Converte o cartucho atual (LIVE vira BLANK, BLANK vira LIVE) |
 | Restricoes | Nenhuma |
 
@@ -187,11 +187,11 @@ Buckshot Roulette e um jogo de horror indie que simula uma versao modificada da 
 
 ---
 
-#### Adrenalina (Adrenaline)
+#### 💉 Adrenalina (Adrenaline)
 
 | Propriedade | Valor |
 |-------------|-------|
-| Emoji | `o` |
+| Emoji | 💉 |
 | Efeito | Rouba um item do oponente E USA IMEDIATAMENTE |
 | Restricoes | **NAO pode roubar outra Adrenalina** |
 | Alvo | Qualquer oponente com itens |
@@ -209,11 +209,11 @@ Buckshot Roulette e um jogo de horror indie que simula uma versao modificada da 
 
 ---
 
-#### Remedio Vencido (Expired Medicine)
+#### 💊 Remedio Vencido (Expired Medicine)
 
 | Propriedade | Valor |
 |-------------|-------|
-| Emoji | `o` |
+| Emoji | 💊 |
 | Efeito | 50% chance: +2 HP / 50% chance: -1 HP |
 | Restricoes | Nenhuma |
 | PERIGO | **PODE TE MATAR se voce tem 1 HP!** |
@@ -230,11 +230,11 @@ Buckshot Roulette e um jogo de horror indie que simula uma versao modificada da 
 
 ### Itens Multiplayer
 
-#### Inversor de Turno (Turn Reverser)
+#### ↩️ Inversor de Ordem (Turn Reverser)
 
 | Propriedade | Valor |
 |-------------|-------|
-| Emoji | `o` |
+| Emoji | ↩️ |
 | Efeito | Inverte a direcao dos turnos (horario <-> anti-horario) |
 | Restricoes | Nenhuma |
 | Util em | Jogos com 3-4 jogadores |
@@ -251,21 +251,21 @@ Buckshot Roulette e um jogo de horror indie que simula uma versao modificada da 
 
 | Item | Restricao | Codigo |
 |------|-----------|--------|
-| Serra | Cano ja serrado | `user.sawedOff === true` |
-| Algemas | Alvo ja algemado | `target.handcuffed === true` |
-| Algemas | Alvo imune | `target.handcuffImmune === true` |
-| Cerveja | Sem cartuchos | `currentShellIndex >= shells.length` |
-| Celular | So 1 cartucho | `remainingShells.length === 0` |
-| Adrenalina | Roubar adrenalina | `stolenItem.id === 'adrenaline'` |
-| Adrenalina | Alvo sem itens | `target.items.length === 0` |
+| 🪚 Serra | Cano ja serrado | `user.sawedOff === true` |
+| ⛓️ Algemas | Alvo ja algemado | `target.handcuffed === true` |
+| ⛓️ Algemas | Alvo imune | `target.handcuffImmune === true` |
+| 🍺 Cerveja | Sem cartuchos | `currentShellIndex >= shells.length` |
+| 📱 Celular | So 1 cartucho | `remainingShells.length === 0` |
+| 💉 Adrenalina | Roubar adrenalina | `stolenItem.id === 'adrenaline'` |
+| 💉 Adrenalina | Alvo sem itens | `target.items.length === 0` |
 
 ### Itens SEM Restricoes
 
-- Lupa (pode usar varias vezes)
-- Cigarro (pode usar com HP maximo)
-- Inversor (pode usar sem saber o cartucho)
-- Remedio Vencido (pode usar a qualquer momento)
-- Inversor de Turno (pode usar a qualquer momento)
+- 🔍 Lupa (pode usar varias vezes)
+- 🚬 Cigarro (pode usar com HP maximo)
+- 🔄 Inversor (pode usar sem saber o cartucho)
+- 💊 Remedio Vencido (pode usar a qualquer momento)
+- ↩️ Inversor de Ordem (pode usar a qualquer momento)
 
 ---
 
@@ -311,6 +311,25 @@ Se voce atira em si mesmo com um cartucho BLANK:
 - Proximo cartucho e carregado automaticamente
 
 Esta e uma mecanica estrategica importante!
+
+---
+
+## Sistema de Raridade dos Itens
+
+Os itens tem diferentes probabilidades de aparecer:
+
+| Item | Peso | Raridade |
+|------|------|----------|
+| 🔍 Lupa | 15 | Comum |
+| 🍺 Cerveja | 15 | Comum |
+| 📱 Celular | 12 | Comum |
+| 🔄 Inversor | 10 | Medio |
+| ↩️ Inversor de Ordem | 10 | Medio |
+| 💊 Remedio Vencido | 8 | Medio |
+| ⛓️ Algemas | 8 | Raro |
+| 🚬 Cigarro | 8 | Raro |
+| 🪚 Serra | 7 | Raro |
+| 💉 Adrenalina | 7 | Raro |
 
 ---
 

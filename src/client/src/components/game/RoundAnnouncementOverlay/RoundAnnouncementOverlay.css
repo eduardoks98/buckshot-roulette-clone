@@ -68,6 +68,89 @@
   margin: 1rem 0;
 }
 
+.cylinder-wrapper {
+  position: relative;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+/* ==========================================
+   FLYING SHELL - Shell flying into cylinder
+   ========================================== */
+
+.flying-shell {
+  position: absolute;
+  bottom: -100px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 18px;
+  height: 36px;
+  z-index: 10;
+  animation: fly-to-cylinder 0.35s ease-out forwards;
+}
+
+.flying-shell-body {
+  width: 100%;
+  height: 100%;
+  border-radius: 4px 4px 9px 9px;
+  position: relative;
+}
+
+.flying-shell-tip {
+  position: absolute;
+  top: 3px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 6px;
+  height: 4px;
+  border-radius: 3px 3px 0 0;
+  background: rgba(255, 255, 255, 0.6);
+}
+
+.flying-shell.live .flying-shell-body {
+  background: linear-gradient(180deg,
+    #fca5a5 0%,
+    #ef4444 20%,
+    #dc2626 50%,
+    #b91c1c 100%
+  );
+  box-shadow:
+    0 0 20px rgba(239, 68, 68, 0.8),
+    0 0 40px rgba(239, 68, 68, 0.4);
+}
+
+.flying-shell.blank .flying-shell-body {
+  background: linear-gradient(180deg,
+    #93c5fd 0%,
+    #3b82f6 20%,
+    #2563eb 50%,
+    #1d4ed8 100%
+  );
+  box-shadow:
+    0 0 20px rgba(59, 130, 246, 0.8),
+    0 0 40px rgba(59, 130, 246, 0.4);
+}
+
+@keyframes fly-to-cylinder {
+  0% {
+    transform: translateX(-50%) translateY(0) scale(1) rotate(0deg);
+    opacity: 1;
+  }
+  40% {
+    transform: translateX(-50%) translateY(-60px) scale(0.9) rotate(-5deg);
+    opacity: 1;
+  }
+  70% {
+    transform: translateX(-50%) translateY(-100px) scale(0.7) rotate(5deg);
+    opacity: 0.9;
+  }
+  100% {
+    transform: translateX(-50%) translateY(-130px) scale(0.3) rotate(0deg);
+    opacity: 0;
+  }
+}
+
 /* ==========================================
    SHELLS QUEUE - Shells waiting to be loaded
    ========================================== */
@@ -133,24 +216,11 @@
     inset 0 2px 4px rgba(255, 255, 255, 0.3);
 }
 
-/* Shell being loaded - animate into cylinder */
-.shell-to-load.loading {
-  animation: shell-load-into-cylinder 0.3s ease-in forwards;
-}
-
-@keyframes shell-load-into-cylinder {
-  0% {
-    transform: translateY(0) scale(1);
-    opacity: 1;
-  }
-  50% {
-    transform: translateY(-80px) scale(0.8);
-    opacity: 0.8;
-  }
-  100% {
-    transform: translateY(-120px) scale(0.3);
-    opacity: 0;
-  }
+/* Shell currently flying - hide from queue */
+.shell-to-load.flying {
+  opacity: 0;
+  transform: scale(0.5);
+  transition: all 0.15s ease-out;
 }
 
 /* Shell already loaded - hidden */
@@ -248,6 +318,21 @@
 @keyframes loading-pulse {
   0%, 100% { opacity: 0.5; }
   50% { opacity: 1; }
+}
+
+.spinning-text {
+  font-size: 1.2rem;
+  color: var(--gold-accent, #d4a418);
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  animation: spinning-pulse 0.5s ease-in-out infinite;
+  text-shadow: 0 0 15px rgba(212, 164, 24, 0.5);
+}
+
+@keyframes spinning-pulse {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.05); }
 }
 
 .ready-text {

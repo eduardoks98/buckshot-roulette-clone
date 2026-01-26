@@ -340,13 +340,13 @@
     font-size: 0.85rem;
   }
 
-  .app-header__online span:not(.online-dot) {
+  .app-header__online .online-label {
     display: none;
   }
 
   .app-header__online {
-    padding: 0.4rem;
-    min-width: 28px;
+    padding: 0.4rem 0.6rem;
+    min-width: auto;
     justify-content: center;
   }
 

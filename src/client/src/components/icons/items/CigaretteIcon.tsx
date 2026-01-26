@@ -7,35 +7,67 @@ export function CigaretteIcon({ size, color = DEFAULT_ICON_COLOR, className, sty
       width={s}
       height={s}
       viewBox="0 0 24 24"
-      fill={color}
+      fill="none"
       className={className}
       style={style}
       aria-hidden={!title}
       role={title ? 'img' : undefined}
     >
       {title && <title>{title}</title>}
-      {/* Cigarro */}
-      <rect x="4" y="14" width="14" height="4" rx="1" fill={color} opacity="0.9" />
-      {/* Filtro */}
-      <rect x="14" y="14" width="4" height="4" rx="0.5" fill={color} opacity="0.6" />
-      {/* Ponta acesa */}
-      <rect x="2" y="14" width="2" height="4" rx="0.5" fill="#ef4444" />
-      {/* Fumaca */}
+
+      {/* Cigarro - corpo principal (branco/claro) */}
+      <rect
+        x="2"
+        y="14"
+        width="14"
+        height="4"
+        rx="1"
+        fill={color}
+      />
+
+      {/* Filtro - parte mais escura */}
+      <rect
+        x="16"
+        y="14"
+        width="6"
+        height="4"
+        rx="1"
+        fill="#1a1a1a"
+      />
+      <rect
+        x="16"
+        y="14"
+        width="6"
+        height="4"
+        rx="1"
+        fill={color}
+        opacity="0.4"
+      />
+
+      {/* Ponta acesa - brasa vermelha */}
+      <rect
+        x="0"
+        y="14"
+        width="3"
+        height="4"
+        rx="1"
+        fill="#ef4444"
+      />
+
+      {/* Fumaca - curvas grossas visiveis */}
       <path
-        d="M3 12c0-2 1.5-2 1.5-4s-1-2-1-4"
+        d="M3 12 Q5 10, 3 7 Q1 4, 3 1"
         fill="none"
         stroke={color}
-        strokeWidth="1.2"
+        strokeWidth="2"
         strokeLinecap="round"
-        opacity="0.5"
       />
       <path
-        d="M6 11c0-1.5 1-1.5 1-3s-0.8-1.5-0.8-3"
+        d="M7 11 Q9 8, 7 5 Q5 2, 7 0"
         fill="none"
         stroke={color}
-        strokeWidth="1"
+        strokeWidth="1.5"
         strokeLinecap="round"
-        opacity="0.4"
       />
     </svg>
   );

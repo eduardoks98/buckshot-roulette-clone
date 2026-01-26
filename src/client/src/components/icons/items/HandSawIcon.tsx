@@ -7,35 +7,37 @@ export function HandSawIcon({ size, color = DEFAULT_ICON_COLOR, className, style
       width={s}
       height={s}
       viewBox="0 0 24 24"
-      fill={color}
+      fill="none"
       className={className}
       style={style}
       aria-hidden={!title}
       role={title ? 'img' : undefined}
     >
       {title && <title>{title}</title>}
-      {/* Lamina */}
+
+      {/* Lamina da serra */}
       <path
-        d="M4 8h14l2 4H4V8z"
+        d="M1 8 L15 6 L17 10 L1 13 Z"
         fill={color}
-        opacity="0.9"
       />
-      {/* Dentes da serra */}
+
+      {/* Dentes da serra - triangulos grandes e visiveis */}
       <path
-        d="M4 12l1.5-2 1.5 2 1.5-2 1.5 2 1.5-2 1.5 2 1.5-2 1.5 2 1.5-2 1.5 2"
+        d="M1 13 L3 9 L5 13 L7 9 L9 13 L11 9 L13 13 L15 9 L17 13"
         fill="none"
         stroke={color}
-        strokeWidth="1.5"
+        strokeWidth="2"
         strokeLinejoin="round"
       />
-      {/* Cabo */}
+
+      {/* Cabo da serra */}
       <path
-        d="M18 8v8a2 2 0 002 2h1a1 1 0 001-1v-4a1 1 0 00-1-1h-1V8"
+        d="M15 6 L19 5 Q22 5, 22 8 L22 14 Q22 17, 19 17 L15 16 Z"
         fill={color}
-        opacity="0.7"
       />
-      {/* Detalhe do cabo */}
-      <rect x="19" y="10" width="2" height="6" rx="0.5" fill={color} opacity="0.5" />
+
+      {/* Buraco no cabo - area escura */}
+      <ellipse cx="18.5" cy="11" rx="2" ry="3" fill="#1a1a1a" />
     </svg>
   );
 }

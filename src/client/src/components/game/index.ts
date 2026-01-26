@@ -17,5 +17,7 @@ export type {
   ShotResult,
   RoundAnnouncement,
   StealModalData,
+  ItemActionModal,
+  TurnDirection,
   GameBoardProps,
 } from './GameBoard/GameBoard';

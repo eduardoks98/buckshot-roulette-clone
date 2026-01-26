@@ -7,33 +7,41 @@ export function InverterIcon({ size, color = DEFAULT_ICON_COLOR, className, styl
       width={s}
       height={s}
       viewBox="0 0 24 24"
-      fill={color}
+      fill="none"
       className={className}
       style={style}
       aria-hidden={!title}
       role={title ? 'img' : undefined}
     >
       {title && <title>{title}</title>}
-      {/* Seta circular superior */}
+
+      {/* Seta superior - sentido horario */}
       <path
-        d="M12 4a8 8 0 016.93 4"
+        d="M12 2 A10 10 0 0 1 22 12"
         fill="none"
         stroke={color}
-        strokeWidth="2.5"
+        strokeWidth="3"
         strokeLinecap="round"
       />
-      <polygon points="20 6 18 10 16 6" fill={color} />
-      {/* Seta circular inferior */}
+
+      {/* Ponta da seta superior */}
+      <polygon points="22 8 22 14 18 11" fill={color} />
+
+      {/* Seta inferior - sentido anti-horario */}
       <path
-        d="M12 20a8 8 0 01-6.93-4"
+        d="M12 22 A10 10 0 0 1 2 12"
         fill="none"
         stroke={color}
-        strokeWidth="2.5"
+        strokeWidth="3"
         strokeLinecap="round"
       />
-      <polygon points="4 18 6 14 8 18" fill={color} />
-      {/* Centro */}
-      <circle cx="12" cy="12" r="2" fill={color} opacity="0.5" />
+
+      {/* Ponta da seta inferior */}
+      <polygon points="2 16 2 10 6 13" fill={color} />
+
+      {/* Centro - circulo */}
+      <circle cx="12" cy="12" r="3" fill={color} />
+      <circle cx="12" cy="12" r="1.5" fill="#1a1a1a" />
     </svg>
   );
 }

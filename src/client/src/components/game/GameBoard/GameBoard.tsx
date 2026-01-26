@@ -71,6 +71,18 @@ export interface StealModalData {
   items: GameItem[];
 }
 
+export interface ItemActionModal {
+  itemId: string;
+  emoji: string;
+  name: string;
+  playerName: string;
+  message: string;
+  result?: 'success' | 'fail';
+  extraInfo?: string;
+}
+
+export type TurnDirection = 1 | -1;
+
 export interface GameBoardProps {
   // Game State
   round: number;
@@ -95,7 +107,11 @@ export interface GameBoardProps {
   roundAnnouncement: RoundAnnouncement | null;
   lastShotResult: ShotResult | null;
   stealModalData: StealModalData | null;
+  itemActionModal: ItemActionModal | null;
   gameOverData: React.ReactNode | null;
+
+  // Direction
+  turnDirection?: TurnDirection;
 
   // Animations
   shotAnimation: 'live' | 'blank' | null;
@@ -117,13 +133,32 @@ export interface GameBoardProps {
 }
 
 // ========================================
+// HELPER: Item Colors Map
+// ========================================
+
+const ITEM_COLORS: Record<string, string> = {
+  magnifying_glass: '#4169e1', // Azul - informacao
+  beer: '#d4a418',             // Dourado - cerveja
+  cigarettes: '#4ade80',       // Verde - cura
+  handcuffs: '#a0a0a0',        // Prata - metal
+  hand_saw: '#e63946',         // Vermelho - perigo
+  phone: '#22d3d4',            // Ciano - tecnologia
+  inverter: '#a855f7',         // Roxo - inversao
+  adrenaline: '#ec4899',       // Pink - energia
+  expired_medicine: '#f97316', // Laranja - risco
+  turn_reverser: '#38bdf8',    // Azul claro - ordem
+};
+
+// ========================================
 // HELPER: Render Item Icon
 // ========================================
 
 function ItemIcon({ item, size = 20 }: { item: GameItem; size?: number }) {
   const IconComponent = ITEM_ICONS[item.id as ItemIconId];
+  const itemColor = ITEM_COLORS[item.id] || 'var(--gold-accent, #d4a418)';
+
   if (IconComponent) {
-    return <IconComponent size={size} color="var(--gold-accent, #d4a418)" />;
+    return <IconComponent size={size} color={itemColor} />;
   }
   // Fallback to emoji if no icon found
   return <span style={{ fontSize: size * 0.8 }}>{item.emoji}</span>;
@@ -176,7 +211,9 @@ export default function GameBoard({
   roundAnnouncement,
   lastShotResult,
   stealModalData,
+  itemActionModal,
   gameOverData,
+  turnDirection = 1,
   shotAnimation,
   damagedPlayerId,
   healedPlayerId,
@@ -195,8 +232,9 @@ export default function GameBoard({
     return roundAnnouncement !== null ||
            lastShotResult !== null ||
            gameOverData !== null ||
-           stealModalData !== null;
-  }, [roundAnnouncement, lastShotResult, gameOverData, stealModalData]);
+           stealModalData !== null ||
+           itemActionModal !== null;
+  }, [roundAnnouncement, lastShotResult, gameOverData, stealModalData, itemActionModal]);
 
   const canAct = isMyTurn && !hasActiveOverlay;
 
@@ -208,7 +246,7 @@ export default function GameBoard({
         <div className="shells-info">
           <span className="shells-remaining">{shells.total} CARTUCHOS</span>
         </div>
-        {turnTimer !== undefined && isMyTurn && (
+        {turnTimer !== undefined && (
           <div className={`turn-timer ${turnTimer <= 10 ? 'warning' : turnTimer <= 30 ? 'caution' : ''}`}>
             {turnTimer}s
           </div>
@@ -221,15 +259,6 @@ export default function GameBoard({
         <div className="game-message">{message}</div>
       )}
 
-      {/* ========== REVEALED SHELL (Magnifying Glass) ========== */}
-      {revealedShell && !gameOverData && (
-        <div className={`revealed-shell ${revealedShell}`}>
-          <span className="revealed-shell__icon">
-            {revealedShell === 'live' ? <ShellLiveIcon size={24} /> : <ShellBlankIcon size={24} />}
-          </span>
-          Proximo cartucho: {revealedShell === 'live' ? 'VIVA' : 'VAZIA'}
-        </div>
-      )}
 
       {/* ========== OPPONENTS AREA ========== */}
       <div className="opponents-area">
@@ -286,6 +315,14 @@ export default function GameBoard({
           shotResult={shotAnimation}
           size="md"
         />
+
+        {/* Direction Indicator */}
+        <div className={`direction-indicator ${turnDirection === 1 ? 'clockwise' : 'counter-clockwise'}`}>
+          <span className="direction-label">Ordem</span>
+          <span className="direction-arrow">
+            {turnDirection === 1 ? '→' : '←'}
+          </span>
+        </div>
 
         {/* Shoot buttons */}
         {isMyTurn && !hasActiveOverlay && selectedTarget && (
@@ -448,6 +485,32 @@ export default function GameBoard({
             <button className="steal-cancel-btn" onClick={onCancelSteal}>
               Cancelar
             </button>
+          </div>
+        </div>
+      )}
+
+      {/* ========== ITEM ACTION MODAL ========== */}
+      {itemActionModal && !gameOverData && (
+        <div className="item-action-overlay">
+          <div className={`item-action-modal ${itemActionModal.result || ''}`}>
+            <div className="item-action-emoji">
+              {(() => {
+                const IconComponent = ITEM_ICONS[itemActionModal.itemId as ItemIconId];
+                const itemColor = ITEM_COLORS[itemActionModal.itemId] || 'var(--gold-accent)';
+                return IconComponent ? (
+                  <IconComponent size={64} color={itemColor} />
+                ) : (
+                  itemActionModal.emoji
+                );
+              })()}
+            </div>
+            <div className="item-action-name">{itemActionModal.name}</div>
+            <div className="item-action-player">{itemActionModal.playerName}</div>
+            {itemActionModal.extraInfo && (
+              <div className={`item-action-extra ${itemActionModal.extraInfo.includes('LIVE') || itemActionModal.extraInfo.includes('VIVA') ? 'live' : 'blank'}`}>
+                {itemActionModal.extraInfo}
+              </div>
+            )}
           </div>
         </div>
       )}

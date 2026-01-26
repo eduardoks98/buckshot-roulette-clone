@@ -14,7 +14,7 @@ import { GAME_RULES } from '../../../../shared/constants';
 // TYPES
 // ==========================================
 
-interface Room {
+export interface Room {
   code: string;
   host: string;
   hostName: string;
@@ -87,6 +87,7 @@ export interface Player {
   disconnectTime: number | null;
   reconnectToken: string | null;
   originalSocketId: string | null;
+  odUserId: string | null; // ID do usuário autenticado (para validar múltiplas abas)
   stats: PlayerStats;
 }
 
@@ -99,9 +100,13 @@ export class RoomService {
 
   // Callbacks para comunicação com handlers
   onGameCancelled?: (roomCode: string) => void;
-  onPlayerWonByDefault?: (roomCode: string, player: Player) => void;
+  onPlayerWonByDefault?: (roomCode: string, player: Player, room: Room) => void;
   onPlayerEliminated?: (roomCode: string, player: Player) => void;
   onRoomDeleted?: (roomCode: string) => void; // Called when room is deleted after grace period
+  onPlayerLeft?: (roomCode: string, players: PlayerPublicState[]) => void; // Called when player leaves/timeout in WaitingRoom
+  onHostChanged?: (roomCode: string, newHostName: string) => void; // Called when host changes
+  onPlayerDisconnected?: (roomCode: string, playerId: string, playerName: string) => void; // Called when player temporarily disconnects
+  onPlayerReconnected?: (roomCode: string, playerId: string, newSocketId: string, playerName: string) => void; // Called when player reconnects
 
   // ==========================================
   // HELPERS
@@ -121,7 +126,7 @@ export class RoomService {
            Math.random().toString(36).substring(2, 15);
   }
 
-  private createPlayer(socketId: string, name: string): Player {
+  private createPlayer(socketId: string, name: string, odUserId?: string): Player {
     return {
       id: socketId,
       name,
@@ -138,6 +143,7 @@ export class RoomService {
       disconnectTime: null,
       reconnectToken: null,
       originalSocketId: null,
+      odUserId: odUserId || null,
       stats: {
         damageDealt: 0,
         damageTaken: 0,
@@ -200,6 +206,17 @@ export class RoomService {
     return null;
   }
 
+  // Busca sala onde um usuário autenticado (por odUserId) está jogando
+  private findRoomByUserId(userId: string): { code: string; room: Room; player: Player } | null {
+    for (const [code, room] of this.rooms) {
+      const player = room.players.find(p => p.odUserId === userId);
+      if (player) {
+        return { code, room, player };
+      }
+    }
+    return null;
+  }
+
   // ==========================================
   // PUBLIC METHODS
   // ==========================================
@@ -207,7 +224,8 @@ export class RoomService {
   createRoom(
     hostSocketId: string,
     hostName: string,
-    password?: string
+    password?: string,
+    odUserId?: string
   ): { room: Room; players: PlayerPublicState[] } {
     let code = this.generateRoomCode();
     while (this.rooms.has(code)) {
@@ -219,7 +237,7 @@ export class RoomService {
       host: hostSocketId,
       hostName,
       password: password || null,
-      players: [this.createPlayer(hostSocketId, hostName)],
+      players: [this.createPlayer(hostSocketId, hostName, odUserId)],
       started: false,
       currentRound: 1,
       turnDirection: 1,
@@ -246,15 +264,51 @@ export class RoomService {
     code: string,
     socketId: string,
     playerName: string,
-    password?: string
-  ): { room: Room; players: PlayerPublicState[] } | { error: string } {
+    password?: string,
+    odUserId?: string
+  ): { room: Room; players: PlayerPublicState[]; isReconnect?: boolean } | { error: string } {
     const room = this.rooms.get(code);
 
     if (!room) return { error: 'Sala não encontrada' };
     if (room.started) return { error: 'Jogo já iniciado' };
-    if (room.players.length >= GAME_RULES.MAX_PLAYERS) {
+
+    // Verificar se é reconexão (jogador desconectado voltando)
+    const disconnectedPlayer = room.players.find(
+      p => p.disconnected && p.name === playerName
+    );
+
+    if (disconnectedPlayer) {
+      // Reconexão - restaurar jogador
+      const oldSocketId = disconnectedPlayer.id;
+      disconnectedPlayer.id = socketId;
+      disconnectedPlayer.disconnected = false;
+      disconnectedPlayer.disconnectTime = null;
+      // Manter originalSocketId para o timeout check poder ignorar
+
+      // Se era o host, atualizar room.host para o novo socket.id
+      if (room.host === oldSocketId) {
+        room.host = socketId;
+        console.log(`[Room] Host ${playerName} reconectou - atualizando room.host para ${socketId}`);
+      }
+
+      console.log(`[Room] ${playerName} reconectou à sala ${code}`);
+
+      // Emitir evento de reconexão
+      this.onPlayerReconnected?.(code, oldSocketId, socketId, playerName);
+
+      return {
+        room,
+        players: room.players.map(p => this.toPublicPlayer(p)),
+        isReconnect: true,
+      };
+    }
+
+    // Verificar se sala está cheia (contando apenas jogadores NÃO-desconectados como ocupando vagas)
+    const activePlayersCount = room.players.filter(p => !p.disconnected).length;
+    if (activePlayersCount >= GAME_RULES.MAX_PLAYERS) {
       return { error: `Sala cheia (máx. ${GAME_RULES.MAX_PLAYERS} jogadores)` };
     }
+
     if (room.players.find(p => p.id === socketId)) {
       return { error: 'Já está na sala' };
     }
@@ -269,7 +323,7 @@ export class RoomService {
       room.emptyRoomTimeout = null;
     }
 
-    room.players.push(this.createPlayer(socketId, playerName));
+    room.players.push(this.createPlayer(socketId, playerName, odUserId));
 
     return {
       room,
@@ -283,25 +337,69 @@ export class RoomService {
     players: PlayerPublicState[];
     deleted: boolean;
     gracePeriodStarted: boolean;
+    playerName?: string;
+    gameInProgress?: boolean;
+    winner?: Player;
   } | null {
     const found = this.findRoomByPlayer(socketId);
     if (!found) return null;
 
     const { code, room } = found;
+    const player = room.players.find(p => p.id === socketId);
+
+    if (!player) return null;
+
+    const playerName = player.name;
+
+    // Se jogo está em andamento, tratar como desistência
+    if (room.started) {
+      console.log(`[Room] ${playerName} desistiu da partida em ${code}`);
+
+      // Marcar jogador como morto (desistiu)
+      player.alive = false;
+      player.disconnected = false;
+
+      // Verificar se TODOS jogadores estão mortos
+      const alivePlayers = room.players.filter(p => p.alive);
+
+      if (alivePlayers.length === 0) {
+        // Todos desistiram - cancelar jogo
+        console.log(`[Room] Todos jogadores abandonaram - cancelando jogo ${code}`);
+        this.onGameCancelled?.(code);
+        this.rooms.delete(code);
+        return { code, room, players: [], deleted: true, gracePeriodStarted: false, playerName, gameInProgress: true };
+      }
+
+      if (alivePlayers.length === 1) {
+        // Sobrou 1 jogador - ele vence!
+        const winner = alivePlayers[0];
+        console.log(`[Room] ${winner.name} venceu por WO (${playerName} desistiu) na sala ${code}`);
+        this.onPlayerWonByDefault?.(code, winner, room);
+        this.rooms.delete(code);
+        return { code, room, players: room.players.map(p => this.toPublicPlayer(p)), deleted: true, gracePeriodStarted: false, playerName, gameInProgress: true, winner };
+      }
+
+      // Ainda tem mais de 1 jogador vivo - continuar jogo
+      // Emitir evento de eliminação para o jogador que desistiu
+      this.onPlayerEliminated?.(code, player);
+
+      return {
+        code,
+        room,
+        players: room.players.map(p => this.toPublicPlayer(p)),
+        deleted: false,
+        gracePeriodStarted: false,
+        playerName,
+        gameInProgress: true,
+      };
+    }
+
+    // Jogo não começou (WaitingRoom) - remover jogador normalmente
     const playerIndex = room.players.findIndex(p => p.id === socketId);
-
-    if (playerIndex === -1) return null;
-
     room.players.splice(playerIndex, 1);
 
     // Se não há mais jogadores
     if (room.players.length === 0) {
-      // Se o jogo já começou, deletar imediatamente
-      if (room.started) {
-        this.rooms.delete(code);
-        return { code, room, players: [], deleted: true, gracePeriodStarted: false };
-      }
-
       // Waiting room vazia - iniciar grace period de 60s
       console.log(`[Room] Sala ${code} está vazia - iniciando grace period de 60s`);
       room.emptyRoomTimeout = setTimeout(() => {
@@ -314,7 +412,7 @@ export class RoomService {
         }
       }, 60000); // 60 segundos
 
-      return { code, room, players: [], deleted: false, gracePeriodStarted: true };
+      return { code, room, players: [], deleted: false, gracePeriodStarted: true, playerName };
     }
 
     // Transferir host se necessário
@@ -329,6 +427,7 @@ export class RoomService {
       players: room.players.map(p => this.toPublicPlayer(p)),
       deleted: false,
       gracePeriodStarted: false,
+      playerName,
     };
   }
 
@@ -387,6 +486,7 @@ export class RoomService {
     gameInProgress: boolean;
     playerName: string;
     newHost?: string;
+    playerDisconnected?: boolean; // true se desconexão temporária (grace period)
   } | null {
     const found = this.findRoomByPlayer(socketId);
     console.log(`[RoomService] handleDisconnect - socketId: ${socketId}, found:`, found ? { code: found.code, started: found.room.started, playersCount: found.room.players.length } : null);
@@ -402,25 +502,33 @@ export class RoomService {
     let newHost: string | undefined;
 
     console.log(`[RoomService] handleDisconnect - room.started: ${room.started}`);
-    // Se jogo não começou, remover jogador normalmente
-    if (!room.started) {
-      const result = this.leaveRoom(socketId);
-      if (!result) return null;
 
-      if (room.host !== socketId && room.players.length > 0) {
-        // Host não mudou
-      } else if (room.players.length > 0) {
-        newHost = room.players[0].name;
-      }
+    // Se jogo não começou (WaitingRoom), usar grace period de 10s
+    if (!room.started) {
+      // Marcar jogador como desconectado (vaga reservada por 10s)
+      player.disconnected = true;
+      player.disconnectTime = Date.now();
+      player.originalSocketId = socketId;
+
+      console.log(`[Room] ${playerName} desconectou da WaitingRoom - vaga reservada por 10s`);
+
+      // Emitir evento de desconexão temporária
+      this.onPlayerDisconnected?.(code, socketId, playerName);
+
+      // Grace period de 10s para reconexão na WaitingRoom
+      const WAITING_ROOM_GRACE_MS = 10000;
+      setTimeout(() => {
+        this.checkWaitingRoomReconnect(code, socketId);
+      }, WAITING_ROOM_GRACE_MS);
 
       return {
         code,
         room,
-        players: result.players,
-        deleted: result.deleted,
+        players: room.players.map(p => this.toPublicPlayer(p)),
+        deleted: false,
         gameInProgress: false,
         playerName,
-        newHost,
+        playerDisconnected: true, // Indica desconexão temporária (não remoção)
       };
     }
 
@@ -473,13 +581,58 @@ export class RoomService {
     if (alivePlayers.length === 1) {
       // Único jogador restante vence
       console.log(`[Room] ${alivePlayers[0].name} venceu por WO na sala ${roomCode}`);
-      this.onPlayerWonByDefault?.(roomCode, alivePlayers[0]);
+      this.onPlayerWonByDefault?.(roomCode, alivePlayers[0], room);
       this.rooms.delete(roomCode);
       return;
     }
 
     // Emitir evento de eliminação
     this.onPlayerEliminated?.(roomCode, player);
+  }
+
+  // Check if player reconnected to WaitingRoom within grace period
+  private checkWaitingRoomReconnect(roomCode: string, originalSocketId: string): void {
+    const room = this.rooms.get(roomCode);
+    if (!room) return;
+
+    // Encontrar jogador pelo originalSocketId
+    const player = room.players.find(p => p.originalSocketId === originalSocketId);
+    if (!player || !player.disconnected) {
+      // Jogador já reconectou ou foi removido
+      console.log(`[Room] Grace period expirou mas jogador já reconectou ou foi removido`);
+      return;
+    }
+
+    // Não reconectou em 10s - remover da sala
+    console.log(`[Room] ${player.name} não reconectou em 10s - removendo da sala ${roomCode}`);
+
+    // Guardar info antes de remover
+    const wasHost = room.host === originalSocketId;
+
+    // Remover jogador da lista
+    room.players = room.players.filter(p => p.originalSocketId !== originalSocketId);
+
+    // Se era host e ainda tem jogadores, passar para o próximo
+    if (wasHost && room.players.length > 0) {
+      room.host = room.players[0].id;
+      room.hostName = room.players[0].name;
+      console.log(`[Room] Novo host: ${room.players[0].name}`);
+      this.onHostChanged?.(roomCode, room.players[0].name);
+    }
+
+    // Se sala ficou vazia, iniciar grace period de 60s para deletar
+    if (room.players.length === 0) {
+      console.log(`[Room] Sala ${roomCode} está vazia - iniciando grace period de 60s`);
+      room.emptyRoomTimeout = setTimeout(() => {
+        if (this.rooms.has(roomCode)) {
+          this.rooms.delete(roomCode);
+          this.onRoomDeleted?.(roomCode);
+        }
+      }, 60000);
+    } else {
+      // Notificar que jogador saiu definitivamente
+      this.onPlayerLeft?.(roomCode, room.players.map(p => this.toPublicPlayer(p)));
+    }
   }
 
   reconnectPlayer(
@@ -533,5 +686,9 @@ export class RoomService {
 
   getRoomByPlayer(playerId: string): { code: string; room: Room } | null {
     return this.findRoomByPlayer(playerId);
+  }
+
+  getRoomByUserId(userId: string): { code: string; room: Room; player: Player } | null {
+    return this.findRoomByUserId(userId);
   }
 }

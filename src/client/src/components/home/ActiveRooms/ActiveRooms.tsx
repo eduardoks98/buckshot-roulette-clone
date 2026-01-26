@@ -141,6 +141,43 @@ export function ActiveRooms() {
       localStorage.removeItem('bangshotSession');
     };
 
+    // Listener para quando usuário já está em um jogo (outra aba ou F5)
+    const handleAlreadyInGame = (data: { roomCode: string; gameStarted: boolean }) => {
+      console.log('[ActiveRooms] alreadyInGame:', data);
+      setCreating(false);
+      setJoining(false);
+
+      if (data.gameStarted) {
+        // Jogo em andamento - tentar reconectar
+        const reconnectData = localStorage.getItem('bangshotReconnect');
+        if (reconnectData) {
+          try {
+            const parsed = JSON.parse(reconnectData);
+            if (parsed.roomCode === data.roomCode) {
+              // Temos token de reconexão - usar
+              socket.emit('reconnectToGame', {
+                roomCode: parsed.roomCode,
+                playerName: parsed.playerName,
+                reconnectToken: parsed.reconnectToken,
+              });
+              return;
+            }
+          } catch {
+            // Ignora erro de parse
+          }
+        }
+        // Sem token válido - redirecionar para game e deixar reconectar via socket
+        navigate('/multiplayer/game', {
+          state: { roomCode: data.roomCode, needsReconnect: true },
+        });
+      } else {
+        // Ainda na waiting room - redirecionar
+        navigate('/multiplayer/room', {
+          state: { roomCode: data.roomCode, fromAlreadyInGame: true },
+        });
+      }
+    };
+
     socket.on('roomList', handleRoomList);
     socket.on('roomListUpdated', handleRoomListUpdated);
     socket.on('roomDeleted', handleRoomDeleted);
@@ -149,6 +186,7 @@ export function ActiveRooms() {
     socket.on('roomJoined', handleRoomJoined);
     socket.on('joinError', handleJoinError);
     socket.on('leftRoom', handleLeftRoom);
+    socket.on('alreadyInGame', handleAlreadyInGame);
 
     // Solicitar lista inicial
     socket.emit('listRooms');
@@ -167,6 +205,7 @@ export function ActiveRooms() {
       socket.off('roomJoined', handleRoomJoined);
       socket.off('joinError', handleJoinError);
       socket.off('leftRoom', handleLeftRoom);
+      socket.off('alreadyInGame', handleAlreadyInGame);
       clearInterval(interval);
     };
   }, [socket, isConnected, navigate, user]);

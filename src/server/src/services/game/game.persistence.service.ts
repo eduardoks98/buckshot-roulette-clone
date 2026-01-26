@@ -96,18 +96,42 @@ export class GamePersistenceService {
     }
   }
 
-  // Add a participant to the game
+  // Add a participant to the game (or update if already exists)
   async addParticipant(params: AddParticipantParams): Promise<string | null> {
     try {
+      // Para usuários logados, usar upsert para evitar erro de constraint
+      if (params.userId) {
+        const participant = await prisma.gameParticipant.upsert({
+          where: {
+            game_id_user_id: {
+              game_id: params.gameId,
+              user_id: params.userId,
+            },
+          },
+          create: {
+            game_id: params.gameId,
+            user_id: params.userId,
+            guest_name: null,
+          },
+          update: {
+            // Nada a atualizar - apenas evita erro de constraint na reconexão
+          },
+        });
+
+        console.log(`[DB] Participante adicionado/atualizado: ${participant.id}`);
+        return participant.id;
+      }
+
+      // Para guests, usar create normal (não têm user_id para constraint)
       const participant = await prisma.gameParticipant.create({
         data: {
           game_id: params.gameId,
-          user_id: params.userId || null,
-          guest_name: params.userId ? null : params.guestName,
+          user_id: null,
+          guest_name: params.guestName,
         },
       });
 
-      console.log(`[DB] Participante adicionado: ${participant.id}`);
+      console.log(`[DB] Participante guest adicionado: ${participant.id}`);
       return participant.id;
     } catch (error) {
       console.error('[DB] Erro ao adicionar participante:', error);

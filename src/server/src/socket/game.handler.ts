@@ -84,6 +84,7 @@ export function registerGameHandlers(
         currentPlayer: nextPlayerId,
         reason: 'shot',
         players: room.players.map(p => gameService.toPublicPlayer(p)),
+        turnStartTime: room.turnStartTime!,
       });
 
       console.log(`[Game] ${socket.id} atirou em ${targetId} - ${result.shell}`);
@@ -165,6 +166,7 @@ export function registerGameHandlers(
                     currentPlayer: nextPlayerId,
                     reason: 'elimination',
                     players: room.players.map(p => gameService.toPublicPlayer(p)),
+                    turnStartTime: room.turnStartTime!,
                   });
                 }
               }
@@ -205,6 +207,7 @@ export function registerGameHandlers(
               currentPlayer: nextPlayerId,
               reason: 'elimination',
               players: room.players.map(p => gameService.toPublicPlayer(p)),
+              turnStartTime: room.turnStartTime!,
             });
           }
         }
@@ -665,6 +668,7 @@ function handleTurnTimeout(
     currentPlayer: nextPlayerId,
     reason: 'timeout',
     players: room.players.map(p => gameService.toPublicPlayer(p as never)),
+    turnStartTime: room.turnStartTime!,
   });
 }
 

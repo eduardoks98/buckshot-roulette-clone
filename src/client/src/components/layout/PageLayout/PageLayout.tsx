@@ -42,6 +42,7 @@ export function InlineAd({ position = 'inline-top' }: { position?: 'inline-top' 
 interface PageLayoutProps {
   children: React.ReactNode;
   title?: string;
+  onBack?: () => void;
   showHeader?: boolean;
   showFooter?: boolean;
   showSideAds?: boolean;
@@ -50,6 +51,7 @@ interface PageLayoutProps {
 export function PageLayout({
   children,
   title,
+  onBack,
   showHeader = true,
   showFooter = true,
   showSideAds = true,
@@ -59,7 +61,7 @@ export function PageLayout({
       {showHeader && <Header />}
 
       {/* ===== BREADCRUMB (full width) ===== */}
-      {title && <PageHeader title={title} />}
+      {title && <PageHeader title={title} onBack={onBack} />}
 
       {/* ===== MAIN BODY WITH SIDE ADS ===== */}
       <div className="page-body">

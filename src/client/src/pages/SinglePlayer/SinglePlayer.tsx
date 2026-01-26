@@ -839,6 +839,7 @@ export default function SinglePlayer() {
         roundAnnouncement={roundAnnouncement}
         lastShotResult={lastShotResult}
         stealModalData={stealModalData}
+        itemActionModal={null}
         gameOverData={gameOverData ? (
           <div className="game-over-overlay">
             <div className="game-over-modal">

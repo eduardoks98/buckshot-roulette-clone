@@ -43,6 +43,13 @@ export default function Lobby() {
     }
   }, [isAuthenticated]);
 
+  // Carregar lista de salas quando conectar
+  useEffect(() => {
+    if (socket && isConnected) {
+      socket.emit('listRooms');
+    }
+  }, [socket, isConnected]);
+
   // Verificar se há jogo ativo para reconexão
   useEffect(() => {
     const saved = localStorage.getItem('bangshotReconnect');
@@ -108,6 +115,11 @@ export default function Lobby() {
       setRooms(roomList);
     });
 
+    // Quando a lista de salas é atualizada (jogador entrou/saiu de uma sala)
+    socket.on('roomListUpdated', () => {
+      socket.emit('listRooms');
+    });
+
     socket.on('joinError', (message) => {
       setError(message);
       setTimeout(() => setError(''), 3000);
@@ -135,13 +147,55 @@ export default function Lobby() {
       setTimeout(() => setError(''), 3000);
     });
 
+    // Evento: usuário já está em um jogo (abriu outra aba)
+    socket.on('alreadyInGame', (data) => {
+      console.log('Usuário já está em um jogo:', data.roomCode, 'gameStarted:', data.gameStarted);
+      if (data.gameStarted) {
+        // Jogo em andamento - tentar reconectar
+        const reconnectData = localStorage.getItem('bangshotReconnect');
+        if (reconnectData) {
+          try {
+            const parsed = JSON.parse(reconnectData);
+            if (parsed.roomCode === data.roomCode) {
+              // Temos token de reconexão - usar
+              socket.emit('reconnectToGame', {
+                roomCode: parsed.roomCode,
+                playerName: parsed.playerName,
+                reconnectToken: parsed.reconnectToken,
+              });
+              return;
+            }
+          } catch {
+            // Ignora erro de parse
+          }
+        }
+        // Sem token - redirecionar para game e deixar reconectar via socket
+        navigate('/multiplayer/game', {
+          state: {
+            roomCode: data.roomCode,
+            needsReconnect: true,
+          },
+        });
+      } else {
+        // Ainda na waiting room - redirecionar
+        navigate('/multiplayer/room', {
+          state: {
+            roomCode: data.roomCode,
+            fromAlreadyInGame: true,
+          },
+        });
+      }
+    });
+
     return () => {
       socket.off('roomCreated');
       socket.off('roomJoined');
       socket.off('roomList');
+      socket.off('roomListUpdated');
       socket.off('joinError');
       socket.off('reconnected');
       socket.off('reconnectError');
+      socket.off('alreadyInGame');
     };
   }, [socket, navigate]);
 

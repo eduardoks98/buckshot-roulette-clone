@@ -23,7 +23,7 @@ import { ItemId } from '../../../../../shared/types';
 import { getLevelInfo } from '../../../../../shared/utils/xpCalculator';
 import { BugReportModal, GameStateForReport } from '../../../components/common/BugReportModal';
 import { AchievementToast } from '../../../components/common';
-import { GameBoard, GamePlayer, GameItem, ShotResult, RoundAnnouncement, StealModalData } from '../../../components/game';
+import { GameBoard, GamePlayer, GameItem, ShotResult, RoundAnnouncement, StealModalData, ItemActionModal, TurnDirection } from '../../../components/game';
 import './MultiplayerGame.css';
 
 interface LocationState {
@@ -85,6 +85,8 @@ export default function MultiplayerGame() {
   const [unlockedAchievements, setUnlockedAchievements] = useState<AchievementUnlocked[]>([]);
   const [showBugReport, setShowBugReport] = useState(false);
   const [recentEvents, setRecentEvents] = useState<string[]>([]);
+  const [itemActionModal, setItemActionModal] = useState<ItemActionModal | null>(null);
+  const [turnDirection, setTurnDirection] = useState<TurnDirection>(1);
 
   // Disconnected players tracking for countdown
   const [disconnectedPlayers, setDisconnectedPlayers] = useState<{
@@ -111,8 +113,9 @@ export default function MultiplayerGame() {
     return roundAnnouncement !== null ||
            lastShotResult !== null ||
            gameOverData !== null ||
-           stealingFromPlayer !== null;
-  }, [roundAnnouncement, lastShotResult, gameOverData, stealingFromPlayer]);
+           stealingFromPlayer !== null ||
+           itemActionModal !== null;
+  }, [roundAnnouncement, lastShotResult, gameOverData, stealingFromPlayer, itemActionModal]);
 
   // Ref to access current overlay state in socket handlers
   const hasActiveOverlayRef = useRef(hasActiveOverlay);
@@ -230,6 +233,7 @@ export default function MultiplayerGame() {
       setSelectedTarget(null);
       setSelectedItem(null);
       setPlayerLastShell({});
+      setTurnDirection(data.turnDirection || 1);
 
       const overlayData: RoundAnnouncement = {
         round: data.round,
@@ -255,12 +259,21 @@ export default function MultiplayerGame() {
     });
 
     // Turn changed
-    socket.on('turnChanged', ({ currentPlayer, reason, players: updatedPlayers }) => {
+    socket.on('turnChanged', ({ currentPlayer, players: updatedPlayers, turnStartTime }) => {
       setCurrentPlayerId(currentPlayer);
       setRevealedShell(null);
       setSelectedTarget(null);
       setSelectedItem(null);
-      setTurnTimer(GAME_RULES.TIMERS.TURN_DURATION_MS / 1000);
+      setMessage(''); // Limpar mensagem anterior
+
+      // Calcular tempo restante baseado no timestamp do servidor
+      if (turnStartTime) {
+        const elapsed = Math.floor((Date.now() - turnStartTime) / 1000);
+        const remaining = Math.max(0, (GAME_RULES.TIMERS.TURN_DURATION_MS / 1000) - elapsed);
+        setTurnTimer(remaining);
+      } else {
+        setTurnTimer(GAME_RULES.TIMERS.TURN_DURATION_MS / 1000);
+      }
 
       if (updatedPlayers) {
         setPlayers(updatedPlayers);
@@ -268,11 +281,6 @@ export default function MultiplayerGame() {
         if (myData) {
           setMyItems(myData.items);
         }
-      }
-
-      const player = (updatedPlayers || players).find(p => p.id === currentPlayer);
-      if (reason && player) {
-        setMessage(`Turno de ${player.name} (${reason})`);
       }
     });
 
@@ -310,11 +318,8 @@ export default function MultiplayerGame() {
       setShells(data.shellsRemaining);
 
       if (data.shell === 'live') {
-        setMessage(`${shooterName} atirou em ${targetName}`);
         setDamagedPlayerId(data.target);
         setTimeout(() => setDamagedPlayerId(null), 600);
-      } else {
-        setMessage(`${shooterName} atirou em ${targetName}`);
       }
     });
 
@@ -322,25 +327,70 @@ export default function MultiplayerGame() {
     socket.on('itemUsed', (data: ItemUsedPayload) => {
       const userName = data.playerId === myId ? 'Você' : data.playerName;
       const item = ITEMS[data.itemId as ItemId];
+      const isMe = data.playerId === myId;
 
-      if (data.itemId === 'adrenaline' && data.stolenItem) {
-        const stolenFrom = data.playerId === myId ? data.targetName : userName;
-        const stolenBy = data.playerId === myId ? 'Você roubou' : `${userName} roubou`;
-        setMessage(`💉 ${stolenBy} ${data.stolenItem.emoji} ${data.stolenItem.name} de ${stolenFrom}!`);
-      } else {
-        setMessage(`${userName} usou ${item?.emoji} ${item?.name}`);
-      }
-
-      if (data.itemId === 'magnifying_glass' && data.revealedShell) {
-        if (data.playerId === myId) {
+      // Determinar informação extra baseado no tipo de item e se é o próprio jogador
+      let extraInfo: string | undefined;
+      if (isMe) {
+        // Mostrar informação completa apenas para quem usou
+        if (data.itemId === 'magnifying_glass' && data.revealedShell) {
+          extraInfo = data.revealedShell === 'live' ? '🔴 VIVA' : '🔵 VAZIA';
           setRevealedShell(data.revealedShell);
+        } else if (data.itemId === 'phone' && data.phoneShell) {
+          extraInfo = `#${data.phonePosition}: ${data.phoneShell === 'live' ? '🔴 LIVE' : '🔵 BLANK'}`;
+        } else if (data.itemId === 'beer' && data.ejectedShell) {
+          extraInfo = data.ejectedShell === 'live' ? '🔴 VIVA' : '🔵 VAZIA';
+        } else if (data.itemId === 'expired_medicine') {
+          if (data.healedAmount && data.healedAmount > 0) {
+            extraInfo = `+${data.healedAmount} HP`;
+          } else if (data.damagedAmount && data.damagedAmount > 0) {
+            extraInfo = `-${data.damagedAmount} HP`;
+          }
+        }
+      } else {
+        // Para outros jogadores, mostrar info apenas de itens não-secretos
+        if (data.itemId === 'beer' && data.ejectedShell) {
+          extraInfo = data.ejectedShell === 'live' ? '🔴 VIVA' : '🔵 VAZIA';
+        } else if (data.itemId === 'expired_medicine') {
+          if (data.healedAmount && data.healedAmount > 0) {
+            extraInfo = `+${data.healedAmount} HP`;
+          } else if (data.damagedAmount && data.damagedAmount > 0) {
+            extraInfo = `-${data.damagedAmount} HP`;
+          }
         }
       }
 
-      if (data.itemId === 'phone' && data.phoneShell && data.playerId === myId) {
-        setMessage(`📱 Cartucho #${data.phonePosition}: ${data.phoneShell === 'live' ? '🔴 LIVE' : '🔵 BLANK'}`);
+      // Determinar mensagem especial para adrenaline
+      let message = '';
+      if (data.itemId === 'adrenaline' && data.stolenItem) {
+        message = `Roubou ${data.stolenItem.emoji} ${data.stolenItem.name} de ${data.targetName}!`;
+      } else if (data.itemId === 'handcuffs' && data.targetName) {
+        message = `Algemou ${data.targetName}!`;
+      } else if (data.itemId === 'turn_reverser') {
+        message = 'Direção invertida!';
       }
 
+      // Criar modal de item
+      const modalData: ItemActionModal = {
+        itemId: data.itemId,
+        emoji: item?.emoji || '?',
+        name: item?.name || data.itemId,
+        playerName: userName,
+        message: message,
+        result: data.failed ? 'fail' : 'success',
+        extraInfo: extraInfo,
+      };
+
+      hasActiveOverlayRef.current = true;
+      setItemActionModal(modalData);
+      setTimeout(() => setItemActionModal(null), 2500);
+
+      // Atualizar direção se mudou (turn_reverser)
+      if (data.directionChanged && data.newDirection !== undefined) {
+        setTurnDirection(data.newDirection);
+      }
+
+      // Efeitos visuais de cura/dano
       if (data.itemId === 'cigarettes' && data.healedAmount && data.healedAmount > 0) {
         setHealedPlayerId(data.playerId);
         setTimeout(() => setHealedPlayerId(null), 700);
@@ -539,14 +589,14 @@ export default function MultiplayerGame() {
     };
   }, [socket, players, myId, selectedItem, navigate]);
 
-  // Turn timer
+  // Turn timer - decrements for all players to stay in sync
   useEffect(() => {
-    if (!isMyTurn) return;
+    // Only run if game is in progress (currentPlayerId is set)
+    if (!currentPlayerId) return;
 
     const interval = setInterval(() => {
       setTurnTimer(prev => {
-        if (prev <= 1) {
-          clearInterval(interval);
+        if (prev <= 0) {
           return 0;
         }
         return prev - 1;
@@ -554,7 +604,7 @@ export default function MultiplayerGame() {
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [isMyTurn, currentPlayerId]);
+  }, [currentPlayerId]);
 
   // Countdown timer for disconnected players
   useEffect(() => {
@@ -724,6 +774,8 @@ export default function MultiplayerGame() {
         roundAnnouncement={roundAnnouncement}
         lastShotResult={lastShotResult}
         stealModalData={stealModalData}
+        itemActionModal={itemActionModal}
+        turnDirection={turnDirection}
         gameOverData={gameOverData ? (
           <div className="game-over-overlay">
             <div className="game-over-modal">

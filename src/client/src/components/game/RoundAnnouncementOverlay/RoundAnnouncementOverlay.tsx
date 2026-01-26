@@ -1,8 +1,8 @@
 // ==========================================
-// ROUND ANNOUNCEMENT OVERLAY - With Shell Loading Animation
+// ROUND ANNOUNCEMENT OVERLAY - With Cylinder Shell Loading Animation
 // ==========================================
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { RevolverCylinder } from '../RevolverCylinder';
 import { TargetIcon, HeartFullIcon } from '../../icons';
 import './RoundAnnouncementOverlay.css';
@@ -22,18 +22,17 @@ export function RoundAnnouncementOverlay({
   hp,
   onAnimationComplete,
 }: RoundAnnouncementOverlayProps) {
-  const [phase, setPhase] = useState<'title' | 'loading' | 'complete'>('title');
+  const [phase, setPhase] = useState<'title' | 'loading' | 'spinning' | 'complete'>('title');
   const [loadedShells, setLoadedShells] = useState(0);
-  const [shellsToLoad, setShellsToLoad] = useState<Array<{ type: 'live' | 'blank'; loaded: boolean }>>([]);
+  const [flyingShellIndex, setFlyingShellIndex] = useState<number | null>(null);
 
   const totalShells = live + blank;
 
   // Create shuffled array of shells to load
-  useEffect(() => {
-    // Create array with live and blank shells, then shuffle
-    const shells: Array<{ type: 'live' | 'blank'; loaded: boolean }> = [
-      ...Array(live).fill(null).map(() => ({ type: 'live' as const, loaded: false })),
-      ...Array(blank).fill(null).map(() => ({ type: 'blank' as const, loaded: false })),
+  const shellsToLoad = useMemo(() => {
+    const shells: Array<{ type: 'live' | 'blank' }> = [
+      ...Array(live).fill(null).map(() => ({ type: 'live' as const })),
+      ...Array(blank).fill(null).map(() => ({ type: 'blank' as const })),
     ];
 
     // Fisher-Yates shuffle
@@ -42,7 +41,7 @@ export function RoundAnnouncementOverlay({
       [shells[i], shells[j]] = [shells[j], shells[i]];
     }
 
-    setShellsToLoad(shells);
+    return shells;
   }, [live, blank]);
 
   // Phase 1: Show title for 1 second, then start loading
@@ -54,36 +53,52 @@ export function RoundAnnouncementOverlay({
     return () => clearTimeout(titleTimer);
   }, []);
 
-  // Phase 2: Load shells one by one
+  // Phase 2: Load shells one by one with flying animation
   useEffect(() => {
     if (phase !== 'loading' || loadedShells >= totalShells) return;
 
+    // Start flying animation for current shell
+    setFlyingShellIndex(loadedShells);
+
     const loadTimer = setTimeout(() => {
       setLoadedShells(prev => prev + 1);
-      setShellsToLoad(prev =>
-        prev.map((shell, i) =>
-          i === loadedShells ? { ...shell, loaded: true } : shell
-        )
-      );
-    }, 300); // 300ms between each shell
+      setFlyingShellIndex(null);
+    }, 400); // 400ms per shell
 
     return () => clearTimeout(loadTimer);
   }, [phase, loadedShells, totalShells]);
 
-  // Phase 3: Complete - wait a moment then call callback
+  // Phase 3: Spinning - after all shells loaded
   useEffect(() => {
     if (loadedShells >= totalShells && phase === 'loading') {
+      const spinTimer = setTimeout(() => {
+        setPhase('spinning');
+      }, 300);
+
+      return () => clearTimeout(spinTimer);
+    }
+  }, [loadedShells, totalShells, phase]);
+
+  // Phase 4: Complete - after spinning
+  useEffect(() => {
+    if (phase === 'spinning') {
       const completeTimer = setTimeout(() => {
         setPhase('complete');
         // Wait a bit more before closing
         setTimeout(() => {
           onAnimationComplete?.();
         }, 800);
-      }, 500);
+      }, 1200); // Spin for 1.2 seconds
 
       return () => clearTimeout(completeTimer);
     }
-  }, [loadedShells, totalShells, phase, onAnimationComplete]);
+  }, [phase, onAnimationComplete]);
+
+  // Calculate chamber position for flying shell animation
+  const getChamberAngle = (index: number) => {
+    const anglePerChamber = 360 / totalShells;
+    return (index * anglePerChamber - 90) * (Math.PI / 180);
+  };
 
   return (
     <div className="round-announcement-overlay">
@@ -95,21 +110,38 @@ export function RoundAnnouncementOverlay({
 
         {/* Cylinder with loading animation */}
         <div className="cylinder-loading-area">
-          <RevolverCylinder
-            totalChambers={totalShells}
-            remainingShells={loadedShells}
-            currentPosition={0}
-            spentChambers={[]}
-            size="lg"
-            isActive={phase === 'complete'}
-          />
+          <div className="cylinder-wrapper">
+            <RevolverCylinder
+              totalChambers={totalShells}
+              remainingShells={loadedShells}
+              currentPosition={0}
+              spentChambers={[]}
+              size="lg"
+              isSpinning={phase === 'spinning'}
+              isActive={phase === 'complete' || phase === 'spinning'}
+            />
+
+            {/* Flying shell animation */}
+            {flyingShellIndex !== null && flyingShellIndex < shellsToLoad.length && (
+              <div
+                className={`flying-shell ${shellsToLoad[flyingShellIndex].type}`}
+                style={{
+                  '--target-angle': `${getChamberAngle(flyingShellIndex)}rad`,
+                } as React.CSSProperties}
+              >
+                <div className="flying-shell-body">
+                  <div className="flying-shell-tip"></div>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Shells waiting to be loaded */}
           <div className="shells-queue">
             {shellsToLoad.map((shell, index) => (
               <div
                 key={index}
-                className={`shell-to-load ${shell.type} ${shell.loaded ? 'loaded' : ''} ${index === loadedShells ? 'loading' : ''}`}
+                className={`shell-to-load ${shell.type} ${index < loadedShells ? 'loaded' : ''} ${index === flyingShellIndex ? 'flying' : ''}`}
                 style={{ animationDelay: `${index * 0.05}s` }}
               >
                 <div className="shell-body">
@@ -121,7 +153,7 @@ export function RoundAnnouncementOverlay({
         </div>
 
         {/* Shell count legend */}
-        <div className={`shell-info ${phase === 'loading' || phase === 'complete' ? 'visible' : ''}`}>
+        <div className={`shell-info ${phase !== 'title' ? 'visible' : ''}`}>
           <span className="shell-count live">
             {live} LIVE
           </span>
@@ -140,6 +172,10 @@ export function RoundAnnouncementOverlay({
           <div className="loading-text">
             Carregando... {loadedShells}/{totalShells}
           </div>
+        )}
+
+        {phase === 'spinning' && (
+          <div className="spinning-text">Embaralhando...</div>
         )}
 
         {phase === 'complete' && (

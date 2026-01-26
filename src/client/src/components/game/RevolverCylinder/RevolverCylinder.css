@@ -7,7 +7,8 @@
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 1rem;
+  gap: 0.5rem;
+  transform: scale(0.85);
 }
 
 /* SVG Container */
@@ -245,29 +246,29 @@
 
 @media (max-width: 768px) {
   .revolver-cylinder {
-    transform: scale(0.85);
+    transform: scale(0.75);
   }
 
   .revolver-cylinder--sm {
-    transform: scale(0.6);
+    transform: scale(0.55);
   }
 
   .revolver-cylinder--lg {
-    transform: scale(1);
+    transform: scale(0.9);
   }
 }
 
 @media (max-width: 480px) {
   .revolver-cylinder {
-    transform: scale(0.7);
+    transform: scale(0.6);
   }
 
   .revolver-cylinder--sm {
-    transform: scale(0.5);
+    transform: scale(0.45);
   }
 
   .revolver-cylinder--lg {
-    transform: scale(0.85);
+    transform: scale(0.75);
   }
 
   .revolver-muzzle-flash {

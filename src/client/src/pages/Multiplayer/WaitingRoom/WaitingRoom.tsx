@@ -49,6 +49,17 @@ export default function WaitingRoom() {
   const [copied, setCopied] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
 
+  // Handler para sair da sala (chamado pelo botão Voltar)
+  // Este é o ÚNICO lugar que deve emitir leaveRoom explicitamente
+  // Fechar aba/F5 deixa o servidor lidar via disconnect + grace period
+  const handleLeaveRoom = () => {
+    if (socket) {
+      localStorage.removeItem('bangshotSession');
+      socket.emit('leaveRoom');
+    }
+    navigate('/multiplayer');
+  };
+
   // Tentar reconectar se não tiver state (F5)
   useEffect(() => {
     if (state || reconnectAttempted.current) return;
@@ -73,16 +84,24 @@ export default function WaitingRoom() {
       setReconnecting(true);
       setRoomCode(savedSession.roomCode);
 
-      if (!isConnected) {
+      // Se já está conectado, emitir joinRoom IMEDIATAMENTE
+      if (isConnected && socket) {
+        console.log('[WaitingRoom] Já conectado, emitindo joinRoom:', savedSession.roomCode);
+        socket.emit('joinRoom', {
+          code: savedSession.roomCode,
+          playerName: savedSession.playerName,
+        });
+      } else {
+        console.log('[WaitingRoom] Aguardando conexão...');
         connect();
       }
     } catch {
       localStorage.removeItem('bangshotSession');
       navigate('/multiplayer');
     }
-  }, [state, isConnected, connect, navigate]);
+  }, [state, isConnected, socket, connect, navigate]);
 
-  // Tentar reconectar quando socket conectar
+  // Tentar reconectar quando socket conectar (fallback se não estava conectado inicialmente)
   useEffect(() => {
     if (!reconnecting || !socket || !isConnected) return;
 
@@ -91,7 +110,7 @@ export default function WaitingRoom() {
 
     try {
       const savedSession: SavedSession = JSON.parse(savedSessionStr);
-      console.log('Tentando reconectar à sala:', savedSession.roomCode);
+      console.log('[WaitingRoom] Socket conectou, tentando reconectar à sala:', savedSession.roomCode);
 
       socket.emit('joinRoom', {
         code: savedSession.roomCode,
@@ -143,9 +162,25 @@ export default function WaitingRoom() {
       setPlayers(newPlayers);
     });
 
-    // Player left
+    // Player left (após grace period expirar ou botão Voltar)
     socket.on('playerLeft', ({ players: newPlayers }) => {
       setPlayers(newPlayers);
+    });
+
+    // Player temporarily disconnected (F5) - vaga reservada por 10s
+    socket.on('playerDisconnected', ({ playerId, playerName }) => {
+      console.log(`[WaitingRoom] ${playerName} desconectou temporariamente`);
+      setPlayers(prev => prev.map(p =>
+        p.id === playerId ? { ...p, disconnected: true } : p
+      ));
+    });
+
+    // Player reconnected after F5
+    socket.on('playerReconnected', ({ playerId, newSocketId, playerName }) => {
+      console.log(`[WaitingRoom] ${playerName} reconectou (${playerId} -> ${newSocketId})`);
+      setPlayers(prev => prev.map(p =>
+        p.id === playerId ? { ...p, id: newSocketId || p.id, disconnected: false } : p
+      ));
     });
 
     // Host changed
@@ -181,6 +216,8 @@ export default function WaitingRoom() {
     return () => {
       socket.off('playerJoined');
       socket.off('playerLeft');
+      socket.off('playerDisconnected');
+      socket.off('playerReconnected');
       socket.off('hostChanged');
       socket.off('roundStarted');
       socket.off('startError');
@@ -188,22 +225,11 @@ export default function WaitingRoom() {
     };
   }, [socket, state, navigate, roomCode, players]);
 
-  // NÃO fazemos cleanup automático ao desmontar.
-  // O servidor controla o grace period de 60s para reconexão.
-  // Se o jogador sair explicitamente, usa handleLeaveRoom.
-
   const handleStartGame = () => {
     if (!socket || !isHost) return;
     setError('');
     socket.emit('startGame');
   };
-
-  // TODO: Implement leave room functionality
-  // const handleLeaveRoom = () => {
-  //   if (!socket) return;
-  //   localStorage.removeItem('bangshotSession');
-  //   socket.emit('leaveRoom');
-  // };
 
   const handleCopyCode = async () => {
     try {
@@ -225,7 +251,7 @@ export default function WaitingRoom() {
 
   if (!isConnected) {
     return (
-      <PageLayout title="Sala de Espera">
+      <PageLayout title="Sala de Espera" onBack={handleLeaveRoom}>
         <div className="waiting-room-content">
           <p className="loading-message">Conectando ao servidor...</p>
         </div>
@@ -236,7 +262,7 @@ export default function WaitingRoom() {
   const canStart = players.length >= GAME_RULES.MIN_PLAYERS;
 
   return (
-    <PageLayout title="Sala de Espera">
+    <PageLayout title="Sala de Espera" onBack={handleLeaveRoom}>
       <div className="waiting-room-content">
         <div className="room-code-display">
           <span className="code-label">Codigo da Sala</span>
@@ -254,13 +280,14 @@ export default function WaitingRoom() {
           <h3>Jogadores ({players.length}/{GAME_RULES.MAX_PLAYERS})</h3>
           <div className="players-list">
             {players.map((player, index) => (
-              <div key={player.id} className="player-card">
-                <div className="player-avatar">
+              <div key={player.id} className={`player-card ${player.disconnected ? 'disconnected' : ''}`}>
+                <div className={`player-avatar ${player.disconnected ? 'disconnected' : ''}`}>
                   {player.name.charAt(0).toUpperCase()}
                 </div>
                 <div className="player-info">
                   <span className="player-name">{player.name}</span>
                   {index === 0 && <span className="host-badge">HOST</span>}
+                  {player.disconnected && <span className="reconnecting-badge">Reconectando...</span>}
                 </div>
               </div>
             ))}

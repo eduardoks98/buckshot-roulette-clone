@@ -159,6 +159,28 @@
   width: fit-content;
 }
 
+/* Disconnected player (F5 grace period) */
+.player-card.disconnected {
+  opacity: 0.6;
+  border-color: var(--border-color);
+}
+
+.player-avatar.disconnected {
+  background: linear-gradient(135deg, #666 0%, #444 100%);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.reconnecting-badge {
+  font-size: 0.65rem;
+  background: rgba(255, 193, 7, 0.2);
+  color: #ffc107;
+  padding: 0.15rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-weight: 500;
+  width: fit-content;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
 /* Game Rules Preview */
 .game-rules-preview {
   width: 100%;
