@@ -7,7 +7,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { getLevelInfo } from '@shared/utils/xpCalculator';
 import { getTitleById } from '@shared/constants/achievements';
-import { PageLayout } from '../../components/layout/PageLayout';
+import { PageLayout, InlineAd } from '../../components/layout/PageLayout';
 import { LoadingState } from '../../components/common/LoadingState';
 import { EmptyState } from '../../components/common/EmptyState';
 import { getRankIcon } from '../../utils/helpers';
@@ -130,9 +130,8 @@ export default function Leaderboard() {
   };
 
   return (
-    <PageLayout>
+    <PageLayout title="Ranking">
       <div className="leaderboard-content">
-        <h1 className="page-title">LEADERBOARD</h1>
 
         {/* Period Tabs */}
         <div className="period-tabs">
@@ -154,6 +153,9 @@ export default function Leaderboard() {
             <span className="my-rank-value">#{myRank}</span>
           </div>
         )}
+
+        {/* Inline Ad - visible on smaller screens */}
+        <InlineAd position="inline-top" />
 
         {/* Leaderboard */}
         {loading ? (
@@ -235,6 +237,9 @@ export default function Leaderboard() {
             />
           </div>
         )}
+
+        {/* Inline Ad - bottom */}
+        <InlineAd position="inline-bottom" />
       </div>
     </PageLayout>
   );

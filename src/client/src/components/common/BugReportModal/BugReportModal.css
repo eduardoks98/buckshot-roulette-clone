@@ -13,10 +13,10 @@
   align-items: center;
   justify-content: center;
   z-index: 10000;
-  animation: fadeIn 0.2s ease-out;
+  animation: bugReportOverlayFadeIn 0.2s ease-out;
 }
 
-@keyframes fadeIn {
+@keyframes bugReportOverlayFadeIn {
   from { opacity: 0; }
   to { opacity: 1; }
 }

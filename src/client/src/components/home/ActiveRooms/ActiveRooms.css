@@ -304,6 +304,16 @@
 @media (max-width: 768px) {
   .active-rooms {
     padding: 1.25rem;
+    flex: none;
+    min-height: auto;
+    overflow: visible;
+    height: auto;
+  }
+
+  .active-rooms__content {
+    flex: none;
+    min-height: auto;
+    overflow: visible;
   }
 
   .active-rooms__actions {

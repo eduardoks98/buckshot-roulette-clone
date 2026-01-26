@@ -4,6 +4,7 @@ import type {
   ClientToServerEvents,
   ServerToClientEvents,
 } from '@shared/types/socket-events.types';
+import { API_URL } from '../config';
 
 // ==========================================
 // TYPES
@@ -61,14 +62,12 @@ export function SocketProvider({ children }: SocketProviderProps) {
 
     connectingRef.current = true;
 
-    const serverUrl = import.meta.env.DEV
-      ? 'http://localhost:3000'
-      : window.location.origin;
+    const serverUrl = API_URL || window.location.origin;
 
     console.log('Conectando ao servidor:', serverUrl);
 
     // Pegar token de autenticação se existir
-    const authToken = localStorage.getItem('buckshot_auth_token');
+    const authToken = localStorage.getItem('bangshot_auth_token');
 
     const newSocket: TypedSocket = io(serverUrl, {
       transports: ['websocket', 'polling'],
@@ -118,6 +117,33 @@ export function SocketProvider({ children }: SocketProviderProps) {
         socketRef.current.disconnect();
         socketRef.current = null;
       }
+    };
+  }, []);
+
+  // Handler para quando o usuário fecha a aba/navegador
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      // Tentar enviar leaveRoom via socket
+      if (socketRef.current?.connected) {
+        socketRef.current.emit('leaveRoom');
+      }
+
+      // Usar sendBeacon como fallback para garantir que o servidor seja notificado
+      const serverUrl = API_URL || window.location.origin;
+
+      const socketId = socketRef.current?.id;
+      if (socketId) {
+        navigator.sendBeacon(
+          `${serverUrl}/api/leave-room`,
+          JSON.stringify({ socketId })
+        );
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
     };
   }, []);
 

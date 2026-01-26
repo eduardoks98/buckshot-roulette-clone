@@ -1,1 +1,1 @@
-export { PageLayout, default } from './PageLayout';
+export { PageLayout, InlineAd, default } from './PageLayout';

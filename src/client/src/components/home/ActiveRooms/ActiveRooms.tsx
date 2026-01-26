@@ -68,7 +68,7 @@ export function ActiveRooms() {
       console.log('Sala criada:', data.code);
       setCreating(false);
       // Salvar dados da sessão
-      localStorage.setItem('buckshotSession', JSON.stringify({
+      localStorage.setItem('bangshotSession', JSON.stringify({
         roomCode: data.code,
         playerName: user?.display_name || '',
         isHost: data.isHost,
@@ -89,7 +89,7 @@ export function ActiveRooms() {
       setJoining(false);
       setShowPasswordModal(false);
       // Salvar dados da sessão
-      localStorage.setItem('buckshotSession', JSON.stringify({
+      localStorage.setItem('bangshotSession', JSON.stringify({
         roomCode: data.code,
         playerName: user?.display_name || '',
         isHost: data.isHost,
@@ -112,7 +112,7 @@ export function ActiveRooms() {
 
       // Se erro é "Já está na sala", limpar sessão antiga corrompida
       if (message.includes('Já está na sala') || message.includes('já está')) {
-        localStorage.removeItem('buckshotSession');
+        localStorage.removeItem('bangshotSession');
       }
 
       setTimeout(() => setJoinError(''), 3000);
@@ -120,16 +120,16 @@ export function ActiveRooms() {
 
     // Listener para sala deletada - limpar sessão se era nossa sala
     const handleRoomDeleted = (data: { code: string }) => {
-      const session = localStorage.getItem('buckshotSession');
+      const session = localStorage.getItem('bangshotSession');
       if (session) {
         try {
           const parsed = JSON.parse(session);
           if (parsed.roomCode === data.code) {
-            localStorage.removeItem('buckshotSession');
+            localStorage.removeItem('bangshotSession');
           }
         } catch {
           // Se JSON inválido, limpar
-          localStorage.removeItem('buckshotSession');
+          localStorage.removeItem('bangshotSession');
         }
       }
       // Atualizar lista de salas
@@ -138,7 +138,7 @@ export function ActiveRooms() {
 
     // Listener para ser removido da sala (kicked, left, etc)
     const handleLeftRoom = () => {
-      localStorage.removeItem('buckshotSession');
+      localStorage.removeItem('bangshotSession');
     };
 
     socket.on('roomList', handleRoomList);
@@ -178,7 +178,7 @@ export function ActiveRooms() {
       return;
     }
     // Limpar sessao antiga antes de criar nova sala
-    localStorage.removeItem('buckshotSession');
+    localStorage.removeItem('bangshotSession');
     setCreating(true);
     setJoinError('');
     socket.emit('createRoom', {
@@ -199,7 +199,7 @@ export function ActiveRooms() {
       return;
     }
     // Limpar sessao antiga antes de entrar em nova sala
-    localStorage.removeItem('buckshotSession');
+    localStorage.removeItem('bangshotSession');
     setJoining(true);
     setJoinError('');
     socket.emit('joinRoom', {
@@ -225,7 +225,7 @@ export function ActiveRooms() {
       return;
     }
     // Limpar sessao antiga antes de entrar em nova sala
-    localStorage.removeItem('buckshotSession');
+    localStorage.removeItem('bangshotSession');
     setJoining(true);
     setJoinError('');
     socket.emit('joinRoom', {
@@ -239,7 +239,7 @@ export function ActiveRooms() {
   const handleJoinWithPassword = () => {
     if (!socket || !isConnected || !user || !pendingRoomCode) return;
     // Limpar sessao antiga antes de entrar em nova sala
-    localStorage.removeItem('buckshotSession');
+    localStorage.removeItem('bangshotSession');
     setJoining(true);
     socket.emit('joinRoom', {
       code: pendingRoomCode,

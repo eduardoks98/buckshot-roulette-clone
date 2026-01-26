@@ -281,14 +281,15 @@ export class RoomService {
 
     room.players.splice(playerIndex, 1);
 
+    // Se não há mais jogadores, deletar a sala
+    if (room.players.length === 0) {
+      this.rooms.delete(code);
+      return { code, room, players: [], deleted: true };
+    }
+
     // Transferir host se necessário
     if (room.host === socketId) {
-      if (room.players.length > 0) {
-        room.host = room.players[0].id;
-      } else {
-        this.rooms.delete(code);
-        return { code, room, players: [], deleted: true };
-      }
+      room.host = room.players[0].id;
     }
 
     return {

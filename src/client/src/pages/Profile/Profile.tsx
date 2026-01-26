@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { getTitleById } from '@shared/constants/achievements';
-import { PageLayout } from '../../components/layout/PageLayout';
+import { PageLayout, InlineAd } from '../../components/layout/PageLayout';
 import XpBar from '../../components/common/XpBar/XpBar';
 import LevelBadge from '../../components/common/LevelBadge/LevelBadge';
 import { LoadingState } from '../../components/common/LoadingState';
@@ -85,7 +85,7 @@ export default function Profile() {
   // Loading state
   if (isLoading) {
     return (
-      <PageLayout>
+      <PageLayout title="Perfil">
         <LoadingState message="Carregando perfil..." />
       </PageLayout>
     );
@@ -145,9 +145,8 @@ export default function Profile() {
   const kd = calculateKD(user.total_kills, user.total_deaths);
 
   return (
-    <PageLayout>
+    <PageLayout title="Perfil">
       <div className="profile-content">
-        <h1 className="page-title">PERFIL</h1>
 
         {/* User Card */}
         <div className="user-card">
@@ -197,6 +196,9 @@ export default function Profile() {
           <XpBar totalXp={user.total_xp} size="lg" showLevel={false} />
         </div>
 
+        {/* Inline Ad - visible on smaller screens */}
+        <InlineAd position="inline-top" />
+
         {/* Stats Grid */}
         <div className="stats-grid">
           <div className="stat-card">
@@ -224,6 +226,9 @@ export default function Profile() {
             <span className="stat-label">K/D</span>
           </div>
         </div>
+
+        {/* Inline Ad - bottom */}
+        <InlineAd position="inline-bottom" />
 
         {/* Title Selector Modal */}
         {showTitleSelector && (

@@ -83,7 +83,7 @@ export default function BugReportModal({ isOpen, onClose, gameState }: BugReport
     setErrorMessage('');
 
     try {
-      const token = localStorage.getItem('buckshot_auth_token');
+      const token = localStorage.getItem('bangshot_auth_token');
 
       const payload = {
         title: title.trim(),

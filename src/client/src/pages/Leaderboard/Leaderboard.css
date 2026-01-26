@@ -2,20 +2,16 @@
    LEADERBOARD STYLES
    ========================================== */
 
+/* Leaderboard content wrapper (herda width do .page-content no PageLayout) */
 .leaderboard-content {
   width: 100%;
-  max-width: 900px;
 }
 
-.page-title {
-  text-align: center;
-  font-size: 2.5rem;
+/* .page-title -> movido para global.css */
+
+/* Leaderboard specific title adjustment */
+.leaderboard-content .page-title {
   margin-top: 2rem;
-  margin-bottom: 1.5rem;
-  background: linear-gradient(135deg, var(--gold-accent) 0%, #fff 50%, var(--gold-accent) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
 }
 
 /* Period Tabs */
@@ -205,18 +201,7 @@
   font-weight: 500;
 }
 
-/* Loading / Error / Empty */
-.loading-message,
-.error-message,
-.empty-message {
-  text-align: center;
-  padding: 3rem 1rem;
-  color: var(--text-dim);
-}
-
-.error-message {
-  color: var(--red-live);
-}
+/* .loading-message, .error-message -> movidos para global.css */
 
 /* Login Prompt */
 .login-prompt {
@@ -257,8 +242,7 @@
 
 /* Responsive */
 @media (max-width: 768px) {
-  .page-title {
-    font-size: 2rem;
+  .leaderboard-content .page-title {
     margin-top: 1rem;
   }
 
@@ -269,10 +253,6 @@
 }
 
 @media (max-width: 500px) {
-  .page-title {
-    font-size: 1.75rem;
-  }
-
   .period-tabs {
     flex-wrap: wrap;
   }
@@ -319,10 +299,6 @@
 }
 
 @media (max-width: 360px) {
-  .page-title {
-    font-size: 1.5rem;
-  }
-
   .period-tab {
     font-size: 0.7rem;
     padding: 0.4rem;

@@ -3,13 +3,15 @@
 // ==========================================
 
 import { useState, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import './Changelog.css';
 
 interface ChangelogEntry {
   version: string;
   date: string;
   title: string;
-  changes: string[];
+  content?: string;
+  changes?: string[]; // Legacy
 }
 
 const GAME_CODE = import.meta.env.VITE_GAME_CODE || 'BANGSHOT';
@@ -114,20 +116,28 @@ export function Changelog() {
 
       <div className="changelog__list">
         {entries.slice(0, 2).map(entry => (
-          <div key={entry.version} className="changelog-entry">
+          <Link
+            key={entry.version}
+            to="/changelog"
+            className="changelog-entry changelog-entry--clickable"
+          >
             <div className="changelog-entry__header">
               <span className="changelog-entry__version">v{entry.version}</span>
               <span className="changelog-entry__date">{entry.date}</span>
             </div>
             <h4 className="changelog-entry__title">{entry.title}</h4>
-            <ul className="changelog-entry__changes">
-              {entry.changes.slice(0, 3).map((change, i) => (
-                <li key={i}>{change}</li>
-              ))}
-            </ul>
-          </div>
+          </Link>
         ))}
       </div>
+
+      {entries.length > 0 && (
+        <Link to="/changelog" className="changelog__view-all">
+          Ver todas as atualizacoes
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <polyline points="9 18 15 12 9 6"/>
+          </svg>
+        </Link>
+      )}
     </div>
   );
 }

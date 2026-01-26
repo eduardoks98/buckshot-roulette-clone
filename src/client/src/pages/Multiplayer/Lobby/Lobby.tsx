@@ -45,7 +45,7 @@ export default function Lobby() {
 
   // Verificar se há jogo ativo para reconexão
   useEffect(() => {
-    const saved = localStorage.getItem('buckshotReconnect');
+    const saved = localStorage.getItem('bangshotReconnect');
     if (saved) {
       try {
         const data: ReconnectData = JSON.parse(saved);
@@ -56,10 +56,10 @@ export default function Lobby() {
           setActiveGame(data);
         } else {
           // Expirado - limpar
-          localStorage.removeItem('buckshotReconnect');
+          localStorage.removeItem('bangshotReconnect');
         }
       } catch {
-        localStorage.removeItem('buckshotReconnect');
+        localStorage.removeItem('bangshotReconnect');
       }
     }
   }, []);
@@ -71,7 +71,7 @@ export default function Lobby() {
     socket.on('roomCreated', (data) => {
       console.log('Sala criada:', data.code);
       // Salvar dados da sessão no localStorage
-      localStorage.setItem('buckshotSession', JSON.stringify({
+      localStorage.setItem('bangshotSession', JSON.stringify({
         roomCode: data.code,
         playerName: playerName.trim(),
         isHost: data.isHost,
@@ -89,7 +89,7 @@ export default function Lobby() {
     socket.on('roomJoined', (data) => {
       console.log('Entrou na sala:', data.code);
       // Salvar dados da sessão no localStorage
-      localStorage.setItem('buckshotSession', JSON.stringify({
+      localStorage.setItem('bangshotSession', JSON.stringify({
         roomCode: data.code,
         playerName: playerName.trim(),
         isHost: data.isHost,
@@ -130,7 +130,7 @@ export default function Lobby() {
       console.log('Erro ao reconectar:', data.message);
       setIsReconnecting(false);
       setActiveGame(null);
-      localStorage.removeItem('buckshotReconnect');
+      localStorage.removeItem('bangshotReconnect');
       setError(data.message);
       setTimeout(() => setError(''), 3000);
     });
@@ -150,6 +150,9 @@ export default function Lobby() {
       setError('Voce precisa estar logado');
       return;
     }
+
+    // Limpar sessão antiga antes de criar nova sala
+    localStorage.removeItem('bangshotSession');
 
     socket?.emit('createRoom', {
       playerName: playerName,
@@ -208,7 +211,7 @@ export default function Lobby() {
   };
 
   const handleAbandonGame = () => {
-    localStorage.removeItem('buckshotReconnect');
+    localStorage.removeItem('bangshotReconnect');
     setActiveGame(null);
   };
 

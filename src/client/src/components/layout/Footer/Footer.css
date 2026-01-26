@@ -1,0 +1,114 @@
+/* ==========================================
+   FOOTER - Estilos unificados do footer
+   ========================================== */
+
+.app-footer {
+  margin-top: auto;
+  padding: 3rem 2rem 1.5rem;
+  background: rgba(0, 0, 0, 0.5);
+  border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+}
+
+.app-footer__content {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  max-width: 1200px;
+  margin: 0 auto 2rem;
+  gap: 2rem;
+}
+
+.app-footer__brand {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.app-footer__logo {
+  font-size: 1.5rem;
+  font-weight: 900;
+  color: var(--gold-accent, #d4a418);
+  letter-spacing: 0.1em;
+}
+
+.app-footer__brand p {
+  font-size: 0.85rem;
+  color: var(--text-dim, #888);
+  margin: 0;
+}
+
+.app-footer__links {
+  display: flex;
+  gap: 1.5rem;
+}
+
+.app-footer__links button {
+  background: none;
+  border: none;
+  color: var(--text-dim, #888);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: color 0.2s;
+  padding: 0;
+}
+
+.app-footer__links button:hover {
+  color: var(--gold-accent, #d4a418);
+}
+
+.app-footer__bottom {
+  text-align: center;
+  padding-top: 1.5rem;
+  border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+}
+
+.app-footer__bottom p {
+  font-size: 0.75rem;
+  color: var(--text-dim, #888);
+  opacity: 0.6;
+  margin: 0;
+}
+
+/* ==========================================
+   RESPONSIVE
+   ========================================== */
+
+@media (max-width: 768px) {
+  .app-footer__content {
+    flex-direction: column;
+    text-align: center;
+  }
+}
+
+@media (max-width: 480px) {
+  .app-footer {
+    padding: 2rem 1rem 1rem;
+  }
+
+  .app-footer__content {
+    margin-bottom: 1.5rem;
+    gap: 1.5rem;
+  }
+
+  .app-footer__logo {
+    font-size: 1.25rem;
+  }
+
+  .app-footer__links {
+    gap: 1rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .app-footer__links button {
+    font-size: 0.8rem;
+  }
+
+  .app-footer__bottom {
+    padding-top: 1rem;
+  }
+
+  .app-footer__bottom p {
+    font-size: 0.7rem;
+  }
+}

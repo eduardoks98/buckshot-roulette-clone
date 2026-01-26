@@ -2,10 +2,9 @@
    HISTORY STYLES
    ========================================== */
 
-/* History content wrapper (inside PageLayout) */
+/* History content wrapper (herda width do .page-content no PageLayout) */
 .history-content {
   width: 100%;
-  max-width: 900px;
 }
 
 /* Login page container (without PageLayout) */
@@ -23,58 +22,7 @@
   left: 1rem;
 }
 
-.page-title {
-  text-align: center;
-  font-size: 2.5rem;
-  margin-top: 0;
-  margin-bottom: 1.5rem;
-  background: linear-gradient(135deg, var(--gold-accent) 0%, #fff 50%, var(--gold-accent) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-/* Loading & Error */
-.loading-message,
-.error-message {
-  text-align: center;
-  padding: 2rem;
-  color: var(--text-dim);
-}
-
-.error-message {
-  color: var(--red-live);
-  background: rgba(230, 57, 70, 0.1);
-  border: 1px solid var(--red-live);
-  border-radius: 10px;
-}
-
-/* Login Required */
-.login-required {
-  text-align: center;
-  padding: 3rem 1rem;
-}
-
-.login-required p {
-  color: var(--text-dim);
-  margin-bottom: 1.5rem;
-}
-
-/* Empty State */
-.empty-state {
-  text-align: center;
-  padding: 3rem 1rem;
-}
-
-.empty-icon {
-  font-size: 4rem;
-  margin-bottom: 1rem;
-}
-
-.empty-state p {
-  color: var(--text-dim);
-  margin-bottom: 1.5rem;
-}
+/* .page-title, .loading-message, .error-message, .login-required, .empty-state -> movidos para global.css */
 
 /* Stats Summary */
 .stats-summary {
@@ -342,33 +290,10 @@
   font-size: 0.9rem;
 }
 
-/* Action Button */
-.action-btn {
-  padding: 0.875rem 1.5rem;
-  border-radius: 10px;
-  font-size: 1rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-  border: none;
-}
-
-.action-btn.primary {
-  background: var(--gold-accent);
-  color: #000;
-}
-
-.action-btn.primary:hover {
-  background: #e8c84a;
-  transform: translateY(-2px);
-}
+/* .action-btn -> movido para global.css */
 
 /* Responsive */
 @media (max-width: 768px) {
-  .page-title {
-    font-size: 2rem;
-  }
-
   .game-card {
     padding: 0.875rem;
   }
@@ -377,11 +302,6 @@
 @media (max-width: 480px) {
   .history-container--login {
     padding: 1rem;
-  }
-
-  .page-title {
-    font-size: 1.75rem;
-    margin-bottom: 1rem;
   }
 
   .stats-row {
@@ -425,10 +345,6 @@
 }
 
 @media (max-width: 360px) {
-  .page-title {
-    font-size: 1.5rem;
-  }
-
   .stats-summary {
     padding: 0.75rem;
   }

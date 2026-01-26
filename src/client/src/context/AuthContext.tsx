@@ -23,7 +23,7 @@ interface User {
   active_title_id: string | null;
 }
 
-const TOKEN_KEY = 'buckshot_auth_token';
+const TOKEN_KEY = 'bangshot_auth_token';
 
 interface AuthContextType {
   user: User | null;

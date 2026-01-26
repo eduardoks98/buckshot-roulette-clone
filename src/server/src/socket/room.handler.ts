@@ -400,6 +400,8 @@ export function registerRoomHandlers(
           gamePersistenceService.deleteGame(result.code)
             .catch(err => console.error('[DB] Erro ao deletar jogo:', err));
           console.log(`[Room] Sala ${result.code} deletada por desconexão - game removido do banco`);
+          // Notificar todos os clientes que a sala foi deletada
+          io.emit('roomDeleted', { code: result.code });
         } else if (result.gameInProgress) {
           // Notificar sobre desconexão durante jogo
           io.to(result.code).emit('playerDisconnected', {

@@ -16,8 +16,8 @@ import { registerGameHandlers } from './socket/game.handler';
 import { RoomService } from './services/game/room.service';
 import { authService } from './services/auth.service';
 
-// Shared room service instance
-const roomService = new RoomService();
+// Shared room service instance (exportado para uso no endpoint /api/leave-room)
+export const roomService = new RoomService();
 
 // Map de socket.id para dados do usuário
 export const socketUserMap = new Map<string, { odUserId: string; displayName: string } | null>();

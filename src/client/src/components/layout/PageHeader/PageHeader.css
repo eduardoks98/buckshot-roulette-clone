@@ -1,0 +1,81 @@
+/* ==========================================
+   PAGE HEADER - Sub-header com breadcrumb
+   ========================================== */
+
+.page-header {
+  width: 100%;
+  background: rgba(0, 0, 0, 0.3);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  /* Mesmo padding lateral que o page-body para alinhar com conteúdo */
+  padding: 0 1rem;
+  display: flex;
+  justify-content: center;
+}
+
+.page-header__inner {
+  width: 100%;
+  /* Mesmo max-width que page-content (1100px) + ads laterais (160px cada) + margins (0.5rem cada) */
+  max-width: calc(1100px + 160px + 160px + 0.5rem + 0.5rem);
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  /* Padding lateral: espaço do ad (160px + 0.5rem) + padding do content (2rem) */
+  padding: 1rem calc(160px + 0.5rem + 2rem);
+}
+
+.page-header__back {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #aaa;
+  padding: 0.35rem 0.75rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all 0.2s;
+}
+
+.page-header__back:hover {
+  border-color: var(--gold-accent);
+  color: var(--gold-accent);
+}
+
+.page-header__back svg {
+  flex-shrink: 0;
+}
+
+.page-header__title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--gold-accent);
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin: 0;
+}
+
+/* ==========================================
+   RESPONSIVE
+   ========================================== */
+
+@media (max-width: 768px) {
+  .page-header__inner {
+    padding: 1rem;
+  }
+
+  .page-header__title {
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .page-header__title {
+    font-size: 0.9rem;
+  }
+
+  .page-header__back {
+    font-size: 0.75rem;
+    padding: 0.3rem 0.6rem;
+  }
+}

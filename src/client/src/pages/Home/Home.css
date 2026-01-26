@@ -336,74 +336,6 @@
   padding-top: 1rem;
 }
 
-/* ===== FOOTER ===== */
-.landing__footer {
-  margin-top: auto;
-  padding: 3rem 2rem 1.5rem;
-  background: rgba(0, 0, 0, 0.5);
-  border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
-}
-
-.landing__footer-content {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  max-width: 1200px;
-  margin: 0 auto 2rem;
-  gap: 2rem;
-}
-
-.landing__footer-brand {
-  display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
-}
-
-.landing__footer-logo {
-  font-size: 1.5rem;
-  font-weight: 900;
-  color: var(--gold-accent, #d4a418);
-  letter-spacing: 0.1em;
-}
-
-.landing__footer-brand p {
-  font-size: 0.85rem;
-  color: var(--text-dim, #888);
-  margin: 0;
-}
-
-.landing__footer-links {
-  display: flex;
-  gap: 1.5rem;
-}
-
-.landing__footer-links button {
-  background: none;
-  border: none;
-  color: var(--text-dim, #888);
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: color 0.2s;
-  padding: 0;
-}
-
-.landing__footer-links button:hover {
-  color: var(--gold-accent, #d4a418);
-}
-
-.landing__footer-bottom {
-  text-align: center;
-  padding-top: 1.5rem;
-  border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
-}
-
-.landing__footer-bottom p {
-  font-size: 0.75rem;
-  color: var(--text-dim, #888);
-  opacity: 0.6;
-  margin: 0;
-}
-
 /* ===== LANDING RESPONSIVE ===== */
 @media (max-width: 1024px) {
   .landing__features-grid {
@@ -467,11 +399,6 @@
   .landing__section-title {
     font-size: 1.5rem;
     margin-bottom: 2rem;
-  }
-
-  .landing__footer-content {
-    flex-direction: column;
-    text-align: center;
   }
 }
 
@@ -893,15 +820,37 @@
 
 /* 900px e abaixo - layout coluna unica */
 @media (max-width: 900px) {
+  .lobby-container {
+    height: auto;
+    min-height: 100vh;
+    overflow: visible;
+  }
+
   .lobby-body {
     grid-template-columns: 1fr;
     padding: 1.5rem;
     gap: 1.5rem;
+    overflow: visible;
+    min-height: auto;
+    flex: none;
+  }
+
+  .lobby-body__left,
+  .lobby-body__right {
+    overflow: visible;
+    min-height: auto;
   }
 }
 
 /* 768px e abaixo - tablet */
 @media (max-width: 768px) {
+  .lobby-container {
+    height: auto;
+    min-height: 100vh;
+    overflow-y: auto;
+    overflow-x: hidden;
+  }
+
   .lobby-header {
     height: auto;
     min-height: 52px;

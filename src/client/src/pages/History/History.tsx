@@ -5,7 +5,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { PageLayout } from '../../components/layout/PageLayout';
+import { PageLayout, InlineAd } from '../../components/layout/PageLayout';
 import { LoadingState } from '../../components/common/LoadingState';
 import { EmptyState } from '../../components/common/EmptyState';
 import { formatDate } from '../../utils/helpers';
@@ -150,7 +150,7 @@ export default function History() {
   // Loading state
   if (authLoading) {
     return (
-      <PageLayout>
+      <PageLayout title="Historico">
         <LoadingState message="Carregando..." />
       </PageLayout>
     );
@@ -175,9 +175,8 @@ export default function History() {
   }
 
   return (
-    <PageLayout>
+    <PageLayout title="Historico">
       <div className="history-content">
-        <h1 className="page-title">HISTORICO</h1>
 
         {/* Stats Summary */}
         {stats && (
@@ -212,6 +211,9 @@ export default function History() {
             </div>
           </div>
         )}
+
+        {/* Inline Ad - visible on smaller screens */}
+        <InlineAd position="inline-top" />
 
         {/* Error State */}
         {error && (
@@ -318,6 +320,9 @@ export default function History() {
             </button>
           </div>
         )}
+
+        {/* Inline Ad - bottom */}
+        <InlineAd position="inline-bottom" />
       </div>
     </PageLayout>
   );

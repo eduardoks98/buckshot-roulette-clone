@@ -6,7 +6,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { MILESTONES } from '@shared/constants/achievements';
-import { PageLayout } from '../../components/layout/PageLayout';
+import { PageLayout, InlineAd } from '../../components/layout/PageLayout';
 import { LoadingState } from '../../components/common/LoadingState';
 import './Achievements.css';
 
@@ -117,7 +117,7 @@ export default function Achievements() {
   // Loading state
   if (authLoading) {
     return (
-      <PageLayout>
+      <PageLayout title="Conquistas">
         <LoadingState message="Carregando..." />
       </PageLayout>
     );
@@ -142,9 +142,8 @@ export default function Achievements() {
   }
 
   return (
-    <PageLayout>
+    <PageLayout title="Conquistas">
       <div className="achievements-content">
-        <h1 className="page-title">CONQUISTAS</h1>
 
         {/* Progress Bar */}
         <div className="achievements-progress">
@@ -161,6 +160,9 @@ export default function Achievements() {
             />
           </div>
         </div>
+
+        {/* Inline Ad - visible on smaller screens */}
+        <InlineAd position="inline-top" />
 
         {/* Category Tabs */}
         <div className="category-tabs">
@@ -211,6 +213,9 @@ export default function Achievements() {
             })}
           </div>
         )}
+
+        {/* Inline Ad - bottom */}
+        <InlineAd position="inline-bottom" />
       </div>
     </PageLayout>
   );

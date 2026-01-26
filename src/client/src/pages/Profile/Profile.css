@@ -2,10 +2,9 @@
    PROFILE STYLES
    ========================================== */
 
-/* Profile content wrapper (inside PageLayout) */
+/* Profile content wrapper (herda width do .page-content no PageLayout) */
 .profile-content {
   width: 100%;
-  max-width: 800px;
 }
 
 /* Login page container (without PageLayout) */
@@ -23,29 +22,7 @@
   left: 1rem;
 }
 
-.page-title {
-  text-align: center;
-  font-size: 2.5rem;
-  margin-top: 0;
-  margin-bottom: 1.5rem;
-  background: linear-gradient(135deg, var(--gold-accent) 0%, #fff 50%, var(--gold-accent) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-/* Loading */
-.loading-message {
-  text-align: center;
-  padding: 3rem;
-  color: var(--text-dim);
-  animation: pulse 1.5s ease-in-out infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 0.5; }
-  50% { opacity: 1; }
-}
+/* .page-title, .loading-message, .google-login-btn -> movidos para global.css */
 
 /* Login Section */
 .login-section {
@@ -87,36 +64,6 @@
   content: "✓ ";
   color: var(--gold-accent);
 }
-
-.google-login-btn {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
-  width: 100%;
-  max-width: 300px;
-  margin: 0 auto 1.5rem;
-  padding: 0.875rem 1.5rem;
-  background: #fff;
-  border: none;
-  border-radius: 8px;
-  font-size: 1rem;
-  font-weight: 500;
-  color: #333;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.google-login-btn:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(255, 255, 255, 0.2);
-}
-
-.google-icon {
-  width: 20px;
-  height: 20px;
-}
-
 
 /* User Card */
 .user-card {
@@ -268,14 +215,7 @@
   gap: 0.75rem;
 }
 
-.action-btn {
-  padding: 0.875rem;
-  border-radius: 10px;
-  font-size: 1rem;
-  font-weight: 500;
-  cursor: pointer;
-  transition: all 0.2s;
-}
+/* .action-btn base -> movido para global.css */
 
 .action-btn.history {
   background: transparent;
@@ -466,10 +406,6 @@
 
 /* Responsive */
 @media (max-width: 768px) {
-  .page-title {
-    font-size: 2rem;
-  }
-
   .user-card {
     padding: 1.5rem;
   }
@@ -480,11 +416,6 @@
 }
 
 @media (max-width: 500px) {
-  .page-title {
-    font-size: 1.75rem;
-    margin-bottom: 1rem;
-  }
-
   .stats-grid {
     grid-template-columns: repeat(2, 1fr);
   }
@@ -517,10 +448,6 @@
 }
 
 @media (max-width: 360px) {
-  .page-title {
-    font-size: 1.5rem;
-  }
-
   .stats-grid {
     gap: 0.5rem;
   }

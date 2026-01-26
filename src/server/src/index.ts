@@ -20,7 +20,7 @@ async function main() {
     // Iniciar servidor
     httpServer.listen(ENV.PORT, () => {
       console.log('========================================');
-      console.log('🎮 BUCKSHOT ROULETTE SERVER');
+      console.log('🎮 BANGSHOT SERVER');
       console.log('========================================');
       console.log(`🚀 Servidor rodando em: http://localhost:${ENV.PORT}`);
       console.log(`📡 Socket.IO: Ativo`);

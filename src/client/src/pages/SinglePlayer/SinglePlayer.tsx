@@ -808,7 +808,7 @@ export default function SinglePlayer() {
     return (
       <div className="singleplayer-page">
         <div className="start-screen">
-          <h1 className="start-title">BUCKSHOT ROULETTE</h1>
+          <h1 className="start-title">BANGSHOT</h1>
           <p className="start-subtitle">Single Player vs Dealer</p>
           <button className="start-btn" onClick={startGame}>INICIAR JOGO</button>
           <button className="back-to-menu-btn" onClick={() => navigate('/')}>← Voltar ao Menu</button>

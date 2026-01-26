@@ -8,7 +8,7 @@ import http from 'http';
 import path from 'path';
 import passport from './config/passport.config';
 import { ENV } from './config/env.config';
-import { getOnlineCount } from './socket';
+import { getOnlineCount, roomService } from './socket';
 import authRoutes from './routes/auth.routes';
 import leaderboardRoutes from './routes/leaderboard.routes';
 import historyRoutes from './routes/history.routes';
@@ -68,6 +68,23 @@ export function createServer(): { app: Express; httpServer: http.Server } {
   // Online count
   app.get('/api/online', (_req: Request, res: Response) => {
     res.json(getOnlineCount());
+  });
+
+  // Leave room endpoint (para sendBeacon quando usuário fecha aba/navegador)
+  app.post('/api/leave-room', (req: Request, res: Response) => {
+    const { socketId } = req.body;
+
+    if (!socketId) {
+      return res.status(400).json({ error: 'socketId required' });
+    }
+
+    const result = roomService.leaveRoom(socketId);
+
+    if (result?.deleted) {
+      console.log(`[API] Sala ${result.code} deletada via beacon`);
+    }
+
+    res.json({ ok: true });
   });
 
   // Auth routes

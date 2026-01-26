@@ -1,0 +1,262 @@
+/* ==========================================
+   LEGAL PAGE - Layout para páginas legais
+   ========================================== */
+
+.legal-page-layout {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, #0a0a0a 0%, #121212 50%, #0a0a0a 100%);
+}
+
+.legal-page-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2rem;
+  width: 100%;
+}
+
+.legal-content {
+  width: 100%;
+  max-width: 800px;
+}
+
+/* Title */
+.legal-page-title {
+  text-align: center;
+  font-size: 2.5rem;
+  margin: 0 0 0.5rem 0;
+  background: linear-gradient(135deg, var(--gold-accent) 0%, #fff 50%, var(--gold-accent) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.legal-date {
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 0.875rem;
+  margin-bottom: 2rem;
+}
+
+/* Loading */
+.legal-loading {
+  text-align: center;
+  color: var(--text-dim);
+  padding: 3rem;
+}
+
+/* Error */
+.legal-error {
+  text-align: center;
+  padding: 3rem 1rem;
+  color: var(--text-dim);
+}
+
+.legal-error p {
+  margin: 0 0 1.5rem;
+  font-size: 1rem;
+}
+
+.legal-retry-btn {
+  background: rgba(212, 164, 24, 0.15);
+  border: 1px solid var(--gold-accent);
+  color: var(--gold-accent);
+  padding: 0.75rem 1.5rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+}
+
+.legal-retry-btn:hover {
+  background: rgba(212, 164, 24, 0.25);
+}
+
+/* Markdown Content */
+.legal-markdown {
+  color: var(--text-secondary);
+  line-height: 1.8;
+}
+
+.legal-markdown h1,
+.legal-markdown h2,
+.legal-markdown h3,
+.legal-markdown h4 {
+  color: var(--gold-accent);
+  margin: 2rem 0 1rem;
+}
+
+.legal-markdown h1 {
+  font-size: 1.75rem;
+}
+
+.legal-markdown h2 {
+  font-size: 1.5rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid rgba(212, 164, 24, 0.3);
+}
+
+.legal-markdown h3 {
+  font-size: 1.25rem;
+  color: var(--gold-light);
+}
+
+.legal-markdown h4 {
+  font-size: 1.1rem;
+  color: var(--gold-light);
+}
+
+.legal-markdown p {
+  margin-bottom: 1rem;
+}
+
+.legal-markdown ul,
+.legal-markdown ol {
+  margin-left: 1.5rem;
+  margin-bottom: 1rem;
+}
+
+.legal-markdown li {
+  margin-bottom: 0.5rem;
+}
+
+.legal-markdown a {
+  color: var(--gold-accent);
+  text-decoration: underline;
+  transition: color 0.2s;
+}
+
+.legal-markdown a:hover {
+  color: var(--gold-light);
+}
+
+.legal-markdown strong {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.legal-markdown code {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  font-family: monospace;
+  font-size: 0.9em;
+}
+
+.legal-markdown pre {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 1rem;
+  border-radius: 8px;
+  overflow-x: auto;
+  margin-bottom: 1rem;
+}
+
+.legal-markdown pre code {
+  background: transparent;
+  padding: 0;
+}
+
+.legal-markdown blockquote {
+  border-left: 3px solid var(--gold-accent);
+  padding-left: 1rem;
+  margin: 1rem 0;
+  color: var(--text-dim);
+  font-style: italic;
+}
+
+.legal-markdown table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 1rem;
+}
+
+.legal-markdown th,
+.legal-markdown td {
+  border: 1px solid var(--border-color);
+  padding: 0.75rem;
+  text-align: left;
+}
+
+.legal-markdown th {
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+}
+
+.legal-markdown hr {
+  border: none;
+  border-top: 1px solid var(--border-color);
+  margin: 2rem 0;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .legal-page-title {
+    font-size: 2rem;
+  }
+
+  .legal-page-content {
+    padding: 1.5rem;
+  }
+
+  .legal-markdown h1 {
+    font-size: 1.5rem;
+  }
+
+  .legal-markdown h2 {
+    font-size: 1.25rem;
+  }
+
+  .legal-markdown h3 {
+    font-size: 1.1rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .legal-page-title {
+    font-size: 1.75rem;
+  }
+
+  .legal-page-content {
+    padding: 1rem;
+  }
+
+  .legal-date {
+    font-size: 0.8rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .legal-markdown {
+    font-size: 0.95rem;
+    line-height: 1.7;
+  }
+
+  .legal-markdown h1 {
+    font-size: 1.35rem;
+  }
+
+  .legal-markdown h2 {
+    font-size: 1.15rem;
+  }
+
+  .legal-markdown h3 {
+    font-size: 1rem;
+  }
+
+  .legal-markdown ul,
+  .legal-markdown ol {
+    margin-left: 1rem;
+  }
+}
+
+@media (max-width: 360px) {
+  .legal-page-title {
+    font-size: 1.5rem;
+  }
+
+  .legal-markdown {
+    font-size: 0.9rem;
+  }
+}

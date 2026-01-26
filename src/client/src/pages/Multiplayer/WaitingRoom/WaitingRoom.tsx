@@ -6,7 +6,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSocket } from '../../../context/SocketContext';
 import { useAuth } from '../../../context/AuthContext';
-import { PageLayout } from '../../../components/layout/PageLayout';
+import { PageLayout, InlineAd } from '../../../components/layout/PageLayout';
 import { PlayerPublicState } from '../../../../../shared/types';
 import { GAME_RULES } from '../../../../../shared/constants';
 import './WaitingRoom.css';
@@ -33,6 +33,10 @@ export default function WaitingRoom() {
   const state = location.state as LocationState | null;
   const reconnectAttempted = useRef(false);
   const gameStarted = useRef(false);
+  const hasLeft = useRef(false);
+  const isInRoom = useRef(false); // Será true só após montagem estável
+  const socketRef = useRef(socket);
+  const mountedRef = useRef(false); // Para detectar StrictMode double-mount
 
   // Redirecionar se não autenticado
   useEffect(() => {
@@ -53,7 +57,7 @@ export default function WaitingRoom() {
   useEffect(() => {
     if (state || reconnectAttempted.current) return;
 
-    const savedSessionStr = localStorage.getItem('buckshotSession');
+    const savedSessionStr = localStorage.getItem('bangshotSession');
     if (!savedSessionStr) {
       navigate('/multiplayer');
       return;
@@ -64,7 +68,7 @@ export default function WaitingRoom() {
 
       // Verificar se a sessão não expirou (30 minutos)
       if (Date.now() - savedSession.timestamp > 30 * 60 * 1000) {
-        localStorage.removeItem('buckshotSession');
+        localStorage.removeItem('bangshotSession');
         navigate('/multiplayer');
         return;
       }
@@ -77,7 +81,7 @@ export default function WaitingRoom() {
         connect();
       }
     } catch {
-      localStorage.removeItem('buckshotSession');
+      localStorage.removeItem('bangshotSession');
       navigate('/multiplayer');
     }
   }, [state, isConnected, connect, navigate]);
@@ -86,7 +90,7 @@ export default function WaitingRoom() {
   useEffect(() => {
     if (!reconnecting || !socket || !isConnected) return;
 
-    const savedSessionStr = localStorage.getItem('buckshotSession');
+    const savedSessionStr = localStorage.getItem('bangshotSession');
     if (!savedSessionStr) return;
 
     try {
@@ -98,7 +102,7 @@ export default function WaitingRoom() {
         playerName: savedSession.playerName,
       });
     } catch {
-      localStorage.removeItem('buckshotSession');
+      localStorage.removeItem('bangshotSession');
       navigate('/multiplayer');
     }
   }, [reconnecting, socket, isConnected, navigate]);
@@ -112,11 +116,12 @@ export default function WaitingRoom() {
       setIsHost(data.isHost);
       setPlayers(data.players);
       setReconnecting(false);
+      isInRoom.current = true; // Reconectou com sucesso
     };
 
     const handleJoinError = (message: string) => {
       console.log('Erro ao reconectar:', message);
-      localStorage.removeItem('buckshotSession');
+      localStorage.removeItem('bangshotSession');
       setReconnecting(false);
       navigate('/multiplayer');
     };
@@ -174,7 +179,7 @@ export default function WaitingRoom() {
 
     // Left room
     socket.on('leftRoom', () => {
-      localStorage.removeItem('buckshotSession');
+      localStorage.removeItem('bangshotSession');
       navigate('/multiplayer');
     });
 
@@ -188,9 +193,23 @@ export default function WaitingRoom() {
     };
   }, [socket, state, navigate, roomCode, players]);
 
-  // REMOVIDO: Cleanup automático causava problemas com React.StrictMode
-  // O usuário deve sair manualmente clicando no botão "Sair da Sala"
-  // Se o usuário fechar a aba/navegar, o servidor detecta a desconexão via socket.disconnect
+  // Manter socketRef atualizado
+  useEffect(() => {
+    socketRef.current = socket;
+  }, [socket]);
+
+  // Cleanup quando componente desmonta (navegação para outra página)
+  // Usa refs para evitar problemas com React.StrictMode e dependências
+  // IMPORTANTE: Só emite leaveRoom se realmente está na sala (isInRoom)
+  useEffect(() => {
+    return () => {
+      if (!hasLeft.current && socketRef.current && !gameStarted.current && isInRoom.current) {
+        hasLeft.current = true;
+        localStorage.removeItem('bangshotSession');
+        socketRef.current.emit('leaveRoom');
+      }
+    };
+  }, []);
 
   const handleStartGame = () => {
     if (!socket || !isHost) return;
@@ -200,7 +219,8 @@ export default function WaitingRoom() {
 
   const handleLeaveRoom = () => {
     if (!socket) return;
-    localStorage.removeItem('buckshotSession');
+    hasLeft.current = true; // Evita emit duplicado no cleanup
+    localStorage.removeItem('bangshotSession');
     socket.emit('leaveRoom');
   };
 
@@ -224,9 +244,9 @@ export default function WaitingRoom() {
 
   if (!isConnected) {
     return (
-      <PageLayout>
-        <div className="waiting-room-container">
-          <p className="connecting-message">Conectando ao servidor...</p>
+      <PageLayout title="Sala de Espera">
+        <div className="waiting-room-content">
+          <p className="loading-message">Conectando ao servidor...</p>
         </div>
       </PageLayout>
     );
@@ -235,10 +255,9 @@ export default function WaitingRoom() {
   const canStart = players.length >= GAME_RULES.MIN_PLAYERS;
 
   return (
-    <PageLayout>
-      <div className="waiting-room-container">
-        <div className="waiting-room-header">
-          <h1 className="waiting-room-title">SALA DE ESPERA</h1>
+    <PageLayout title="Sala de Espera">
+      <div className="waiting-room-content">
+        <div className="waiting-room-actions">
           <button className="leave-room-btn" onClick={handleLeaveRoom}>
             Sair da Sala
           </button>
@@ -253,6 +272,8 @@ export default function WaitingRoom() {
         </div>
 
         {error && <div className="error-message">{error}</div>}
+
+        <InlineAd position="inline-top" />
 
         <div className="players-section">
           <h3>Jogadores ({players.length}/{GAME_RULES.MAX_PLAYERS})</h3>
@@ -290,6 +311,8 @@ export default function WaitingRoom() {
             <li>{GAME_RULES.TIMERS.TURN_DURATION_MS / 1000}s por turno</li>
           </ul>
         </div>
+
+        <InlineAd position="inline-bottom" />
 
         {isHost ? (
           <button

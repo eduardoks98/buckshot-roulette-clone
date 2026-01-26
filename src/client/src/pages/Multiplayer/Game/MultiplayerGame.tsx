@@ -178,7 +178,7 @@ export default function MultiplayerGame() {
   useEffect(() => {
     if (!socket || !isConnected) return;
 
-    const saved = localStorage.getItem('buckshotReconnect');
+    const saved = localStorage.getItem('bangshotReconnect');
     if (!saved) return;
 
     try {
@@ -419,8 +419,8 @@ export default function MultiplayerGame() {
 
     // Game over
     socket.on('gameOver', (data: GameOverPayload) => {
-      localStorage.removeItem('buckshotSession');
-      localStorage.removeItem('buckshotReconnect');
+      localStorage.removeItem('bangshotSession');
+      localStorage.removeItem('bangshotReconnect');
       setGameOverData(data);
     });
 
@@ -446,7 +446,7 @@ export default function MultiplayerGame() {
 
     // Reconnect credentials
     socket.on('reconnectCredentials', (data: { roomCode: string; playerName: string; reconnectToken: string }) => {
-      localStorage.setItem('buckshotReconnect', JSON.stringify({
+      localStorage.setItem('bangshotReconnect', JSON.stringify({
         roomCode: data.roomCode,
         playerName: data.playerName,
         reconnectToken: data.reconnectToken,
