@@ -98,6 +98,17 @@ export default function MultiplayerGame() {
     remainingTime: number;
   }[]>([]);
 
+  // Rematch state
+  const [isRequestingRematch, setIsRequestingRematch] = useState(false);
+
+  // Estado para rastrear item roubado que precisa de alvo (Adrenaline + Handcuffs/Adrenaline)
+  const [pendingStolenItem, setPendingStolenItem] = useState<{
+    itemId: string;
+    itemIndex: number;
+    itemName: string;
+    itemEmoji: string;
+  } | null>(null);
+
   // Overlay queue system
   interface PendingOverlay {
     type: 'round' | 'shot' | 'reload';
@@ -135,8 +146,8 @@ export default function MultiplayerGame() {
       switch (next.type) {
         case 'round':
         case 'reload':
+          // Animation component will call onRoundAnnouncementComplete when done
           setRoundAnnouncement(next.data as RoundAnnouncement);
-          setTimeout(() => setRoundAnnouncement(null), next.duration);
           break;
         case 'shot':
           setLastShotResult(next.data as ShotResult);
@@ -166,6 +177,7 @@ export default function MultiplayerGame() {
       const maxHp = gs.maxHp || gs.yourHp || players.find(p => p.alive)?.maxHp || 4;
 
       if (!state.reconnected) {
+        // Animation component will call onRoundAnnouncementComplete when done
         setRoundAnnouncement({
           round: gs.round,
           live: gs.shells.live,
@@ -173,7 +185,6 @@ export default function MultiplayerGame() {
           hp: maxHp,
         });
         hasActiveOverlayRef.current = true;
-        setTimeout(() => setRoundAnnouncement(null), 5000);
       } else {
         setMessage('Reconectado ao jogo!');
       }
@@ -236,6 +247,7 @@ export default function MultiplayerGame() {
       setPhoneRevealedPositions([]);
       setSelectedTarget(null);
       setSelectedItem(null);
+      setPendingStolenItem(null); // Limpar item pendente no início do round
       setPlayerLastShell({});
       setTurnDirection(data.turnDirection || 1);
 
@@ -253,15 +265,20 @@ export default function MultiplayerGame() {
           duration: 5000,
         }]);
       } else {
+        // Animation component will call onRoundAnnouncementComplete when done
         hasActiveOverlayRef.current = true;
         setRoundAnnouncement(overlayData);
-        setTimeout(() => setRoundAnnouncement(null), 5000);
       }
 
       setMessage('');
 
-      // Sincronizar timer com servidor
-      if (data.turnStartTime) {
+      // Sincronizar timer com servidor usando turnElapsed (tempo já decorrido)
+      if (data.turnElapsed !== undefined) {
+        const elapsedSec = Math.floor(data.turnElapsed / 1000);
+        const remaining = Math.max(0, (GAME_RULES.TIMERS.TURN_DURATION_MS / 1000) - elapsedSec);
+        setTurnTimer(remaining);
+      } else if (data.turnStartTime) {
+        // fallback para compatibilidade com versões antigas
         const elapsed = Math.floor((Date.now() - data.turnStartTime) / 1000);
         const remaining = Math.max(0, (GAME_RULES.TIMERS.TURN_DURATION_MS / 1000) - elapsed);
         setTurnTimer(remaining);
@@ -271,15 +288,21 @@ export default function MultiplayerGame() {
     });
 
     // Turn changed
-    socket.on('turnChanged', ({ currentPlayer, players: updatedPlayers, turnStartTime }) => {
+    socket.on('turnChanged', ({ currentPlayer, players: updatedPlayers, turnElapsed, turnStartTime }) => {
       setCurrentPlayerId(currentPlayer);
       setRevealedShell(null);
       setSelectedTarget(null);
       setSelectedItem(null);
+      setPendingStolenItem(null); // Limpar item pendente quando turno muda
       setMessage(''); // Limpar mensagem anterior
 
-      // Calcular tempo restante baseado no timestamp do servidor
-      if (turnStartTime) {
+      // Calcular tempo restante usando turnElapsed (tempo já decorrido)
+      if (turnElapsed !== undefined) {
+        const elapsedSec = Math.floor(turnElapsed / 1000);
+        const remaining = Math.max(0, (GAME_RULES.TIMERS.TURN_DURATION_MS / 1000) - elapsedSec);
+        setTurnTimer(remaining);
+      } else if (turnStartTime) {
+        // fallback para compatibilidade
         const elapsed = Math.floor((Date.now() - turnStartTime) / 1000);
         const remaining = Math.max(0, (GAME_RULES.TIMERS.TURN_DURATION_MS / 1000) - elapsed);
         setTurnTimer(remaining);
@@ -457,6 +480,32 @@ export default function MultiplayerGame() {
       }
 
       setSelectedItem(null);
+
+      // Verificar se item roubado precisa de alvo e foi eu quem usou
+      // Segundo regras do Buckshot Roulette: item roubado DEVE ser usado imediatamente
+      if (data.itemId === 'adrenaline' && data.stolenItem && isMe) {
+        const stolenItemId = data.stolenItem.id;
+        const needsTarget = stolenItemId === 'handcuffs' || stolenItemId === 'adrenaline';
+
+        if (needsTarget) {
+          // Encontrar o item no inventário atualizado
+          const updatedItems = data.players?.find(p => p.id === myId)?.items || [];
+          const stolenIndex = updatedItems.findIndex(item => item.id === stolenItemId);
+
+          if (stolenIndex !== -1) {
+            // Agendar para mostrar seleção de alvo APÓS o overlay de item fechar
+            setTimeout(() => {
+              setPendingStolenItem({
+                itemId: stolenItemId,
+                itemIndex: stolenIndex,
+                itemName: data.stolenItem!.name,
+                itemEmoji: data.stolenItem!.emoji,
+              });
+              setMessage(`Use ${data.stolenItem!.emoji} ${data.stolenItem!.name} - Selecione um alvo!`);
+            }, 2600); // Overlay de item dura 2500ms + buffer
+          }
+        }
+      }
     });
 
     // Shell ejected (Beer item)
@@ -492,9 +541,9 @@ export default function MultiplayerGame() {
           duration: 4000,
         }]);
       } else {
+        // Animation component will call onRoundAnnouncementComplete when done
         hasActiveOverlayRef.current = true;
         setRoundAnnouncement(overlayData);
-        setTimeout(() => setRoundAnnouncement(null), 4000);
       }
     });
 
@@ -523,6 +572,33 @@ export default function MultiplayerGame() {
       localStorage.removeItem('bangshotSession');
       localStorage.removeItem('bangshotReconnect');
       setGameOverData(data);
+      setIsRequestingRematch(false);
+    });
+
+    // Rematch - room created (I'm the host)
+    socket.on('roomCreated', (data) => {
+      setIsRequestingRematch(false);
+      navigate('/multiplayer/room', {
+        state: {
+          roomCode: data.code,
+          isHost: true,
+          players: data.players,
+          fromRematch: true,
+        },
+      });
+    });
+
+    // Rematch - room joined (I joined an existing rematch room)
+    socket.on('roomJoined', (data) => {
+      setIsRequestingRematch(false);
+      navigate('/multiplayer/room', {
+        state: {
+          roomCode: data.code,
+          isHost: data.isHost,
+          players: data.players,
+          fromRematch: true,
+        },
+      });
     });
 
     // Reconnected
@@ -621,6 +697,8 @@ export default function MultiplayerGame() {
       socket.off('reconnectError');
       socket.off('reconnectCredentials');
       socket.off('achievementsUnlocked');
+      socket.off('roomCreated');
+      socket.off('roomJoined');
     };
   }, [socket, players, myId, selectedItem, navigate]);
 
@@ -658,10 +736,11 @@ export default function MultiplayerGame() {
 
   // Actions
   const handleShoot = useCallback((targetId: string) => {
-    if (!socket || !isMyTurn || hasActiveOverlay) return;
+    // Bloquear tiro se tem item roubado pendente de uso (ex: Handcuffs via Adrenaline)
+    if (!socket || !isMyTurn || hasActiveOverlay || pendingStolenItem) return;
     socket.emit('shoot', { targetId });
     setSelectedTarget(null);
-  }, [socket, isMyTurn, hasActiveOverlay]);
+  }, [socket, isMyTurn, hasActiveOverlay, pendingStolenItem]);
 
   const handleUseItem = useCallback((itemIndex: number) => {
     if (!socket || !isMyTurn || hasActiveOverlay || itemIndex >= myItems.length) return;
@@ -692,6 +771,19 @@ export default function MultiplayerGame() {
 
   const handleSelectTarget = (playerId: string) => {
     if (!isMyTurn || !socket || hasActiveOverlay) return;
+
+    // Se tem item roubado pendente (Adrenaline -> Handcuffs/Adrenaline), usar automaticamente
+    if (pendingStolenItem) {
+      socket.emit('useItem', {
+        itemId: pendingStolenItem.itemId as ItemId,
+        targetId: playerId,
+        itemIndex: pendingStolenItem.itemIndex,
+      });
+      setPendingStolenItem(null);
+      setSelectedTarget(null);
+      setMessage('');
+      return;
+    }
 
     if (selectedItem !== null) {
       const item = myItems[selectedItem];
@@ -731,6 +823,17 @@ export default function MultiplayerGame() {
     setSelectedTarget(null);
   }, []);
 
+  // Handle rematch request
+  const handleRematch = useCallback(() => {
+    if (!socket || !state?.roomCode || !me?.name) return;
+
+    setIsRequestingRematch(true);
+    socket.emit('requestRematch', {
+      previousRoomCode: state.roomCode,
+      playerName: me.name,
+    });
+  }, [socket, state?.roomCode, me?.name]);
+
   // Helper to log events for bug reports
   const logEvent = useCallback((event: string) => {
     const timestamp = new Date().toISOString();
@@ -757,8 +860,8 @@ export default function MultiplayerGame() {
   }
 
   // Prepare props for GameBoard
-  const alivePlayers = players.filter(p => p.alive);
-  const otherPlayers = alivePlayers.filter(p => p.id !== myId);
+  // Mostrar TODOS os jogadores (vivos e eliminados) para permitir roubo de itens com Adrenaline
+  const otherPlayers = players.filter(p => p.id !== myId);
 
   const opponentsForBoard: GamePlayer[] = otherPlayers.map(p => ({
     id: p.id,
@@ -880,8 +983,8 @@ export default function MultiplayerGame() {
 
               {/* XP Results - Apenas o meu */}
               {gameOverData.xpResults && gameOverData.xpResults.length > 0 && (() => {
-                const myOdId = user?.id;
-                const myXpResult = gameOverData.xpResults.find((xp: PlayerXpResult) => xp.odId === myOdId);
+                const myUserId = user?.id;
+                const myXpResult = gameOverData.xpResults.find((xp: PlayerXpResult) => xp.odUserId === myUserId);
                 if (!myXpResult) return null;
 
                 const levelInfo = getLevelInfo(myXpResult.newTotalXp);
@@ -909,14 +1012,36 @@ export default function MultiplayerGame() {
                           <div className="xp-fill" style={{ width: `${Math.round(levelInfo.xpProgress * 100)}%` }} />
                         </div>
                       </div>
+                      {/* PDL/ELO */}
+                      {myXpResult.eloChange !== undefined && (
+                        <div className="pdl-section">
+                          <div className={`pdl-change ${myXpResult.eloChange >= 0 ? 'positive' : 'negative'}`}>
+                            {myXpResult.eloChange >= 0 ? '+' : ''}{myXpResult.eloChange} PDL
+                          </div>
+                          {myXpResult.newEloRating && (
+                            <div className="pdl-total">
+                              ELO: {myXpResult.newEloRating}
+                            </div>
+                          )}
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
               })()}
 
-              <button className="back-btn" onClick={() => navigate('/multiplayer')}>
-                Voltar ao Lobby
-              </button>
+              <div className="game-over-actions">
+                <button
+                  className="rematch-btn"
+                  onClick={handleRematch}
+                  disabled={isRequestingRematch}
+                >
+                  {isRequestingRematch ? 'Aguardando...' : 'Jogar Novamente'}
+                </button>
+                <button className="back-btn" onClick={() => navigate('/multiplayer')}>
+                  Voltar ao Lobby
+                </button>
+              </div>
             </div>
           </div>
         ) : null}
@@ -931,6 +1056,7 @@ export default function MultiplayerGame() {
         onStealItem={handleStealItem}
         onCancelSteal={handleCancelSteal}
         onBack={() => navigate('/multiplayer')}
+        onRoundAnnouncementComplete={() => setRoundAnnouncement(null)}
       >
         {/* Disconnected Players Alert */}
         {disconnectedPlayers.length > 0 && (

@@ -9,6 +9,7 @@ import { gamePersistenceService } from '../services/game/game.persistence.servic
 import { achievementService, PlayerEndGameStats } from '../services/achievement.service';
 import { startTurnTimer, RoomWithTimer, calculateAwards } from './game.handler';
 import { Item, PlayerPublicState } from '../../../shared/types';
+import { logger, LOG_CATEGORIES } from '../services/logger.service';
 
 const gameService = new GameService();
 
@@ -290,9 +291,19 @@ export function registerRoomHandlers(
       // Notificar todos os clientes que uma nova sala foi criada
       io.emit('roomListUpdated');
 
-      console.log(`[Room] Sala ${result.room.code} criada por ${playerName}`);
+      logger.info(LOG_CATEGORIES.ROOM, `Sala criada: ${result.room.code}`, {
+        roomCode: result.room.code,
+        socketId: socket.id,
+        playerName,
+        userId: userData?.odUserId,
+        hasPassword: !!password,
+      });
     } catch (error) {
-      console.error('[Room] Erro ao criar sala:', error);
+      logger.error(LOG_CATEGORIES.ROOM, 'Erro ao criar sala', {
+        socketId: socket.id,
+        playerName,
+        error: String(error),
+      });
       socket.emit('joinError', 'Erro ao criar sala');
     }
   });
@@ -370,9 +381,20 @@ export function registerRoomHandlers(
         newPlayer: playerName,
       });
 
-      console.log(`[Room] ${playerName} entrou na sala ${code}`);
+      logger.info(LOG_CATEGORIES.ROOM, `Jogador entrou: ${playerName}`, {
+        roomCode: code.toUpperCase(),
+        socketId: socket.id,
+        playerName,
+        userId: userData?.odUserId,
+        playerCount: result.players.length,
+      });
     } catch (error) {
-      console.error('[Room] Erro ao entrar na sala:', error);
+      logger.error(LOG_CATEGORIES.ROOM, 'Erro ao entrar na sala', {
+        socketId: socket.id,
+        roomCode: code,
+        playerName,
+        error: String(error),
+      });
       socket.emit('joinError', 'Erro ao entrar na sala');
     }
   });
@@ -486,7 +508,7 @@ export function registerRoomHandlers(
           playerSocket.emit('roundStarted', {
             ...roundData,
             itemsReceived: player.items as Item[],
-            turnStartTime: result.room.turnStartTime || undefined,
+            turnElapsed: result.room.turnStartTime ? Date.now() - result.room.turnStartTime : 0,
           });
 
           // Enviar credenciais de reconexão
@@ -501,9 +523,17 @@ export function registerRoomHandlers(
         }
       });
 
-      console.log(`[Room] Jogo iniciado na sala ${result.room.code}`);
+      logger.info(LOG_CATEGORIES.GAME, `Jogo iniciado: ${result.room.code}`, {
+        roomCode: result.room.code,
+        socketId: socket.id,
+        playerCount: result.room.players.length,
+        players: result.room.players.map(p => p.name),
+      });
     } catch (error) {
-      console.error('[Room] Erro ao iniciar jogo:', error);
+      logger.error(LOG_CATEGORIES.GAME, 'Erro ao iniciar jogo', {
+        socketId: socket.id,
+        error: String(error),
+      });
       socket.emit('startError', 'Erro ao iniciar jogo');
     }
   });
@@ -610,12 +640,22 @@ export function registerRoomHandlers(
         currentPlayer: result.gameState.currentPlayer,
         reason: 'reconnected',
         players: result.gameState.players,
-        turnStartTime: room!.turnStartTime!,
+        turnElapsed: room!.turnStartTime ? Date.now() - room!.turnStartTime : 0,
       });
 
-      console.log(`[Room] ${playerName} reconectou à sala ${roomCode}`);
+      logger.info(LOG_CATEGORIES.CONN, `Reconectou: ${playerName}`, {
+        roomCode,
+        socketId: socket.id,
+        playerName,
+        method: 'attemptReconnect',
+      });
     } catch (error) {
-      console.error('[Room] Erro ao reconectar:', error);
+      logger.error(LOG_CATEGORIES.CONN, 'Erro ao reconectar', {
+        socketId: socket.id,
+        roomCode,
+        playerName,
+        error: String(error),
+      });
       socket.emit('reconnectError', { message: 'Erro ao reconectar' });
     }
   });
@@ -666,7 +706,7 @@ export function registerRoomHandlers(
           currentPlayer: result.gameState.currentPlayer,
           reason: 'reconnected',
           players: result.gameState.players,
-          turnStartTime: room?.turnStartTime || Date.now(),
+          turnElapsed: room?.turnStartTime ? Date.now() - room.turnStartTime : 0,
         });
 
         console.log(`[Room] ${result.playerName} reconectou ao jogo ${roomCode} via rejoinGame`);
@@ -735,6 +775,96 @@ export function registerRoomHandlers(
   });
 
   // ==========================================
+  // ADD BOT (Development Only)
+  // ==========================================
+  socket.on('addBot', ({ botName, difficulty }) => {
+    try {
+      // Verificar se está em uma sala
+      const roomData = roomService.getRoomByPlayer(socket.id);
+      if (!roomData) {
+        socket.emit('botError', { message: 'Você não está em uma sala' });
+        return;
+      }
+
+      const { code, room } = roomData;
+
+      // Verificar se é o host
+      if (room.host !== socket.id) {
+        socket.emit('botError', { message: 'Apenas o host pode adicionar bots' });
+        return;
+      }
+
+      // Importar botService dinamicamente para evitar dependência circular
+      import('../services/bot/bot.service').then(({ botService }) => {
+        const result = botService.addBotToRoom(
+          io,
+          roomService,
+          code,
+          botName || `AI-${room.players.length}`,
+          difficulty || 'medium'
+        );
+
+        if (!result.success || !result.bot) {
+          socket.emit('botError', { message: result.error || 'Erro desconhecido' });
+          return;
+        }
+
+        socket.emit('botAdded', {
+          botId: result.bot.id,
+          botName: result.bot.name,
+        });
+
+        io.emit('roomListUpdated');
+      });
+    } catch (error) {
+      logger.error(LOG_CATEGORIES.ROOM, 'Erro ao adicionar bot', {
+        socketId: socket.id,
+        error: String(error),
+      });
+      socket.emit('botError', { message: 'Erro ao adicionar bot' });
+    }
+  });
+
+  // ==========================================
+  // REMOVE BOT (Development Only)
+  // ==========================================
+  socket.on('removeBot', ({ botId }) => {
+    try {
+      const roomData = roomService.getRoomByPlayer(socket.id);
+      if (!roomData) {
+        socket.emit('botError', { message: 'Você não está em uma sala' });
+        return;
+      }
+
+      const { code, room } = roomData;
+
+      // Verificar se é o host
+      if (room.host !== socket.id) {
+        socket.emit('botError', { message: 'Apenas o host pode remover bots' });
+        return;
+      }
+
+      import('../services/bot/bot.service').then(({ botService }) => {
+        const result = botService.removeBotFromRoom(io, roomService, code, botId);
+
+        if (!result.success) {
+          socket.emit('botError', { message: result.error || 'Erro desconhecido' });
+          return;
+        }
+
+        socket.emit('botRemoved', { botId });
+        io.emit('roomListUpdated');
+      });
+    } catch (error) {
+      logger.error(LOG_CATEGORIES.ROOM, 'Erro ao remover bot', {
+        socketId: socket.id,
+        error: String(error),
+      });
+      socket.emit('botError', { message: 'Erro ao remover bot' });
+    }
+  });
+
+  // ==========================================
   // CHECK ACTIVE GAME
   // ==========================================
   socket.on('checkActiveGame', () => {
@@ -750,6 +880,96 @@ export function registerRoomHandlers(
         gameStarted: existingGame.room.started,
       });
       console.log(`[Room] checkActiveGame: ${userData.displayName} está em ${existingGame.code}`);
+    }
+  });
+
+  // ==========================================
+  // REMATCH HANDLER
+  // ==========================================
+
+  socket.on('requestRematch', async ({ previousRoomCode, playerName }) => {
+    const userData = socketUserMap.get(socket.id);
+
+    // Check if user is already in another game
+    if (userData?.odUserId) {
+      const existingGame = roomService.getRoomByUserId(userData.odUserId);
+      if (existingGame && existingGame.code !== previousRoomCode) {
+        socket.emit('joinError', 'Você já está em outro jogo');
+        return;
+      }
+    }
+
+    // Check if a rematch room already exists for this previous game
+    const existingRematchCode = roomService.getRematchRoom(previousRoomCode);
+
+    if (existingRematchCode) {
+      // Rematch room exists - join it
+      const result = roomService.joinRoom(
+        existingRematchCode,
+        socket.id,
+        playerName,
+        undefined,
+        userData?.odUserId
+      );
+
+      if ('error' in result) {
+        socket.emit('joinError', result.error);
+        return;
+      }
+
+      socket.join(existingRematchCode);
+
+      socket.emit('roomJoined', {
+        code: result.room.code,
+        players: result.room.players.map(toPublicPlayer),
+        isHost: result.room.host === socket.id,
+      });
+
+      socket.to(existingRematchCode).emit('playerJoined', {
+        players: result.room.players.map(toPublicPlayer),
+        newPlayer: playerName,
+      });
+
+      console.log(`[Rematch] ${playerName} entrou na revanche ${existingRematchCode} (anterior: ${previousRoomCode})`);
+    } else {
+      // No rematch room yet - create one (this player becomes host)
+      const result = roomService.createRoom(socket.id, playerName, undefined, userData?.odUserId);
+      const newRoomCode = result.room.code;
+
+      // Register the rematch mapping
+      roomService.setRematchRoom(previousRoomCode, newRoomCode);
+
+      socket.join(newRoomCode);
+
+      // Persist to database
+      try {
+        await gamePersistenceService.createGame({
+          roomCode: newRoomCode,
+          hostUserId: userData?.odUserId,
+          hostGuestName: !userData?.odUserId ? playerName : undefined,
+          hasPassword: false,
+        });
+      } catch (err) {
+        console.error('[DB] Erro ao criar jogo de revanche:', err);
+      }
+
+      socket.emit('roomCreated', {
+        code: newRoomCode,
+        players: result.players,
+        isHost: true,
+        hasPassword: false,
+      });
+
+      // Broadcast rematch room to all players who might be waiting
+      // They can use this to auto-join when they click "Play Again"
+      socket.emit('rematchRoomReady', {
+        newRoomCode,
+        previousRoomCode,
+      });
+
+      io.emit('roomListUpdated');
+
+      console.log(`[Rematch] ${playerName} criou revanche ${newRoomCode} (anterior: ${previousRoomCode})`);
     }
   });
 }

@@ -30,8 +30,24 @@ export interface ClientToServerEvents {
   abandonGame: (data: AbandonGamePayload) => void;
   checkActiveGame: () => void;
 
+  // Rematch
+  requestRematch: (data: RequestRematchPayload) => void;
+
+  // Bot (Development Only)
+  addBot: (data: AddBotPayload) => void;
+  removeBot: (data: RemoveBotPayload) => void;
+
   // Online count
   requestOnlineCount: () => void;
+}
+
+export interface AddBotPayload {
+  botName?: string;
+  difficulty?: 'easy' | 'medium' | 'hard';
+}
+
+export interface RemoveBotPayload {
+  botId: string;
 }
 
 export interface CreateRoomPayload {
@@ -71,6 +87,11 @@ export interface RejoinGamePayload {
 
 export interface AbandonGamePayload {
   roomCode: string;
+}
+
+export interface RequestRematchPayload {
+  previousRoomCode: string;
+  playerName: string;
 }
 
 // ==========================================
@@ -120,8 +141,25 @@ export interface ServerToClientEvents {
   // Achievement events
   achievementsUnlocked: (data: AchievementUnlocked[]) => void;
 
+  // Rematch events
+  rematchRoomReady: (data: RematchRoomReadyPayload) => void;
+
+  // Bot events (Development Only)
+  botAdded: (data: BotAddedPayload) => void;
+  botRemoved: (data: BotRemovedPayload) => void;
+  botError: (data: { message: string }) => void;
+
   // Online count
   onlineCount: (data: { total: number; inQueue: number }) => void;
+}
+
+export interface BotAddedPayload {
+  botId: string;
+  botName: string;
+}
+
+export interface BotRemovedPayload {
+  botId: string;
 }
 
 // ==========================================
@@ -175,7 +213,8 @@ export interface RoundStartedPayload {
   currentPlayer: string;
   turnDirection: TurnDirection;
   itemsReceived?: Item[];
-  turnStartTime?: number;
+  turnStartTime?: number; // deprecated - use turnElapsed
+  turnElapsed?: number; // ms elapsed since turn started (for sync)
 }
 
 export interface ShotFiredPayload {
@@ -205,9 +244,10 @@ export interface ItemUsedPayload extends ItemUseResult {
 
 export interface TurnChangedPayload {
   currentPlayer: string;
-  reason: 'shot' | 'timeout' | 'playerDisconnected' | 'handcuffs' | 'reconnected' | 'elimination';
+  reason: 'shot' | 'timeout' | 'playerDisconnected' | 'handcuffs' | 'reconnected' | 'elimination' | 'beer_reload';
   players: PlayerPublicState[];
-  turnStartTime: number; // Timestamp when turn started (for sync)
+  turnStartTime?: number; // deprecated - use turnElapsed
+  turnElapsed?: number; // ms elapsed since turn started (for sync)
 }
 
 export interface TurnTimerStartedPayload {
@@ -326,4 +366,9 @@ export interface ShellEjectedPayload {
   ejectedShell: ShellType;
   playerId: string;
   playerName: string;
+}
+
+export interface RematchRoomReadyPayload {
+  newRoomCode: string;
+  previousRoomCode: string;
 }

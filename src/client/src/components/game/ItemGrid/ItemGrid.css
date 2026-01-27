@@ -88,3 +88,56 @@
     font-size: 1.3rem;
   }
 }
+
+@media (max-width: 380px) {
+  .item-grid {
+    gap: 0.35rem;
+    padding: 0.75rem;
+  }
+
+  .item-slot {
+    width: 42px;
+    height: 42px;
+  }
+
+  .item-emoji {
+    font-size: 1.2rem;
+  }
+
+  .item-grid.empty {
+    min-height: 55px;
+  }
+
+  .no-items {
+    font-size: 0.8rem;
+  }
+}
+
+@media (max-width: 320px) {
+  .item-grid {
+    gap: 0.25rem;
+    padding: 0.5rem;
+  }
+
+  .item-slot {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+  }
+
+  .item-emoji {
+    font-size: 1rem;
+  }
+
+  .item-grid.empty {
+    min-height: 45px;
+  }
+
+  .no-items {
+    font-size: 0.75rem;
+  }
+
+  .empty-slot {
+    font-size: 1rem;
+  }
+}

@@ -97,6 +97,8 @@ export interface Player {
 
 export class RoomService {
   private rooms: Map<string, Room> = new Map();
+  // Rematch tracking: previousRoomCode -> newRoomCode
+  private rematchRooms: Map<string, string> = new Map();
 
   // Callbacks para comunicação com handlers
   onGameCancelled?: (roomCode: string) => void;
@@ -824,5 +826,75 @@ export class RoomService {
 
   getRoomByUserId(userId: string): { code: string; room: Room; player: Player } | null {
     return this.findRoomByUserId(userId);
+  }
+
+  // ==========================================
+  // REMATCH METHODS
+  // ==========================================
+
+  /**
+   * Check if a rematch room already exists for a previous game
+   */
+  getRematchRoom(previousRoomCode: string): string | null {
+    const newCode = this.rematchRooms.get(previousRoomCode);
+    if (newCode && this.rooms.has(newCode)) {
+      const room = this.rooms.get(newCode);
+      // Only return if room exists and game hasn't started yet
+      if (room && !room.started) {
+        return newCode;
+      }
+    }
+    // Clean up stale entry
+    this.rematchRooms.delete(previousRoomCode);
+    return null;
+  }
+
+  /**
+   * Register a new rematch room for a previous game
+   */
+  setRematchRoom(previousRoomCode: string, newRoomCode: string): void {
+    // Clear any old mapping
+    this.rematchRooms.delete(previousRoomCode);
+    this.rematchRooms.set(previousRoomCode, newRoomCode);
+
+    // Auto-cleanup after 5 minutes
+    setTimeout(() => {
+      if (this.rematchRooms.get(previousRoomCode) === newRoomCode) {
+        this.rematchRooms.delete(previousRoomCode);
+      }
+    }, 5 * 60 * 1000);
+  }
+
+  /**
+   * Clear rematch mapping when done
+   */
+  clearRematchRoom(previousRoomCode: string): void {
+    this.rematchRooms.delete(previousRoomCode);
+  }
+
+  /**
+   * Delete a room (used after game over)
+   */
+  deleteRoom(code: string): boolean {
+    const room = this.rooms.get(code);
+    if (!room) {
+      return false;
+    }
+
+    // Clear any pending timeouts
+    if (room.turnTimeout) {
+      clearTimeout(room.turnTimeout);
+      room.turnTimeout = null;
+    }
+    if (room.emptyRoomTimeout) {
+      clearTimeout(room.emptyRoomTimeout);
+      room.emptyRoomTimeout = null;
+    }
+
+    // Delete the room
+    this.rooms.delete(code);
+    console.log(`[Room] Sala ${code} deletada após game over`);
+
+    return true;
   }
 }

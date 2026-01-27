@@ -7,3 +7,4 @@ export * from './player.types';
 export * from './item.types';
 export * from './socket-events.types';
 export * from './achievement.types';
+export * from './bug.types';

@@ -162,7 +162,6 @@ export default function SinglePlayer() {
       blank: blankCount,
       hp: initialState.player.maxHp,
     });
-    setTimeout(() => setRoundAnnouncement(null), 5000);
   }, []);
 
   const startRound = useCallback((roundNumber: number) => {
@@ -193,7 +192,6 @@ export default function SinglePlayer() {
       blank: blankCount,
       hp: initialState.player.maxHp,
     });
-    setTimeout(() => setRoundAnnouncement(null), 5000);
   }, []);
 
   // ========================================
@@ -231,7 +229,6 @@ export default function SinglePlayer() {
           blank: blankCount,
           hp: prev.player.maxHp,
         });
-        setTimeout(() => setRoundAnnouncement(null), 4000);
         setPlayerLastShell({});
 
         return {
@@ -883,6 +880,7 @@ export default function SinglePlayer() {
         onStealItem={handleStealItem}
         onCancelSteal={cancelSteal}
         onBack={() => navigate('/')}
+        onRoundAnnouncementComplete={() => setRoundAnnouncement(null)}
       >
         {/* Phone Modal */}
         {phoneModal && (

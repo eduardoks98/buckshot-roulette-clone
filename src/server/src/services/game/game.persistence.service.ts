@@ -327,6 +327,8 @@ export class GamePersistenceService {
             previousPrestige: previousLevelInfo.prestigeLevel,
             newPrestige: newLevelInfo.prestigeLevel,
             breakdown: xpResult.breakdown,
+            eloChange: eloChange,
+            newEloRating: newElo,
           });
 
           // Log detalhado do cálculo de ELO e XP

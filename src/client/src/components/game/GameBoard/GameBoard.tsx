@@ -4,6 +4,7 @@
 
 import { useMemo } from 'react';
 import { RevolverCylinder } from '../RevolverCylinder';
+import { RoundAnnouncementOverlay } from '../RoundAnnouncementOverlay';
 import {
   HeartFullIcon,
   HeartEmptyIcon,
@@ -12,10 +13,7 @@ import {
   HandSawIcon,
   ExplosionIcon,
   SmokeIcon,
-  TargetIcon,
   AdrenalineIcon,
-  ShellLiveIcon,
-  ShellBlankIcon,
   ITEM_ICONS,
   ItemIconId,
 } from '../../icons';
@@ -128,6 +126,7 @@ export interface GameBoardProps {
   onStealItem?: (itemIndex: number) => void;
   onCancelSteal?: () => void;
   onBack: () => void;
+  onRoundAnnouncementComplete?: () => void;
 
   // Extra content
   children?: React.ReactNode;
@@ -166,32 +165,6 @@ function ItemIcon({ item, size = 20 }: { item: GameItem; size?: number }) {
 }
 
 // ========================================
-// HELPER: Shell Icons
-// ========================================
-
-function ShellIcons({ live, blank }: { live: number; blank: number }) {
-  const shells: JSX.Element[] = [];
-
-  for (let i = 0; i < live; i++) {
-    shells.push(
-      <div key={`live-${i}`} className="shell-icon live" title="LIVE">
-        <div className="shell-tip"></div>
-      </div>
-    );
-  }
-
-  for (let i = 0; i < blank; i++) {
-    shells.push(
-      <div key={`blank-${i}`} className="shell-icon blank" title="BLANK">
-        <div className="shell-tip"></div>
-      </div>
-    );
-  }
-
-  return <div className="shells-visual">{shells}</div>;
-}
-
-// ========================================
 // MAIN COMPONENT
 // ========================================
 
@@ -227,6 +200,7 @@ export default function GameBoard({
   onStealItem,
   onCancelSteal,
   onBack,
+  onRoundAnnouncementComplete,
   children,
 }: GameBoardProps) {
   // Check if any overlay is active (blocks interactions)
@@ -414,27 +388,13 @@ export default function GameBoard({
 
       {/* ========== ROUND ANNOUNCEMENT OVERLAY ========== */}
       {roundAnnouncement && !gameOverData && (
-        <div className="round-announcement-overlay">
-          <div className="round-announcement">
-            <h2><TargetIcon size={36} color="var(--gold-accent)" /> RODADA {roundAnnouncement.round}</h2>
-            <div className="shell-distribution">
-              <div className="shells-visual-container">
-                <ShellIcons live={roundAnnouncement.live} blank={roundAnnouncement.blank} />
-              </div>
-              <div className="shell-legend">
-                <span className="legend-item live">
-                  <ShellLiveIcon size={20} /> {roundAnnouncement.live} LIVE
-                </span>
-                <span className="legend-item blank">
-                  <ShellBlankIcon size={20} /> {roundAnnouncement.blank} BLANK
-                </span>
-              </div>
-            </div>
-            <div className="hp-announcement">
-              <HeartFullIcon size={24} /> {roundAnnouncement.hp} HP cada
-            </div>
-          </div>
-        </div>
+        <RoundAnnouncementOverlay
+          round={roundAnnouncement.round}
+          live={roundAnnouncement.live}
+          blank={roundAnnouncement.blank}
+          hp={roundAnnouncement.hp}
+          onAnimationComplete={onRoundAnnouncementComplete}
+        />
       )}
 
       {/* ========== SHOT RESULT OVERLAY ========== */}

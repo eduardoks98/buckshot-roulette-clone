@@ -8,7 +8,7 @@
 import { Request, Response } from 'express';
 import { bugService } from '../services/bug.service';
 import { authService } from '../services/auth.service';
-import { BugCategory, BugPriority } from '@prisma/client';
+import { BUG_CATEGORIES, DEFAULT_PRIORITY } from '../../../shared/types/bug.types';
 
 // ==========================================
 // CREATE BUG REPORT (anyone can report)
@@ -24,7 +24,7 @@ export const createBugReport = async (req: Request, res: Response) => {
     }
 
     // Validate category
-    if (!Object.values(BugCategory).includes(category)) {
+    if (!BUG_CATEGORIES.includes(category)) {
       return res.status(400).json({ error: 'Categoria invalida' });
     }
 
@@ -43,7 +43,7 @@ export const createBugReport = async (req: Request, res: Response) => {
       title,
       description,
       category,
-      priority: priority || BugPriority.MEDIUM,
+      priority: priority || DEFAULT_PRIORITY,
       game_room_code: gameRoomCode,
       game_round: gameRound,
       game_state: gameState ? JSON.stringify(gameState) : undefined,

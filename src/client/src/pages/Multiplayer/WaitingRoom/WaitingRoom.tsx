@@ -11,10 +11,14 @@ import { PlayerPublicState } from '../../../../../shared/types';
 import { GAME_RULES } from '../../../../../shared/constants';
 import './WaitingRoom.css';
 
+// Verificar se está em modo de desenvolvimento
+const isDevelopment = import.meta.env.DEV;
+
 interface LocationState {
   roomCode: string;
   isHost: boolean;
   players: PlayerPublicState[];
+  fromRematch?: boolean;
 }
 
 interface SavedSession {
@@ -28,7 +32,7 @@ export default function WaitingRoom() {
   const navigate = useNavigate();
   const location = useLocation();
   const { socket, isConnected, connect } = useSocket();
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, user } = useAuth();
 
   const state = location.state as LocationState | null;
   const reconnectAttempted = useRef(false);
@@ -48,6 +52,20 @@ export default function WaitingRoom() {
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
   const [reconnecting, setReconnecting] = useState(false);
+  const [addingBot, setAddingBot] = useState(false);
+
+  // Salvar sessão quando vem do rematch (para permitir reconexão em caso de F5)
+  useEffect(() => {
+    if (state?.fromRematch && state.roomCode && user?.display_name) {
+      localStorage.setItem('bangshotSession', JSON.stringify({
+        roomCode: state.roomCode,
+        playerName: user.display_name,
+        isHost: state.isHost,
+        timestamp: Date.now(),
+      }));
+      console.log('[WaitingRoom] Sessão salva do rematch:', state.roomCode);
+    }
+  }, [state?.fromRematch, state?.roomCode, state?.isHost, user?.display_name]);
 
   // Handler para sair da sala (chamado pelo botão Voltar)
   // Este é o ÚNICO lugar que deve emitir leaveRoom explicitamente
@@ -231,6 +249,53 @@ export default function WaitingRoom() {
     socket.emit('startGame');
   };
 
+  // Bot management (Development only)
+  const handleAddBot = () => {
+    if (!socket || !isHost || !isDevelopment) return;
+    if (players.length >= GAME_RULES.MAX_PLAYERS) {
+      setError('Sala cheia');
+      return;
+    }
+    setAddingBot(true);
+    setError('');
+    socket.emit('addBot', {
+      difficulty: 'medium',
+    });
+  };
+
+  const handleRemoveBot = (botId: string) => {
+    if (!socket || !isHost || !isDevelopment) return;
+    socket.emit('removeBot', { botId });
+  };
+
+  // Listen for bot events
+  useEffect(() => {
+    if (!socket || !isDevelopment) return;
+
+    const handleBotAdded = () => {
+      setAddingBot(false);
+    };
+
+    const handleBotRemoved = () => {
+      // Bot removed successfully
+    };
+
+    const handleBotError = ({ message }: { message: string }) => {
+      setError(message);
+      setAddingBot(false);
+    };
+
+    socket.on('botAdded', handleBotAdded);
+    socket.on('botRemoved', handleBotRemoved);
+    socket.on('botError', handleBotError);
+
+    return () => {
+      socket.off('botAdded', handleBotAdded);
+      socket.off('botRemoved', handleBotRemoved);
+      socket.off('botError', handleBotError);
+    };
+  }, [socket]);
+
   const handleCopyCode = async () => {
     try {
       await navigator.clipboard.writeText(roomCode);
@@ -279,18 +344,31 @@ export default function WaitingRoom() {
         <div className="players-section">
           <h3>Jogadores ({players.length}/{GAME_RULES.MAX_PLAYERS})</h3>
           <div className="players-list">
-            {players.map((player, index) => (
-              <div key={player.id} className={`player-card ${player.disconnected ? 'disconnected' : ''}`}>
-                <div className={`player-avatar ${player.disconnected ? 'disconnected' : ''}`}>
-                  {player.name.charAt(0).toUpperCase()}
+            {players.map((player, index) => {
+              const isBot = player.id.startsWith('BOT_');
+              return (
+                <div key={player.id} className={`player-card ${player.disconnected ? 'disconnected' : ''} ${isBot ? 'bot' : ''}`}>
+                  <div className={`player-avatar ${player.disconnected ? 'disconnected' : ''} ${isBot ? 'bot' : ''}`}>
+                    {isBot ? 'AI' : player.name.charAt(0).toUpperCase()}
+                  </div>
+                  <div className="player-info">
+                    <span className="player-name">{player.name}</span>
+                    {index === 0 && !isBot && <span className="host-badge">HOST</span>}
+                    {isBot && <span className="bot-badge">BOT</span>}
+                    {player.disconnected && <span className="reconnecting-badge">Reconectando...</span>}
+                  </div>
+                  {isHost && isDevelopment && isBot && (
+                    <button
+                      className="remove-bot-btn"
+                      onClick={() => handleRemoveBot(player.id)}
+                      title="Remover bot"
+                    >
+                      X
+                    </button>
+                  )}
                 </div>
-                <div className="player-info">
-                  <span className="player-name">{player.name}</span>
-                  {index === 0 && <span className="host-badge">HOST</span>}
-                  {player.disconnected && <span className="reconnecting-badge">Reconectando...</span>}
-                </div>
-              </div>
-            ))}
+              );
+            })}
 
             {/* Empty slots */}
             {Array.from({ length: GAME_RULES.MAX_PLAYERS - players.length }).map((_, i) => (
@@ -302,6 +380,17 @@ export default function WaitingRoom() {
               </div>
             ))}
           </div>
+
+          {/* Add Bot button (Development only) */}
+          {isDevelopment && isHost && players.length < GAME_RULES.MAX_PLAYERS && (
+            <button
+              className="add-bot-btn"
+              onClick={handleAddBot}
+              disabled={addingBot}
+            >
+              {addingBot ? 'Adicionando...' : '+ Adicionar Bot (DEV)'}
+            </button>
+          )}
         </div>
 
         <div className="game-rules-preview">

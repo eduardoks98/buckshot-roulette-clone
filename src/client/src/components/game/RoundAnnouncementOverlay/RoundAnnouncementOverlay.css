@@ -4,10 +4,7 @@
 
 .round-announcement-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
+  inset: 0;
   background: rgba(0, 0, 0, 0.92);
   display: flex;
   align-items: center;
@@ -29,101 +26,6 @@
   align-items: center;
   gap: 1.5rem;
   animation: announcement-scale 0.5s ease;
-}
-
-/* ==========================================
-   REVOLVER ANIMATION AREA - Side/Top view container
-   ========================================== */
-
-.revolver-animation-area {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  min-height: 280px;
-  margin: 1rem 0;
-  perspective: 1000px;
-}
-
-/* Side view container */
-.side-view-container {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-}
-
-.side-view-container.entrance {
-  animation: revolver-entrance 0.8s cubic-bezier(0.22, 1, 0.36, 1) forwards;
-}
-
-@keyframes revolver-entrance {
-  0% {
-    opacity: 0;
-    transform: translateX(-100px) scale(0.85) rotate(-5deg);
-  }
-  60% {
-    opacity: 1;
-    transform: translateX(10px) scale(1.02) rotate(1deg);
-  }
-  100% {
-    opacity: 1;
-    transform: translateX(0) scale(1) rotate(0deg);
-  }
-}
-
-.side-view-container.cylinder-open {
-  animation: none;
-}
-
-/* Exiting side view (transition phase) */
-.side-view-container.exiting {
-  position: absolute;
-  animation: side-view-exit 0.7s cubic-bezier(0.55, 0, 1, 0.45) forwards;
-}
-
-@keyframes side-view-exit {
-  0% {
-    opacity: 1;
-    transform: perspective(800px) rotateX(0deg) scale(1);
-  }
-  40% {
-    opacity: 0.8;
-    transform: perspective(800px) rotateX(-35deg) scale(0.95);
-  }
-  100% {
-    opacity: 0;
-    transform: perspective(800px) rotateX(-90deg) scale(0.6);
-  }
-}
-
-/* Top view container entering */
-.top-view-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2rem;
-}
-
-.top-view-container.entering {
-  animation: top-view-enter 0.7s cubic-bezier(0, 0.55, 0.45, 1) forwards;
-  animation-delay: 0.2s;
-  opacity: 0;
-}
-
-@keyframes top-view-enter {
-  0% {
-    opacity: 0;
-    transform: perspective(800px) rotateX(90deg) scale(0.6);
-  }
-  60% {
-    opacity: 0.8;
-    transform: perspective(800px) rotateX(-10deg) scale(1.02);
-  }
-  100% {
-    opacity: 1;
-    transform: perspective(800px) rotateX(0deg) scale(1);
-  }
 }
 
 @keyframes announcement-scale {
@@ -182,7 +84,7 @@
   width: 18px;
   height: 36px;
   z-index: 10;
-  animation: fly-to-cylinder 0.35s ease-out forwards;
+  animation: fly-to-cylinder 0.28s ease-out forwards;
 }
 
 .flying-shell-body {
@@ -243,99 +145,6 @@
   100% {
     transform: translateX(-50%) translateY(-130px) scale(0.3) rotate(0deg);
     opacity: 0;
-  }
-}
-
-/* ==========================================
-   SHELLS QUEUE - Shells waiting to be loaded
-   ========================================== */
-
-.shells-queue {
-  display: flex;
-  gap: 0.5rem;
-  justify-content: center;
-  flex-wrap: wrap;
-  max-width: 400px;
-  min-height: 50px;
-}
-
-.shell-to-load {
-  width: 22px;
-  height: 44px;
-  position: relative;
-  animation: shell-appear 0.3s ease-out backwards;
-}
-
-.shell-to-load .shell-body {
-  width: 100%;
-  height: 100%;
-  border-radius: 4px 4px 11px 11px;
-  position: relative;
-  transition: all 0.3s ease;
-}
-
-.shell-to-load .shell-tip {
-  position: absolute;
-  top: 3px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 8px;
-  height: 5px;
-  border-radius: 3px 3px 0 0;
-  background: rgba(255, 255, 255, 0.5);
-}
-
-/* Live shell */
-.shell-to-load.live .shell-body {
-  background: linear-gradient(180deg,
-    #fca5a5 0%,
-    #ef4444 20%,
-    #dc2626 50%,
-    #b91c1c 100%
-  );
-  box-shadow:
-    0 4px 15px rgba(239, 68, 68, 0.6),
-    inset 0 2px 4px rgba(255, 255, 255, 0.3);
-}
-
-/* Blank shell */
-.shell-to-load.blank .shell-body {
-  background: linear-gradient(180deg,
-    #93c5fd 0%,
-    #3b82f6 20%,
-    #2563eb 50%,
-    #1d4ed8 100%
-  );
-  box-shadow:
-    0 4px 15px rgba(59, 130, 246, 0.6),
-    inset 0 2px 4px rgba(255, 255, 255, 0.3);
-}
-
-/* Shell currently flying - hide from queue */
-.shell-to-load.flying {
-  opacity: 0;
-  transform: scale(0.5);
-  transition: all 0.15s ease-out;
-}
-
-/* Shell already loaded - hidden */
-.shell-to-load.loaded {
-  opacity: 0;
-  transform: scale(0);
-  width: 0;
-  margin: 0;
-  padding: 0;
-  transition: all 0.2s ease;
-}
-
-@keyframes shell-appear {
-  0% {
-    opacity: 0;
-    transform: translateY(20px) rotate(-10deg);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0) rotate(0);
   }
 }
 
@@ -463,16 +272,6 @@
     font-size: 2rem;
   }
 
-  .shells-queue {
-    max-width: 300px;
-    gap: 0.4rem;
-  }
-
-  .shell-to-load {
-    width: 18px;
-    height: 36px;
-  }
-
   .shell-count {
     font-size: 1.1rem;
     padding: 0.4rem 0.8rem;
@@ -498,18 +297,112 @@
     letter-spacing: 1px;
   }
 
-  .shells-queue {
-    max-width: 250px;
-    gap: 0.3rem;
-  }
-
-  .shell-to-load {
-    width: 16px;
-    height: 32px;
-  }
-
   .ready-text {
     font-size: 1.4rem;
     letter-spacing: 3px;
+  }
+}
+
+@media (max-width: 350px) {
+  .round-announcement {
+    gap: 1rem;
+    padding: 0 0.5rem;
+  }
+
+  .round-title {
+    font-size: 1.4rem;
+    gap: 0.5rem;
+  }
+
+  .round-title svg {
+    width: 28px;
+    height: 28px;
+  }
+
+  .cylinder-loading-area {
+    gap: 1rem;
+    margin: 0.5rem 0;
+  }
+
+  .shell-info {
+    gap: 0.75rem;
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+
+  .shell-count {
+    font-size: 0.9rem;
+    padding: 0.25rem 0.5rem;
+    letter-spacing: 0.5px;
+  }
+
+  .hp-announcement {
+    font-size: 1rem;
+    gap: 0.3rem;
+  }
+
+  .loading-text {
+    font-size: 0.85rem;
+  }
+
+  .spinning-text {
+    font-size: 1rem;
+    letter-spacing: 1px;
+  }
+
+  .ready-text {
+    font-size: 1.2rem;
+    letter-spacing: 2px;
+  }
+
+  .flying-shell {
+    width: 14px;
+    height: 28px;
+  }
+}
+
+@media (max-width: 320px) {
+  .round-announcement {
+    gap: 0.75rem;
+  }
+
+  .round-title {
+    font-size: 1.2rem;
+  }
+
+  .round-title svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .shell-info {
+    gap: 0.5rem;
+  }
+
+  .shell-count {
+    font-size: 0.8rem;
+    padding: 0.2rem 0.4rem;
+  }
+
+  .hp-announcement {
+    font-size: 0.9rem;
+  }
+
+  .loading-text {
+    font-size: 0.75rem;
+  }
+
+  .spinning-text {
+    font-size: 0.9rem;
+  }
+
+  .ready-text {
+    font-size: 1rem;
+    letter-spacing: 1.5px;
+  }
+
+  .flying-shell {
+    width: 12px;
+    height: 24px;
   }
 }

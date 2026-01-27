@@ -9,6 +9,7 @@ import { gamePersistenceService } from '../services/game/game.persistence.servic
 import { achievementService, PlayerEndGameStats } from '../services/achievement.service';
 import { GAME_RULES } from '../../../shared/constants';
 import { Item, ItemId, GameAward } from '../../../shared/types';
+import { logger, LOG_CATEGORIES } from '../services/logger.service';
 
 const gameService = new GameService();
 
@@ -84,12 +85,37 @@ export function registerGameHandlers(
         currentPlayer: nextPlayerId,
         reason: 'shot',
         players: room.players.map(p => gameService.toPublicPlayer(p)),
-        turnStartTime: room.turnStartTime!,
+        turnElapsed: 0, // Turno acabou de começar
       });
 
-      console.log(`[Game] ${socket.id} atirou em ${targetId} - ${result.shell}`);
+      // Se o próximo jogador é um bot, agendar jogada
+      const nextPlayer = room.players.find(p => p.id === nextPlayerId);
+      if (nextPlayer && nextPlayer.id.startsWith('BOT_')) {
+        import('../services/bot/bot.service').then(({ botService }) => {
+          // Delay para aguardar o overlay de shot result no cliente
+          const SHOT_OVERLAY_DELAY = 3500; // 3s overlay + 500ms buffer
+          botService.scheduleBotTurn(io, room as never, code, roomService, SHOT_OVERLAY_DELAY);
+        });
+      }
+
+      // Log do tiro
+      const shooter = room.players.find(p => p.id === socket.id);
+      const targetPlayer = room.players.find(p => p.id === targetId);
+      logger.info(LOG_CATEGORIES.SHOT, `${shooter?.name || socket.id} atirou em ${targetPlayer?.name || targetId}`, {
+        roomCode: code,
+        socketId: socket.id,
+        shooter: shooter?.name,
+        target: targetPlayer?.name,
+        shell: result.shell,
+        damage: result.damage,
+        targetSelf: socket.id === targetId,
+        sawedOff: result.sawedOff,
+      });
     } catch (error) {
-      console.error('[Game] Erro ao processar tiro:', error);
+      logger.error(LOG_CATEGORIES.SHOT, 'Erro ao processar tiro', {
+        socketId: socket.id,
+        error: String(error),
+      });
       socket.emit('actionError', 'Erro ao processar tiro');
     }
   });
@@ -166,8 +192,17 @@ export function registerGameHandlers(
                     currentPlayer: nextPlayerId,
                     reason: 'elimination',
                     players: room.players.map(p => gameService.toPublicPlayer(p)),
-                    turnStartTime: room.turnStartTime!,
+                    turnElapsed: 0, // Turno acabou de começar
                   });
+
+                  // Se o próximo jogador é um bot, agendar jogada
+                  const nextPlayerElim = room.players.find(p => p.id === nextPlayerId);
+                  if (nextPlayerElim && nextPlayerElim.id.startsWith('BOT_')) {
+                    import('../services/bot/bot.service').then(({ botService }) => {
+                      const ITEM_OVERLAY_DELAY = 3000;
+                      botService.scheduleBotTurn(io, room as never, code, roomService, ITEM_OVERLAY_DELAY);
+                    });
+                  }
                 }
               }
             }
@@ -207,15 +242,78 @@ export function registerGameHandlers(
               currentPlayer: nextPlayerId,
               reason: 'elimination',
               players: room.players.map(p => gameService.toPublicPlayer(p)),
-              turnStartTime: room.turnStartTime!,
+              turnElapsed: 0, // Turno acabou de começar
             });
+
+            // Se o próximo jogador é um bot, agendar jogada
+            const nextPlayerMed = room.players.find(p => p.id === nextPlayerId);
+            if (nextPlayerMed && nextPlayerMed.id.startsWith('BOT_')) {
+              import('../services/bot/bot.service').then(({ botService }) => {
+                const ITEM_OVERLAY_DELAY = 3000;
+                botService.scheduleBotTurn(io, room as never, code, roomService, ITEM_OVERLAY_DELAY);
+              });
+            }
           }
         }
       }
 
-      console.log(`[Game] ${socket.id} usou item ${itemId}`);
+      // Cerveja no último cartucho: avançar turno para o próximo jogador
+      // Quando a cerveja causa reload, significa que acabou as shells e o turno deve passar
+      if (itemId === 'beer' && result.reloaded && result.newShells) {
+        io.to(code).emit('shellsReloaded', {
+          shells: result.newShells,
+          itemsDistributed: result.itemsDistributed || [],
+        });
+
+        // Avançar turno (cerveja no último cartucho passa a vez)
+        const nextPlayerId = gameService.advanceTurn(room, false, false);
+
+        // Reset turn timer
+        if (room.turnTimeout) {
+          clearTimeout(room.turnTimeout);
+        }
+        room.turnStartTime = Date.now();
+        room.turnTimeout = setTimeout(() => {
+          handleTurnTimeout(io, room, code, roomService);
+        }, GAME_RULES.TIMERS.TURN_DURATION_MS);
+
+        io.to(code).emit('turnChanged', {
+          currentPlayer: nextPlayerId,
+          reason: 'beer_reload',
+          players: room.players.map(p => gameService.toPublicPlayer(p)),
+          turnElapsed: 0,
+        });
+
+        // Se o próximo jogador é um bot, agendar jogada
+        const nextPlayerBeer = room.players.find(p => p.id === nextPlayerId);
+        if (nextPlayerBeer && nextPlayerBeer.id.startsWith('BOT_')) {
+          import('../services/bot/bot.service').then(({ botService }) => {
+            const ITEM_OVERLAY_DELAY = 3000;
+            botService.scheduleBotTurn(io, room as never, code, roomService, ITEM_OVERLAY_DELAY);
+          });
+        }
+
+        logger.info(LOG_CATEGORIES.ITEM, `Cerveja causou reload - turno passou para ${nextPlayerId}`, {
+          roomCode: code,
+          socketId: socket.id,
+        });
+      }
+
+      // Log do uso de item
+      const user = room.players.find(p => p.id === socket.id);
+      logger.info(LOG_CATEGORIES.ITEM, `${user?.name || socket.id} usou ${itemId}`, {
+        roomCode: code,
+        socketId: socket.id,
+        playerName: user?.name,
+        itemId,
+        targetId,
+        itemIndex,
+      });
     } catch (error) {
-      console.error('[Game] Erro ao usar item:', error);
+      logger.error(LOG_CATEGORIES.ITEM, 'Erro ao usar item', {
+        socketId: socket.id,
+        error: String(error),
+      });
       socket.emit('actionError', 'Erro ao usar item');
     }
   });
@@ -411,7 +509,7 @@ export function calculateAwards(players: RoomWithTimer['players']): GameAward[] 
   return awards;
 }
 
-async function handleRoundEnd(
+export async function handleRoundEnd(
   io: TypedIOServer,
   room: RoomWithTimer,
   code: string,
@@ -425,6 +523,12 @@ async function handleRoundEnd(
   }
 
   const winner = room.players.find(p => p.id === winnerId);
+
+  // Aguardar overlay de tiro terminar antes de mostrar resultado do round
+  // O overlay de tiro dura 3000ms no cliente, adicionamos 500ms de buffer
+  const SHOT_OVERLAY_DELAY = 3500;
+
+  await new Promise(resolve => setTimeout(resolve, SHOT_OVERLAY_DELAY));
 
   // Finalizar round no banco de dados
   gamePersistenceService.endRound(code, room.currentRound, winnerId || '')
@@ -582,6 +686,12 @@ async function handleRoundEnd(
         awards,
       });
     }
+
+    // Delete room after game over (with delay to ensure event is sent)
+    setTimeout(() => {
+      roomService.deleteRoom(code);
+    }, 2000);
+
     return;
   }
 
@@ -609,7 +719,7 @@ async function handleRoundEnd(
         playerSocket.emit('roundStarted', {
           ...roundData,
           itemsReceived: player.items,
-          turnStartTime: room.turnStartTime || undefined,
+          turnElapsed: room.turnStartTime ? Date.now() - room.turnStartTime : 0,
         });
       }
     });
@@ -624,6 +734,13 @@ function handleTurnTimeout(
 ): void {
   const currentPlayer = room.players[room.currentPlayerIndex];
   if (!currentPlayer || !currentPlayer.alive) return;
+
+  // Log do timeout
+  logger.warn(LOG_CATEGORIES.TIMER, `Turno expirou - ${currentPlayer.name} atirou em si`, {
+    roomCode: code,
+    socketId: currentPlayer.id,
+    playerName: currentPlayer.name,
+  });
 
   // Auto-shoot self
   const result = gameService.processShot(room as never, currentPlayer.id, currentPlayer.id);
@@ -673,8 +790,17 @@ function handleTurnTimeout(
     currentPlayer: nextPlayerId,
     reason: 'timeout',
     players: room.players.map(p => gameService.toPublicPlayer(p as never)),
-    turnStartTime: room.turnStartTime!,
+    turnElapsed: 0, // Turno acabou de começar
   });
+
+  // Se o próximo jogador é um bot, agendar jogada
+  const nextPlayerTimeout = room.players.find(p => p.id === nextPlayerId);
+  if (nextPlayerTimeout && nextPlayerTimeout.id.startsWith('BOT_')) {
+    import('../services/bot/bot.service').then(({ botService }) => {
+      const SHOT_OVERLAY_DELAY = 3500;
+      botService.scheduleBotTurn(io, room as never, code, roomService, SHOT_OVERLAY_DELAY);
+    });
+  }
 }
 
 // ==========================================
@@ -697,7 +823,22 @@ export function startTurnTimer(
     handleTurnTimeout(io, room, code, roomService);
   }, GAME_RULES.TIMERS.TURN_DURATION_MS);
 
-  console.log(`[Game] Turn timer started for room ${code}`);
+  const currentPlayer = room.players[room.currentPlayerIndex];
+  logger.debug(LOG_CATEGORIES.TIMER, 'Timer iniciado', {
+    roomCode: code,
+    currentPlayer: currentPlayer?.name,
+    duration: GAME_RULES.TIMERS.TURN_DURATION_MS,
+  });
+
+  // Se o jogador atual for um bot, agendar jogada automática
+  // Adiciona delay para aguardar o overlay de Round Announcement no cliente (~3s)
+  if (currentPlayer && currentPlayer.id.startsWith('BOT_')) {
+    import('../services/bot/bot.service').then(({ botService }) => {
+      // ROUND_ANNOUNCEMENT_DELAY: tempo que o overlay de round fica visível no cliente
+      const ROUND_ANNOUNCEMENT_DELAY = 3500; // 3s overlay + 500ms buffer
+      botService.scheduleBotTurn(io, room as never, code, roomService, ROUND_ANNOUNCEMENT_DELAY);
+    });
+  }
 }
 
 // Export the RoomWithTimer interface for use in other files

@@ -4,7 +4,7 @@
 // Envia bug reports para o Games Admin centralizado
 // ==========================================
 
-import { BugCategory, BugPriority } from '@prisma/client';
+import { BugCategory, BugPriority, DEFAULT_PRIORITY } from '../../../shared/types/bug.types';
 
 // ==========================================
 // CONFIG
@@ -76,7 +76,7 @@ class BugService {
           title: params.title,
           description: params.description,
           category: params.category,
-          priority: params.priority || BugPriority.MEDIUM,
+          priority: params.priority || DEFAULT_PRIORITY,
           user_id: params.user_id || null,
           game_room_code: params.game_room_code || null,
           game_round: params.game_round || null,

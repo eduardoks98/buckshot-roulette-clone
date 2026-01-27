@@ -15,6 +15,7 @@ import { registerRoomHandlers, setupRoomCallbacks } from './socket/room.handler'
 import { registerGameHandlers } from './socket/game.handler';
 import { RoomService } from './services/game/room.service';
 import { authService } from './services/auth.service';
+import { logger, LOG_CATEGORIES } from './services/logger.service';
 
 // Shared room service instance (exportado para uso no endpoint /api/leave-room)
 export const roomService = new RoomService();
@@ -78,7 +79,11 @@ export function setupSocketIO(httpServer: HttpServer): TypedIOServer {
 
   io.on('connection', async (socket: TypedSocket) => {
     const clientIP = socket.handshake.address;
-    console.log(`[${new Date().toLocaleString('pt-BR')}] Nova conexão: ${socket.id} | IP: ${clientIP}`);
+
+    logger.info(LOG_CATEGORIES.CONN, 'Nova conexão', {
+      socketId: socket.id,
+      ip: clientIP,
+    });
 
     // Tentar autenticar o usuário pelo token
     const authToken = socket.handshake.auth?.token;
@@ -87,12 +92,23 @@ export function setupSocketIO(httpServer: HttpServer): TypedIOServer {
         const user = await authService.validateToken(authToken);
         if (user) {
           socketUserMap.set(socket.id, { odUserId: user.id, displayName: user.display_name });
-          console.log(`[Auth] Socket ${socket.id} autenticado como ${user.display_name}`);
+
+          logger.info(LOG_CATEGORIES.AUTH, 'Socket autenticado', {
+            socketId: socket.id,
+            userId: user.id,
+            displayName: user.display_name,
+          });
 
           // Verificar se usuário já está em um jogo ativo
           const existingGame = roomService.getRoomByUserId(user.id);
           if (existingGame) {
-            console.log(`[Auth] ${user.display_name} já está em jogo ativo: ${existingGame.code}`);
+            logger.info(LOG_CATEGORIES.AUTH, 'Usuário já em jogo ativo', {
+              socketId: socket.id,
+              userId: user.id,
+              displayName: user.display_name,
+              roomCode: existingGame.code,
+              gameStarted: existingGame.room.started,
+            });
             socket.emit('alreadyInGame', {
               roomCode: existingGame.code,
               gameStarted: existingGame.room.started,
@@ -100,7 +116,9 @@ export function setupSocketIO(httpServer: HttpServer): TypedIOServer {
           }
         }
       } catch (error) {
-        console.log(`[Auth] Token inválido para socket ${socket.id}`);
+        logger.warn(LOG_CATEGORIES.AUTH, 'Token inválido', {
+          socketId: socket.id,
+        });
       }
     }
 
@@ -118,7 +136,15 @@ export function setupSocketIO(httpServer: HttpServer): TypedIOServer {
 
     // Handler de desconexão
     socket.on('disconnect', (reason) => {
-      console.log(`[${new Date().toLocaleString('pt-BR')}] Desconectado: ${socket.id} | Motivo: ${reason}`);
+      const userData = socketUserMap.get(socket.id);
+
+      logger.info(LOG_CATEGORIES.CONN, 'Desconectado', {
+        socketId: socket.id,
+        userId: userData?.odUserId,
+        displayName: userData?.displayName,
+        reason,
+      });
+
       // Limpar dados do usuário
       socketUserMap.delete(socket.id);
       // A lógica de desconexão será tratada no room.handler
@@ -129,7 +155,10 @@ export function setupSocketIO(httpServer: HttpServer): TypedIOServer {
 
     // Handler de erros
     socket.on('error', (error) => {
-      console.error(`[${new Date().toLocaleString('pt-BR')}] Erro no socket ${socket.id}:`, error);
+      logger.error(LOG_CATEGORIES.CONN, 'Erro no socket', {
+        socketId: socket.id,
+        error: String(error),
+      });
     });
   });
 
@@ -138,7 +167,9 @@ export function setupSocketIO(httpServer: HttpServer): TypedIOServer {
   // ==========================================
 
   io.engine.on('connection_error', (err) => {
-    console.error('Erro de conexão Socket.IO:', err);
+    logger.error(LOG_CATEGORIES.CONN, 'Erro de conexão Socket.IO', {
+      error: String(err),
+    });
   });
 
   return io;

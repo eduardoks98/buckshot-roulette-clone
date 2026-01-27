@@ -280,3 +280,59 @@
     height: 38px;
   }
 }
+
+/* Tiny screens - 350px */
+@media (max-width: 350px) {
+  .revolver-cylinder {
+    transform: scale(0.4);
+  }
+
+  .revolver-cylinder--sm {
+    transform: scale(0.3);
+  }
+
+  .revolver-cylinder--lg {
+    transform: scale(0.5);
+  }
+
+  .revolver-muzzle-flash {
+    width: 45px;
+    height: 34px;
+  }
+
+  .revolver-firing-arrow svg {
+    width: 16px;
+    height: 12px;
+  }
+}
+
+/* Ultra small screens - 320px */
+@media (max-width: 320px) {
+  .revolver-cylinder {
+    transform: scale(0.35);
+    gap: 0.25rem;
+  }
+
+  .revolver-cylinder--sm {
+    transform: scale(0.25);
+  }
+
+  .revolver-cylinder--lg {
+    transform: scale(0.45);
+  }
+
+  .revolver-muzzle-flash {
+    width: 40px;
+    height: 30px;
+    top: -25%;
+  }
+
+  .revolver-firing-arrow {
+    top: -6px;
+  }
+
+  .revolver-firing-arrow svg {
+    width: 14px;
+    height: 10px;
+  }
+}

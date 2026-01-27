@@ -149,6 +149,7 @@ interface ItemResult {
   eliminated?: boolean;
   reloaded?: boolean;
   newShells?: ShellInfo;
+  itemsDistributed?: { playerId: string; items: Item[] }[]; // Itens distribuídos no reload
   usedImmediately?: boolean; // Adrenalina - item roubado foi usado imediatamente
   players: PlayerPublicState[];
   shellsRemaining: ShellInfo;
@@ -593,7 +594,8 @@ export class GameService {
           return { error: 'Selecione um alvo' };
         }
         const target = room.players.find(p => p.id === targetId);
-        if (!target || !target.alive || target.id === userId) {
+        // Permite roubar de jogadores mortos (eles mantêm os itens até o fim do round)
+        if (!target || target.id === userId) {
           return { error: 'Alvo invalido' };
         }
         if (target.items.length === 0) {
@@ -690,6 +692,7 @@ export class GameService {
       const reloadResult = this.reloadShells(room);
       baseResult.reloaded = true;
       baseResult.newShells = reloadResult.shells;
+      baseResult.itemsDistributed = reloadResult.itemsDistributed;
     }
 
     return {

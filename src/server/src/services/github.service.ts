@@ -2,7 +2,7 @@
 // GITHUB INTEGRATION SERVICE
 // ==========================================
 
-import { BugCategory, BugPriority } from '@prisma/client';
+import { BugCategory, BugPriority } from '../../../shared/types/bug.types';
 
 // ==========================================
 // TYPES

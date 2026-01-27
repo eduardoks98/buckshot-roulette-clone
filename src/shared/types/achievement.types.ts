@@ -101,6 +101,8 @@ export interface PlayerXpResult {
   previousPrestige: number;
   newPrestige: number;
   breakdown: XpBreakdown;
+  eloChange?: number;
+  newEloRating?: number;
 }
 
 // ==========================================

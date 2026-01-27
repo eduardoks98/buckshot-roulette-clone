@@ -1145,10 +1145,7 @@
    ========================================== */
 .round-announcement-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
+  inset: 0;
   background: rgba(0, 0, 0, 0.85);
   display: flex;
   align-items: center;
@@ -1257,10 +1254,7 @@
    ========================================== */
 .shot-result-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
+  inset: 0;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1550,10 +1544,7 @@
    ========================================== */
 .steal-modal-overlay {
   position: fixed;
-  top: 0;
-  left: 0;
-  width: 100vw;
-  height: 100vh;
+  inset: 0;
   background: rgba(0, 0, 0, 0.9);
   display: flex;
   align-items: center;
@@ -1567,7 +1558,7 @@
   border: 2px solid rgba(212, 164, 24, 0.5);
   border-radius: 16px;
   padding: 2rem;
-  max-width: 400px;
+  max-width: min(400px, calc(100vw - 2rem));
   width: 90%;
   text-align: center;
   animation: modal-appear 0.4s ease;
@@ -1713,8 +1704,8 @@
   padding: 2rem 3rem;
   text-align: center;
   animation: item-modal-pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-  min-width: 280px;
-  max-width: 90%;
+  min-width: min(280px, calc(100vw - 2rem));
+  max-width: min(90%, calc(100vw - 2rem));
   box-shadow:
     0 10px 40px rgba(0, 0, 0, 0.6),
     0 0 40px rgba(212, 164, 24, 0.15);
@@ -1887,7 +1878,7 @@
   border: 1px solid rgba(212, 164, 24, 0.4);
   border-radius: 12px;
   padding: 1.5rem;
-  max-width: 550px;
+  max-width: min(550px, calc(100vw - 2rem));
   width: 100%;
   margin: auto;
 }
@@ -2122,6 +2113,34 @@
   border-radius: 2px;
 }
 
+/* PDL/ELO Section */
+.game-over-modal .pdl-section {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.game-over-modal .pdl-change {
+  font-weight: bold;
+  font-size: 1rem;
+}
+
+.game-over-modal .pdl-change.positive {
+  color: #4ade80;
+}
+
+.game-over-modal .pdl-change.negative {
+  color: #f87171;
+}
+
+.game-over-modal .pdl-total {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
 /* Back Button */
 .game-over-modal .back-btn {
   width: 100%;
@@ -2139,6 +2158,39 @@
 
 .game-over-modal .back-btn:hover {
   opacity: 0.9;
+}
+
+.game-over-modal .game-over-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+
+.game-over-modal .rematch-btn {
+  flex: 1;
+  padding: 0.75rem;
+  background: #4ade80;
+  color: #000;
+  border: none;
+  border-radius: 8px;
+  font-weight: bold;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: opacity 0.2s;
+}
+
+.game-over-modal .rematch-btn:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.game-over-modal .rematch-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.game-over-modal .game-over-actions .back-btn {
+  flex: 1;
+  margin-top: 0;
 }
 
 /* Mobile adjustments */
@@ -2514,5 +2566,237 @@
     font-size: 1.3rem;
     bottom: 15px;
     right: 15px;
+  }
+}
+
+/* ==========================================
+   EXTRA SMALL SCREENS - 350px
+   ========================================== */
+@media (max-width: 350px) {
+  .game-header {
+    flex-direction: column;
+    gap: 0.25rem;
+    padding: 0.25rem 0.5rem;
+  }
+
+  .round-info {
+    font-size: 0.85rem;
+  }
+
+  .turn-timer {
+    min-width: 45px;
+    font-size: 0.9rem;
+    padding: 0.25rem 0.5rem;
+  }
+
+  .shells-remaining {
+    font-size: 0.9rem;
+  }
+
+  .back-btn-small {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.8rem;
+  }
+
+  .opponents-area {
+    grid-template-columns: 1fr 1fr;
+    gap: 0.2rem;
+    padding: 0.2rem;
+  }
+
+  .opponent-card {
+    padding: 0.3rem;
+  }
+
+  .opponent-name {
+    font-size: 0.7rem;
+  }
+
+  .hp-heart {
+    font-size: 0.85rem;
+  }
+
+  .revolver-area {
+    padding: 0.2rem;
+    margin: 0.1rem 0;
+    gap: 0.3rem;
+  }
+
+  .shoot-btn {
+    padding: 0.5rem 1rem;
+    font-size: 0.8rem;
+  }
+
+  .shoot-self-btn {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.8rem;
+  }
+
+  .my-status {
+    padding: 0.3rem;
+    gap: 0.4rem;
+  }
+
+  .my-hp .hp-heart {
+    font-size: 1.3rem;
+  }
+
+  .my-items {
+    padding: 0.2rem;
+    gap: 0.2rem;
+  }
+
+  .item-btn {
+    width: 40px;
+    height: 40px;
+    font-size: 1rem;
+  }
+}
+
+/* ==========================================
+   ULTRA SMALL SCREENS - 320px
+   ========================================== */
+@media (max-width: 320px) {
+  .game-board {
+    padding: 0.1rem;
+  }
+
+  .game-header {
+    padding: 0.2rem 0.4rem;
+    margin-bottom: 0.15rem;
+    gap: 0.2rem;
+  }
+
+  .round-info {
+    font-size: 0.75rem;
+  }
+
+  .turn-timer {
+    min-width: 40px;
+    font-size: 0.8rem;
+    padding: 0.2rem 0.4rem;
+  }
+
+  .shells-remaining {
+    font-size: 0.8rem;
+    letter-spacing: 1px;
+  }
+
+  .game-message {
+    padding: 0.3rem 0.5rem;
+    font-size: 0.75rem;
+    margin-bottom: 0.15rem;
+  }
+
+  .opponents-area {
+    grid-template-columns: 1fr;
+    gap: 0.15rem;
+    padding: 0.15rem;
+    margin-bottom: 0.15rem;
+  }
+
+  .opponent-card {
+    padding: 0.25rem;
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .opponent-name {
+    font-size: 0.65rem;
+  }
+
+  .opponent-hp {
+    gap: 0.15rem;
+  }
+
+  .hp-heart {
+    font-size: 0.75rem;
+  }
+
+  .round-wins {
+    font-size: 0.65rem;
+    padding: 0.05rem 0.25rem;
+  }
+
+  .revolver-area {
+    padding: 0.1rem;
+    margin: 0.1rem 0;
+    gap: 0.2rem;
+  }
+
+  .shoot-btn {
+    padding: 0.4rem 0.8rem;
+    font-size: 0.75rem;
+    letter-spacing: 1px;
+  }
+
+  .shoot-self-btn {
+    padding: 0.35rem 0.7rem;
+    font-size: 0.7rem;
+  }
+
+  .shoot-hint {
+    font-size: 0.8rem;
+  }
+
+  .my-status {
+    padding: 0.25rem;
+    gap: 0.3rem;
+    margin-top: 0.5rem;
+    margin-bottom: 0.25rem;
+  }
+
+  .my-hp .hp-heart {
+    font-size: 1.2rem;
+  }
+
+  .my-status-effect {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+  }
+
+  .my-round-wins {
+    font-size: 0.9rem;
+    padding: 0.2rem 0.5rem;
+  }
+
+  .my-items {
+    padding: 0.15rem;
+    gap: 0.15rem;
+  }
+
+  .item-btn {
+    width: 36px;
+    height: 36px;
+    font-size: 0.95rem;
+    border-radius: 8px;
+  }
+
+  .waiting-turn {
+    padding: 0.3rem;
+    font-size: 0.75rem;
+  }
+
+  /* Spent shells smaller */
+  .player-spent-shell {
+    width: 12px;
+    height: 22px;
+    bottom: -12px;
+  }
+
+  .my-spent-shell {
+    width: 14px;
+    height: 26px;
+    top: -18px;
+  }
+
+  /* Direction indicator */
+  .direction-indicator {
+    padding: 0.3rem 0.5rem;
+    font-size: 0.7rem;
+  }
+
+  .direction-arrow {
+    font-size: 1rem;
   }
 }
