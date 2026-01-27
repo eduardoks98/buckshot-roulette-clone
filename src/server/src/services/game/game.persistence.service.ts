@@ -31,6 +31,7 @@ interface CreateGameParams {
   roomCode: string;
   hostUserId?: string;
   hostGuestName?: string;
+  hostSocketId?: string;  // Socket ID do host para correlação
   hasPassword: boolean;
   maxPlayers?: number;
 }
@@ -39,6 +40,7 @@ interface AddParticipantParams {
   gameId: string;
   userId?: string;
   guestName?: string;
+  odId?: string;  // Socket ID or Bot ID (para correlacionar com stats no endGame)
 }
 
 interface PlayerGameStats {
@@ -90,6 +92,7 @@ export class GamePersistenceService {
             create: {
               user_id: params.hostUserId || null,
               guest_name: params.hostUserId ? null : params.hostGuestName,
+              socket_id: params.hostSocketId,  // Salvar socket ID do host
             },
           },
         },
@@ -119,9 +122,10 @@ export class GamePersistenceService {
             game_id: params.gameId,
             user_id: params.userId,
             guest_name: null,
+            socket_id: params.odId,  // Salvar socket ID para correlação
           },
           update: {
-            // Nada a atualizar - apenas evita erro de constraint na reconexão
+            socket_id: params.odId,  // Atualizar socket ID na reconexão
           },
         });
 
@@ -129,16 +133,17 @@ export class GamePersistenceService {
         return participant.id;
       }
 
-      // Para guests, usar create normal (não têm user_id para constraint)
+      // Para guests/bots, usar create normal (não têm user_id para constraint)
       const participant = await prisma.gameParticipant.create({
         data: {
           game_id: params.gameId,
           user_id: null,
           guest_name: params.guestName,
+          socket_id: params.odId,  // Salvar socket ID para correlação
         },
       });
 
-      console.log(`[DB] Participante guest adicionado: ${participant.id}`);
+      console.log(`[DB] Participante guest/bot adicionado: ${participant.id} (socket: ${params.odId})`);
       return participant.id;
     } catch (error) {
       console.error('[DB] Erro ao adicionar participante:', error);
@@ -414,6 +419,36 @@ export class GamePersistenceService {
           console.log(`[ELO] ${participant.user_id}: ${playerElo} -> ${newElo} (${eloChange >= 0 ? '+' : ''}${eloChange})`);
           console.log(`[LP] ${participant.user_id}: ${rankingResult.displayRank} (${rankingResult.lpChange >= 0 ? '+' : ''}${rankingResult.lpChange} LP, LP: ${rankingResult.newLp}/100)${rankingResult.promoted ? ' PROMOVIDO!' : ''}${rankingResult.demoted ? ' REBAIXADO!' : ''}`);
           console.log(`[XP] ${participant.user_id}: +${xpResult.totalXp} XP (total: ${newTotalXp}, lvl ${newLevelInfo.displayLevel} P${newLevelInfo.prestigeLevel})`);
+        } else {
+          // ========================================
+          // PROCESSAR GUEST/BOT (sem user_id)
+          // ========================================
+          // Tentar encontrar pelo socket_id (odId)
+          const guestParticipant = game.participants.find(
+            p => !p.user_id && p.socket_id === stats.odId
+          );
+
+          if (guestParticipant) {
+            // Atualizar stats do guest/bot (sem ELO/XP pois não tem conta)
+            await prisma.gameParticipant.update({
+              where: { id: guestParticipant.id },
+              data: {
+                position: stats.position,
+                rounds_won: stats.roundsWon,
+                kills: stats.kills,
+                deaths: stats.deaths,
+                items_used: stats.itemsUsed,
+                damage_dealt: stats.damageDealt,
+                damage_taken: stats.damageTaken,
+                self_damage: stats.selfDamage,
+                shots_fired: stats.shotsFired,
+              },
+            });
+
+            console.log(`[DB] Stats de guest/bot atualizadas: ${guestParticipant.guest_name} (${stats.odId})`);
+          } else {
+            console.warn(`[DB] Participante não encontrado para stats: odId=${stats.odId}, odUserId=${stats.odUserId}`);
+          }
         }
       }
 

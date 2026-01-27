@@ -278,6 +278,7 @@ export function registerRoomHandlers(
         roomCode: result.room.code,
         hostUserId: userData?.odUserId,
         hostGuestName: userData ? undefined : playerName,
+        hostSocketId: socket.id,  // Socket ID do host
         hasPassword: !!password,
       }).catch(err => console.error('[DB] Erro ao criar jogo:', err));
 
@@ -365,6 +366,7 @@ export function registerRoomHandlers(
           gameId,
           userId: userData?.odUserId,
           guestName: userData ? undefined : playerName,
+          odId: socket.id,  // Socket ID para correlação com stats
         }).catch(err => console.error('[DB] Erro ao adicionar participante:', err));
       }
 
@@ -947,6 +949,7 @@ export function registerRoomHandlers(
           roomCode: newRoomCode,
           hostUserId: userData?.odUserId,
           hostGuestName: !userData?.odUserId ? playerName : undefined,
+          hostSocketId: socket.id,  // Socket ID do host
           hasPassword: false,
         });
       } catch (err) {

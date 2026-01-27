@@ -21,6 +21,10 @@ interface User {
   total_xp: number;
   is_admin: boolean;
   active_title_id: string | null;
+  // New ranking system
+  tier: string;
+  division: number | null;
+  lp: number;
 }
 
 const TOKEN_KEY = 'bangshot_auth_token';

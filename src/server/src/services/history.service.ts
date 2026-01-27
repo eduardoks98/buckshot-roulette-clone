@@ -164,7 +164,7 @@ class HistoryService {
         const opponents = game.participants
           .filter(p => p.user_id !== userId)
           .map(p => ({
-            display_name: p.user?.display_name || 'Jogador',
+            display_name: p.user?.display_name || p.guest_name || 'Jogador',  // Usar guest_name para bots
             position: p.position,
             elo_rating: p.user?.elo_rating || 1000,
           }));
@@ -176,7 +176,12 @@ class HistoryService {
               id: winnerParticipant.user.id,
               display_name: winnerParticipant.user.display_name,
             }
-          : null;
+          : winnerParticipant?.guest_name
+            ? {
+                id: '',  // Bots não têm ID de usuário
+                display_name: winnerParticipant.guest_name,
+              }
+            : null;
 
         return {
           id: game.id,
@@ -270,7 +275,7 @@ class HistoryService {
       const opponents = game.participants
         .filter(p => p.user_id !== userId)
         .map(p => ({
-          display_name: p.user?.display_name || 'Jogador',
+          display_name: p.user?.display_name || p.guest_name || 'Jogador',  // Usar guest_name para bots
           position: p.position,
           elo_rating: p.user?.elo_rating || 1000,
         }));
@@ -282,12 +287,17 @@ class HistoryService {
             id: winnerParticipant.user.id,
             display_name: winnerParticipant.user.display_name,
           }
-        : null;
+        : winnerParticipant?.guest_name
+          ? {
+              id: '',  // Bots não têm ID de usuário
+              display_name: winnerParticipant.guest_name,
+            }
+          : null;
 
       // Mapear participantes
       const participants = game.participants.map(p => ({
         user_id: p.user_id,
-        display_name: p.user?.display_name || 'Jogador',
+        display_name: p.user?.display_name || p.guest_name || 'Jogador',  // Usar guest_name para bots
         position: p.position,
         rounds_won: p.rounds_won,
         kills: p.kills,

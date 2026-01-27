@@ -1,296 +1,447 @@
 /* ==========================================
-   PROFILE STYLES
+   PROFILE STYLES - Redesigned
    ========================================== */
 
-/* Profile content wrapper (herda width do .page-content no PageLayout) */
+/* Profile content wrapper */
 .profile-content {
   width: 100%;
-}
-
-/* Login page container (without PageLayout) */
-.profile-container--login {
-  min-height: 100vh;
-  padding: 2rem;
-  max-width: 500px;
-  margin: 0 auto;
-  background: linear-gradient(180deg, #0a0a0a 0%, #121212 50%, #0a0a0a 100%);
-}
-
-.profile-container--login .back-btn {
-  position: absolute;
-  top: 1rem;
-  left: 1rem;
-}
-
-/* .page-title, .loading-message, .google-login-btn -> movidos para global.css */
-
-/* Login Section */
-.login-section {
-  text-align: center;
-  padding: 2rem;
-}
-
-.login-icon {
-  font-size: 4rem;
-  margin-bottom: 1rem;
-}
-
-.login-section h2 {
-  color: var(--text-primary);
-  margin-bottom: 1rem;
-}
-
-.login-section p {
-  color: var(--text-dim);
-  margin-bottom: 1rem;
-}
-
-.benefits-list {
-  list-style: none;
-  padding: 0;
-  margin-bottom: 2rem;
-  text-align: left;
-  max-width: 250px;
-  margin-left: auto;
-  margin-right: auto;
-}
-
-.benefits-list li {
-  color: var(--text-dim);
-  padding: 0.5rem 0;
-}
-
-.benefits-list li::before {
-  content: "✓ ";
-  color: var(--gold-accent);
-}
-
-/* User Card */
-.user-card {
   display: flex;
   flex-direction: column;
-  align-items: center;
   gap: 1rem;
-  padding: 2rem;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--border-color);
-  border-radius: 16px;
-  margin-bottom: 1.5rem;
 }
 
-.user-avatar {
-  width: 80px;
-  height: 80px;
+/* ==========================================
+   PROFILE HEADER - Horizontal Layout
+   ========================================== */
+
+.profile-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+}
+
+.profile-header__left {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex: 1;
+  min-width: 0;
+}
+
+.profile-avatar {
+  width: 56px;
+  height: 56px;
   border-radius: 50%;
   background: linear-gradient(135deg, var(--gold-accent) 0%, #b8860b 100%);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 2rem;
+  font-size: 1.5rem;
   font-weight: bold;
   color: #000;
   overflow: hidden;
+  flex-shrink: 0;
 }
 
-.user-avatar img {
+.profile-avatar img {
   width: 100%;
   height: 100%;
   object-fit: cover;
 }
 
-.user-info {
-  text-align: center;
+.profile-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
 }
 
-.user-name {
-  font-size: 1.5rem;
+.profile-name {
+  font-size: 1.1rem;
   color: var(--text-primary);
   margin: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.user-username {
+.profile-username {
   color: var(--text-dim);
-  font-size: 0.9rem;
+  font-size: 0.8rem;
 }
 
-.user-rank {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  padding: 1rem 2rem;
-  border: 2px solid;
-  border-radius: 12px;
-  background: rgba(0, 0, 0, 0.3);
-}
-
-.rank-label {
-  font-size: 0.75rem;
-  color: var(--text-dim);
-  text-transform: uppercase;
-  letter-spacing: 0.1em;
-}
-
-.rank-value {
-  font-size: 1.5rem;
-  font-weight: bold;
-}
-
-.elo-value {
-  font-size: 0.9rem;
-  color: var(--text-dim);
-}
-
-/* XP Section */
-.xp-section {
-  padding: 1.25rem;
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid var(--border-color);
-  border-radius: 12px;
-  margin-bottom: 1.5rem;
-}
-
-.xp-section-header {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin-bottom: 0.75rem;
-}
-
-.xp-section-info {
-  display: flex;
-  flex-direction: column;
-}
-
-.xp-total {
-  font-size: 1.1rem;
+.profile-title {
+  display: inline-block;
+  margin-top: 0.2rem;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.7rem;
   font-weight: 600;
   color: var(--gold-accent);
+  background: rgba(212, 164, 24, 0.12);
+  border: 1px solid rgba(212, 164, 24, 0.3);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+  white-space: nowrap;
 }
 
-/* Achievements Button */
-.action-btn.achievements {
+.profile-title:hover {
+  background: rgba(212, 164, 24, 0.2);
+}
+
+.profile-set-title {
+  display: inline-block;
+  margin-top: 0.2rem;
+  padding: 0.15rem 0.5rem;
+  font-size: 0.65rem;
+  color: var(--text-dim);
   background: transparent;
+  border: 1px dashed var(--border-color);
+  border-radius: 12px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.profile-set-title:hover {
   color: var(--gold-accent);
-  border: 1px solid var(--gold-accent);
+  border-color: var(--gold-accent);
 }
 
-.action-btn.achievements:hover {
-  background: rgba(212, 164, 24, 0.1);
+.profile-header__right {
+  flex-shrink: 0;
 }
 
-/* Stats Grid */
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 0.75rem;
-  margin-bottom: 1.5rem;
-}
-
-.stat-card {
+.profile-rank {
   display: flex;
   flex-direction: column;
   align-items: center;
-  padding: 1rem;
+  padding: 0.5rem 1rem;
+  border: 2px solid;
+  border-radius: 10px;
+  background: rgba(0, 0, 0, 0.3);
+  min-width: 80px;
+}
+
+.profile-rank__value {
+  font-size: 1rem;
+  font-weight: bold;
+  white-space: nowrap;
+}
+
+.profile-rank__lp {
+  font-size: 0.75rem;
+  color: var(--text-dim);
+}
+
+/* ==========================================
+   XP SECTION - Compact
+   ========================================== */
+
+.profile-xp {
+  padding: 0.75rem 1rem;
   background: rgba(255, 255, 255, 0.03);
   border: 1px solid var(--border-color);
   border-radius: 10px;
 }
 
-.stat-value {
-  font-size: 1.5rem;
+.profile-xp__header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.5rem;
+}
+
+.profile-xp__total {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--gold-accent);
+}
+
+/* ==========================================
+   STATS GRID - 6 columns
+   ========================================== */
+
+.profile-stats {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 0.5rem;
+}
+
+.profile-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.6rem 0.3rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+
+.profile-stat__value {
+  font-size: 1.1rem;
   font-weight: bold;
   color: var(--gold-accent);
 }
 
-.stat-label {
+.profile-stat__label {
+  font-size: 0.6rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  text-align: center;
+}
+
+/* ==========================================
+   RECENT FORM
+   ========================================== */
+
+.profile-form {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+}
+
+.profile-form__recent {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.profile-form__label {
   font-size: 0.75rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+
+.profile-form__icons {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.profile-form__icon {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.65rem;
+  font-weight: bold;
+  border-radius: 4px;
+}
+
+.profile-form__icon.win {
+  background: rgba(76, 175, 80, 0.2);
+  color: #4caf50;
+}
+
+.profile-form__icon.loss {
+  background: rgba(244, 67, 54, 0.2);
+  color: #f44336;
+}
+
+.profile-form__streaks {
+  display: flex;
+  gap: 1rem;
+}
+
+.profile-form__streak {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.profile-form__streak-value {
+  font-size: 1rem;
+  font-weight: bold;
+  color: var(--gold-accent);
+}
+
+.profile-form__streak-label {
+  font-size: 0.6rem;
   color: var(--text-dim);
   text-transform: uppercase;
 }
 
-/* Profile Actions */
-.profile-actions {
+/* ==========================================
+   HISTORY SECTION
+   ========================================== */
+
+.profile-history {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.profile-history__header {
   display: flex;
-  flex-direction: column;
-  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border-color);
 }
 
-/* .action-btn base -> movido para global.css */
+.profile-history__title {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  margin: 0;
+}
 
-.action-btn.history {
-  background: transparent;
+.profile-history__see-all {
+  font-size: 0.75rem;
   color: var(--gold-accent);
-  border: 1px solid var(--gold-accent);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  transition: background 0.2s;
 }
 
-.action-btn.history:hover {
+.profile-history__see-all:hover {
   background: rgba(212, 164, 24, 0.1);
 }
 
-.action-btn.leaderboard {
-  background: var(--gold-accent);
-  color: #000;
-  border: none;
+.profile-history__loading,
+.profile-history__empty {
+  padding: 1.5rem;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 0.85rem;
 }
 
-.action-btn.leaderboard:hover {
-  background: #e8c84a;
+.profile-history__list {
+  display: flex;
+  flex-direction: column;
 }
 
-.action-btn.logout {
+/* Game Card */
+.profile-game {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.6rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+  transition: background 0.2s;
+}
+
+.profile-game:last-child {
+  border-bottom: none;
+}
+
+.profile-game:hover {
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.profile-game.win {
+  border-left: 3px solid #4caf50;
+}
+
+.profile-game.loss {
+  border-left: 3px solid #f44336;
+}
+
+.profile-game__position {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.75rem;
+  font-weight: bold;
+  color: var(--text-dim);
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 50%;
+}
+
+.profile-game__position.winner {
+  background: transparent;
+  font-size: 1rem;
+}
+
+.profile-game__info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 0;
+}
+
+.profile-game__date {
+  font-size: 0.75rem;
+  color: var(--text-primary);
+}
+
+.profile-game__opponents {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-game__stats {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.profile-game__stat {
+  font-size: 0.7rem;
+  color: var(--text-dim);
+}
+
+.profile-game__elo {
+  font-size: 0.8rem;
+  font-weight: 600;
+  min-width: 40px;
+  text-align: right;
+}
+
+.profile-game__elo.positive {
+  color: #4caf50;
+}
+
+.profile-game__elo.negative {
+  color: #f44336;
+}
+
+/* ==========================================
+   LOGOUT BUTTON
+   ========================================== */
+
+.profile-logout {
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 0.5rem;
   width: 100%;
-  margin-top: 1rem;
+  padding: 0.75rem;
   background: transparent;
   color: var(--red-live);
   border: 1px solid var(--red-live);
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s;
 }
 
-.action-btn.logout:hover {
+.profile-logout:hover {
   background: rgba(230, 57, 70, 0.1);
 }
 
-/* Active Title */
-.user-active-title {
-  display: inline-block;
-  margin-top: 0.35rem;
-  padding: 0.2rem 0.75rem;
-  font-size: 0.8rem;
-  font-weight: 600;
-  color: var(--gold-accent);
-  background: rgba(212, 164, 24, 0.12);
-  border: 1px solid rgba(212, 164, 24, 0.3);
-  border-radius: 20px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
+/* ==========================================
+   TITLE SELECTOR MODAL (unchanged)
+   ========================================== */
 
-.user-active-title:hover {
-  background: rgba(212, 164, 24, 0.2);
-}
-
-.user-set-title {
-  display: inline-block;
-  margin-top: 0.35rem;
-  padding: 0.2rem 0.75rem;
-  font-size: 0.75rem;
-  color: var(--text-dim);
-  background: transparent;
-  border: 1px dashed var(--border-color);
-  border-radius: 20px;
-  cursor: pointer;
-  transition: all 0.2s;
-}
-
-.user-set-title:hover {
-  color: var(--gold-accent);
-  border-color: var(--gold-accent);
-}
-
-/* Title Selector Modal */
 .title-selector-overlay {
   position: fixed;
   top: 0;
@@ -410,63 +561,306 @@
   border-color: var(--text-primary);
 }
 
-/* Responsive */
-@media (max-width: 768px) {
-  .user-card {
-    padding: 1.5rem;
+/* ==========================================
+   GAME DETAILS MODAL
+   ========================================== */
+
+.game-details-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+  padding: 1rem;
+}
+
+.game-details-modal {
+  background: #1a1a1a;
+  border: 1px solid var(--border-color);
+  border-radius: 16px;
+  padding: 1.5rem;
+  width: 100%;
+  max-width: 550px;
+  max-height: 85vh;
+  overflow-y: auto;
+}
+
+.game-details-loading {
+  text-align: center;
+  color: var(--text-dim);
+  padding: 2rem;
+}
+
+.game-details-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.game-details-title {
+  font-size: 1.1rem;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.game-details-date {
+  font-size: 0.8rem;
+  color: var(--text-dim);
+}
+
+.game-details-winner {
+  text-align: center;
+  padding: 0.75rem;
+  background: rgba(212, 164, 24, 0.1);
+  border: 1px solid rgba(212, 164, 24, 0.3);
+  border-radius: 10px;
+  margin-bottom: 1rem;
+  color: var(--gold-accent);
+  font-size: 0.95rem;
+}
+
+.game-details-subtitle {
+  font-size: 0.9rem;
+  color: var(--text-primary);
+  margin: 0 0 0.75rem;
+}
+
+.participants-table {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.participants-header {
+  display: flex;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  font-size: 0.7rem;
+  color: var(--text-dim);
+  text-transform: uppercase;
+  font-weight: 600;
+}
+
+.participant-row {
+  display: flex;
+  align-items: center;
+  padding: 0.6rem 0.75rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 8px;
+  font-size: 0.85rem;
+  transition: background 0.2s;
+}
+
+.participant-row:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.participant-row.winner {
+  background: rgba(76, 175, 80, 0.1);
+  border-left: 3px solid #4caf50;
+}
+
+.participant-row.is-me {
+  background: rgba(212, 164, 24, 0.1);
+  border-left: 3px solid var(--gold-accent);
+}
+
+.participant-row.winner.is-me {
+  background: linear-gradient(90deg, rgba(76, 175, 80, 0.15) 0%, rgba(212, 164, 24, 0.15) 100%);
+}
+
+.p-col {
+  flex-shrink: 0;
+}
+
+.p-pos {
+  width: 30px;
+  text-align: center;
+  font-weight: 600;
+}
+
+.p-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: var(--text-primary);
+}
+
+.p-stat {
+  width: 40px;
+  text-align: center;
+  color: var(--text-dim);
+}
+
+.p-elo {
+  width: 45px;
+  text-align: right;
+  font-weight: 600;
+}
+
+.p-elo .positive {
+  color: #4caf50;
+}
+
+.p-elo .negative {
+  color: #f44336;
+}
+
+.game-details-close {
+  width: 100%;
+  margin-top: 1.25rem;
+  padding: 0.75rem;
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 0.9rem;
+  transition: all 0.2s;
+}
+
+.game-details-close:hover {
+  color: var(--text-primary);
+  border-color: var(--text-primary);
+}
+
+/* ==========================================
+   RESPONSIVE
+   ========================================== */
+
+@media (max-width: 600px) {
+  .profile-stats {
+    grid-template-columns: repeat(3, 1fr);
   }
 
-  .user-name {
-    font-size: 1.25rem;
+  .profile-form {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
+  }
+
+  .profile-form__recent {
+    justify-content: space-between;
+  }
+
+  .profile-form__streaks {
+    justify-content: center;
   }
 }
 
-@media (max-width: 500px) {
-  .stats-grid {
-    grid-template-columns: repeat(2, 1fr);
+@media (max-width: 480px) {
+  .profile-header {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.75rem;
   }
 
-  .stat-value {
+  .profile-header__left {
+    justify-content: flex-start;
+  }
+
+  .profile-header__right {
+    display: flex;
+    justify-content: center;
+  }
+
+  .profile-rank {
+    flex-direction: row;
+    gap: 0.5rem;
+    width: 100%;
+    justify-content: center;
+  }
+
+  .profile-avatar {
+    width: 48px;
+    height: 48px;
     font-size: 1.25rem;
   }
 
-  .user-card {
-    padding: 1rem;
+  .profile-name {
+    font-size: 1rem;
   }
 
-  .user-avatar {
-    width: 64px;
-    height: 64px;
-    font-size: 1.5rem;
+  .profile-stat__value {
+    font-size: 0.95rem;
   }
 
-  .user-rank {
-    padding: 0.75rem 1.5rem;
+  .profile-stat__label {
+    font-size: 0.55rem;
   }
 
-  .rank-value {
-    font-size: 1.25rem;
-  }
-
-  .xp-section {
-    padding: 1rem;
+  .profile-game__stats {
+    display: none;
   }
 }
 
 @media (max-width: 360px) {
-  .stats-grid {
-    gap: 0.5rem;
+  .profile-stats {
+    grid-template-columns: repeat(2, 1fr);
   }
 
-  .stat-card {
-    padding: 0.75rem 0.5rem;
+  .profile-form__icons {
+    flex-wrap: wrap;
+    justify-content: center;
   }
 
-  .stat-value {
-    font-size: 1rem;
+  .profile-game {
+    padding: 0.5rem 0.75rem;
   }
 
-  .stat-label {
-    font-size: 0.65rem;
+  .profile-game__elo {
+    min-width: 35px;
+    font-size: 0.75rem;
+  }
+}
+
+/* Game Details Modal Responsive */
+@media (max-width: 500px) {
+  .game-details-modal {
+    padding: 1rem;
+  }
+
+  .participants-header {
+    font-size: 0.6rem;
+    padding: 0.4rem 0.5rem;
+  }
+
+  .participant-row {
+    font-size: 0.75rem;
+    padding: 0.5rem;
+  }
+
+  .p-pos {
+    width: 25px;
+  }
+
+  .p-stat {
+    width: 30px;
+    font-size: 0.7rem;
+  }
+
+  .p-elo {
+    width: 40px;
+    font-size: 0.7rem;
+  }
+
+  /* Hide some columns on very small screens */
+  .participants-header .p-stat:nth-child(5),
+  .participant-row .p-stat:nth-child(5),
+  .participants-header .p-stat:nth-child(6),
+  .participant-row .p-stat:nth-child(6) {
+    display: none;
   }
 }

@@ -34,6 +34,10 @@ interface UserProfile {
   total_xp: number;
   is_admin: boolean;
   active_title_id: string | null;
+  // New ranking system
+  tier: string;
+  division: number | null;
+  lp: number;
 }
 
 // ==========================================
@@ -143,6 +147,10 @@ export class AuthService {
       total_xp: user.total_xp,
       is_admin: user.is_admin,
       active_title_id: user.active_title_id,
+      // New ranking system
+      tier: user.tier,
+      division: user.division,
+      lp: user.lp,
     };
   }
 

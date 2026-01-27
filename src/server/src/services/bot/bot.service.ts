@@ -6,6 +6,7 @@
 import { TypedIOServer } from '../../socket';
 import { RoomService, Player, Room } from '../game/room.service';
 import { GameService } from '../game/game.service';
+import { gamePersistenceService } from '../game/game.persistence.service';
 import { startTurnTimer } from '../../socket/game.handler';
 import { ItemId, Item } from '../../../../shared/types';
 import { GAME_RULES } from '../../../../shared/constants';
@@ -172,6 +173,17 @@ class BotService {
       difficulty,
       roomCode,
     });
+
+    // Persistir bot como participante no banco de dados
+    gamePersistenceService.getGameId(roomCode).then(gameId => {
+      if (gameId) {
+        gamePersistenceService.addParticipant({
+          gameId,
+          odId: botId,
+          guestName: displayName,  // Bots são salvos como guests com nome
+        }).catch(err => console.error('[DB] Erro ao adicionar bot como participante:', err));
+      }
+    }).catch(err => console.error('[DB] Erro ao obter gameId para bot:', err));
 
     // Broadcast para a sala (WaitingRoom format - simplified)
     const waitingRoomPlayers = room.players.map(p => ({
