@@ -2,7 +2,18 @@
 // BUG REPORT MODAL COMPONENT
 // ==========================================
 
-import { useState, useRef } from 'react';
+import { useState, useRef, ReactNode } from 'react';
+import {
+  BugIcon,
+  GamepadIcon,
+  MonitorIcon,
+  GlobeIcon,
+  PerformanceIcon,
+  PinIcon,
+  CameraIcon,
+  ChartIcon,
+  CheckIcon,
+} from '../../icons';
 import './BugReportModal.css';
 
 export interface GameStateForReport {
@@ -24,12 +35,12 @@ interface BugReportModalProps {
 type BugCategory = 'GAMEPLAY' | 'UI' | 'CONNECTION' | 'PERFORMANCE' | 'OTHER';
 type BugPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
-const CATEGORY_OPTIONS: { value: BugCategory; label: string; emoji: string }[] = [
-  { value: 'GAMEPLAY', label: 'Gameplay', emoji: '🎮' },
-  { value: 'UI', label: 'Interface', emoji: '🖥️' },
-  { value: 'CONNECTION', label: 'Conexao', emoji: '🌐' },
-  { value: 'PERFORMANCE', label: 'Performance', emoji: '⚡' },
-  { value: 'OTHER', label: 'Outro', emoji: '📌' },
+const CATEGORY_OPTIONS: { value: BugCategory; label: string; icon: ReactNode }[] = [
+  { value: 'GAMEPLAY', label: 'Gameplay', icon: <GamepadIcon size={16} /> },
+  { value: 'UI', label: 'Interface', icon: <MonitorIcon size={16} /> },
+  { value: 'CONNECTION', label: 'Conexao', icon: <GlobeIcon size={16} /> },
+  { value: 'PERFORMANCE', label: 'Performance', icon: <PerformanceIcon size={16} /> },
+  { value: 'OTHER', label: 'Outro', icon: <PinIcon size={16} /> },
 ];
 
 const PRIORITY_OPTIONS: { value: BugPriority; label: string; color: string }[] = [
@@ -154,7 +165,7 @@ export default function BugReportModal({ isOpen, onClose, gameState }: BugReport
     <div className="bug-report-overlay" onClick={handleClose}>
       <div className="bug-report-modal" onClick={(e) => e.stopPropagation()}>
         <div className="bug-report-header">
-          <h3>🐛 Reportar Bug</h3>
+          <h3><BugIcon size={20} color="#4caf50" /> Reportar Bug</h3>
           <button className="bug-report-close" onClick={handleClose} disabled={isSubmitting}>
             &times;
           </button>
@@ -162,7 +173,7 @@ export default function BugReportModal({ isOpen, onClose, gameState }: BugReport
 
         {submitStatus === 'success' ? (
           <div className="bug-report-success">
-            <span className="success-icon">✅</span>
+            <CheckIcon size={48} color="#4caf50" />
             <p>Bug reportado com sucesso!</p>
             <p className="success-subtitle">Obrigado por ajudar a melhorar o jogo!</p>
           </div>
@@ -198,7 +209,7 @@ export default function BugReportModal({ isOpen, onClose, gameState }: BugReport
                     onClick={() => setCategory(cat.value)}
                     disabled={isSubmitting}
                   >
-                    <span>{cat.emoji}</span>
+                    {cat.icon}
                     <span>{cat.label}</span>
                   </button>
                 ))}
@@ -267,7 +278,7 @@ export default function BugReportModal({ isOpen, onClose, gameState }: BugReport
                       onChange={handleScreenshotChange}
                       disabled={isSubmitting}
                     />
-                    <span className="upload-icon">📷</span>
+                    <span className="upload-icon"><CameraIcon size={24} /></span>
                     <span>Clique para adicionar screenshot</span>
                   </label>
                 )}
@@ -277,7 +288,7 @@ export default function BugReportModal({ isOpen, onClose, gameState }: BugReport
             {/* Game State Info */}
             {gameState && (
               <div className="game-state-info">
-                <span className="info-icon">📊</span>
+                <span className="info-icon"><ChartIcon size={16} /></span>
                 <span>Estado do jogo sera capturado automaticamente</span>
               </div>
             )}

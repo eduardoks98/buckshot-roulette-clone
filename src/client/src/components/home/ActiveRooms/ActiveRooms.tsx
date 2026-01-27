@@ -6,7 +6,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSocket } from '../../../context/SocketContext';
 import { useAuth } from '../../../context/AuthContext';
-import { PlayersIcon, RefreshIcon, UserIcon, PlusIcon, TargetCircleIcon } from '../../icons';
+import { PlayersIcon, RefreshIcon, UserIcon, PlusIcon, TargetCircleIcon, GamepadIcon, LockIcon } from '../../icons';
 import './ActiveRooms.css';
 
 interface RoomInfo {
@@ -384,7 +384,7 @@ export function ActiveRooms() {
 
         {!loading && rooms.length === 0 && (
           <div className="active-rooms__empty">
-            <span className="active-rooms__empty-icon">🎮</span>
+            <GamepadIcon size={48} color="#6b5b95" />
             <p>Nenhuma sala disponivel</p>
             <span className="active-rooms__empty-hint">Crie uma sala ou jogue solo!</span>
           </div>
@@ -404,7 +404,9 @@ export function ActiveRooms() {
                     {room.playerCount}/{room.maxPlayers}
                   </span>
                   {room.hasPassword && (
-                    <span className="room-card__lock" title="Sala com senha">🔒</span>
+                    <span className="room-card__lock" title="Sala com senha">
+                      <LockIcon size={14} color="#d4a418" />
+                    </span>
                   )}
                 </div>
                 <button

@@ -29,3 +29,5 @@ export { SettingsIcon } from './SettingsIcon';
 export { LogoutIcon } from './LogoutIcon';
 export { UserIcon } from './UserIcon';
 export { TargetCircleIcon } from './TargetCircleIcon';
+export { MonitorIcon } from './MonitorIcon';
+export { CheckIcon } from './CheckIcon';
