@@ -439,26 +439,14 @@ export function calculateLpChange(input: RankingInput): RankingResult {
 }
 
 /**
- * Migra ELO antigo para o novo sistema
+ * Retorna valores padrão para novo jogador ou reset
  */
-export function migrateFromElo(oldElo: number): RankInfo {
-  // Conversão: ELO 1000 (default) = Gold IV (MMR 800)
-  // ELO 500-1500 mapeia para MMR 0-1600
-  const mmr = Math.max(0, Math.min(2400, Math.round((oldElo - 500) * 1.6)));
-
-  const { tier, division } = getRankFromMmr(mmr);
-
-  // LP inicial baseado na posição dentro da divisão
-  const range = TIER_MMR_RANGES[tier];
-  const divisionRange = (range.max - range.min) / 4;
-  const mmrInDivision = (mmr - range.min) % divisionRange;
-  const lp = Math.round((mmrInDivision / divisionRange) * 100);
-
+export function getDefaultRankInfo(): RankInfo {
   return {
-    tier,
-    division,
-    lp: Math.min(99, Math.max(0, lp)), // 0-99 para não triggerar promoção
-    mmr,
+    tier: 'Bronze',
+    division: 4,
+    lp: 0,
+    mmr: MMR_CONFIG.DEFAULT_MMR,
   };
 }
 

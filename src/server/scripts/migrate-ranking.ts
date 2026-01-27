@@ -1,18 +1,23 @@
 // ==========================================
-// SCRIPT DE MIGRAÇÃO - ELO para LP + MMR
+// SCRIPT DE RESET - Sistema LP + MMR
 // ==========================================
-// Converte o sistema de ELO antigo para o novo sistema de ranking
+// Reseta todos os rankings para Bronze IV (valores padrão)
 // Executar: npx ts-node src/server/scripts/migrate-ranking.ts
 // ==========================================
 
 import { PrismaClient } from '@prisma/client';
-import { migrateFromElo, getDisplayRank, Tier } from '../../shared/utils/rankingCalculator';
 
 const prisma = new PrismaClient();
 
+// Valores padrão do novo sistema
+const DEFAULT_TIER = 'Bronze';
+const DEFAULT_DIVISION = 4;
+const DEFAULT_LP = 0;
+const DEFAULT_MMR = 800;
+
 async function main() {
   console.log('==========================================');
-  console.log('MIGRAÇÃO DE RANKING: ELO -> LP + MMR');
+  console.log('RESET DE RANKING: Todos para Bronze IV');
   console.log('==========================================\n');
 
   // Buscar todos os usuários
@@ -20,7 +25,6 @@ async function main() {
     select: {
       id: true,
       username: true,
-      elo_rating: true,
       tier: true,
       division: true,
       lp: true,
@@ -28,57 +32,32 @@ async function main() {
     },
   });
 
-  console.log(`Encontrados ${users.length} usuários para migrar.\n`);
+  console.log(`Encontrados ${users.length} usuários para resetar.\n`);
 
-  let migrated = 0;
-  let skipped = 0;
+  // Atualizar todos de uma vez
+  const result = await prisma.user.updateMany({
+    data: {
+      tier: DEFAULT_TIER,
+      division: DEFAULT_DIVISION,
+      lp: DEFAULT_LP,
+      mmr_hidden: DEFAULT_MMR,
+      peak_mmr: DEFAULT_MMR,
+      games_since_promo: 0,
+    },
+  });
 
-  for (const user of users) {
-    // Verificar se já foi migrado (tier diferente de Bronze ou mmr diferente de 800)
-    const alreadyMigrated =
-      user.tier !== 'Bronze' ||
-      user.division !== 4 ||
-      user.lp !== 0 ||
-      user.mmr_hidden !== 800;
-
-    if (alreadyMigrated) {
-      console.log(`[SKIP] ${user.username}: já migrado (${user.tier} ${user.division ? `${['IV', 'III', 'II', 'I'][4 - user.division]}` : ''} ${user.lp} LP)`);
-      skipped++;
-      continue;
-    }
-
-    // Converter ELO para novo sistema
-    const newRanking = migrateFromElo(user.elo_rating);
-
-    // Atualizar usuário
-    await prisma.user.update({
-      where: { id: user.id },
-      data: {
-        tier: newRanking.tier,
-        division: newRanking.division,
-        lp: newRanking.lp,
-        mmr_hidden: newRanking.mmr,
-        peak_mmr: newRanking.mmr,
-        games_since_promo: 0,
-      },
-    });
-
-    const displayRank = getDisplayRank(newRanking.tier, newRanking.division);
-    console.log(`[OK] ${user.username}: ELO ${user.elo_rating} -> ${displayRank} (${newRanking.lp} LP, MMR ${newRanking.mmr})`);
-    migrated++;
-  }
-
-  console.log('\n==========================================');
-  console.log('MIGRAÇÃO CONCLUÍDA');
   console.log('==========================================');
-  console.log(`Migrados: ${migrated}`);
-  console.log(`Pulados: ${skipped}`);
-  console.log(`Total: ${users.length}`);
+  console.log('RESET CONCLUÍDO');
+  console.log('==========================================');
+  console.log(`Usuários atualizados: ${result.count}`);
+  console.log(`Novo rank padrão: ${DEFAULT_TIER} IV`);
+  console.log(`LP: ${DEFAULT_LP}`);
+  console.log(`MMR: ${DEFAULT_MMR}`);
 }
 
 main()
   .catch((e) => {
-    console.error('Erro durante migração:', e);
+    console.error('Erro durante reset:', e);
     process.exit(1);
   })
   .finally(async () => {
