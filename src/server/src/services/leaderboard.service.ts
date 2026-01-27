@@ -4,6 +4,7 @@
 
 import { LeaderboardPeriod } from '@prisma/client';
 import prisma from '../lib/prisma';
+import { getDisplayRank, TIERS, Tier } from '../../../shared/utils/rankingCalculator';
 
 // ==========================================
 // TYPES
@@ -22,6 +23,11 @@ interface LeaderboardEntry {
   elo_gain?: number;
   total_xp: number;
   active_title_id: string | null;
+  // Novo sistema de ranking
+  tier?: string;
+  division?: number | null;
+  lp?: number;
+  displayRank?: string;
 }
 
 // ==========================================
@@ -68,17 +74,37 @@ export class LeaderboardService {
   // ==========================================
 
   private async getAllTimeLeaderboard(limit: number): Promise<LeaderboardEntry[]> {
+    // Buscar usuários com jogos jogados
     const users = await prisma.user.findMany({
       where: {
         games_played: { gt: 0 },
       },
-      orderBy: {
-        elo_rating: 'desc',
-      },
-      take: limit,
+      // Não podemos ordenar por tier/division/lp diretamente no Prisma de forma complexa,
+      // então buscamos todos e ordenamos em memória
+      take: limit * 3, // Busca mais para garantir que temos suficientes após ordenação
     });
 
-    return users.map((user, index) => ({
+    // Ordenar por tier (índice), division (menor é melhor), lp (maior é melhor)
+    const sorted = users.sort((a, b) => {
+      // Primeiro: Tier (maior índice = melhor)
+      const tierIndexA = TIERS.indexOf(a.tier as Tier);
+      const tierIndexB = TIERS.indexOf(b.tier as Tier);
+      if (tierIndexA !== tierIndexB) {
+        return tierIndexB - tierIndexA; // Maior tier primeiro
+      }
+
+      // Segundo: Division (menor número = melhor, I=1 é melhor que IV=4)
+      const divA = a.division ?? 0; // null (Master+) = 0 = melhor
+      const divB = b.division ?? 0;
+      if (divA !== divB) {
+        return divA - divB; // Menor divisão primeiro
+      }
+
+      // Terceiro: LP (maior = melhor)
+      return b.lp - a.lp;
+    }).slice(0, limit);
+
+    return sorted.map((user, index) => ({
       rank: index + 1,
       user_id: user.id,
       username: user.username,
@@ -90,6 +116,11 @@ export class LeaderboardService {
       elo_rating: user.elo_rating,
       total_xp: user.total_xp,
       active_title_id: user.active_title_id,
+      // Novo sistema de ranking
+      tier: user.tier,
+      division: user.division,
+      lp: user.lp,
+      displayRank: getDisplayRank(user.tier as Tier, user.division as 1 | 2 | 3 | 4 | null),
     }));
   }
 
@@ -100,14 +131,29 @@ export class LeaderboardService {
 
     if (!user || user.games_played === 0) return null;
 
-    const higherRanked = await prisma.user.count({
-      where: {
-        games_played: { gt: 0 },
-        elo_rating: { gt: user.elo_rating },
-      },
+    // Contar jogadores com rank melhor
+    // Como a ordenação é complexa (tier > division > lp), precisamos buscar todos
+    const allUsers = await prisma.user.findMany({
+      where: { games_played: { gt: 0 } },
+      select: { id: true, tier: true, division: true, lp: true },
     });
 
-    return higherRanked + 1;
+    // Ordenar da mesma forma que getAllTimeLeaderboard
+    const sorted = allUsers.sort((a, b) => {
+      const tierIndexA = TIERS.indexOf(a.tier as Tier);
+      const tierIndexB = TIERS.indexOf(b.tier as Tier);
+      if (tierIndexA !== tierIndexB) return tierIndexB - tierIndexA;
+
+      const divA = a.division ?? 0;
+      const divB = b.division ?? 0;
+      if (divA !== divB) return divA - divB;
+
+      return b.lp - a.lp;
+    });
+
+    // Encontrar posição do usuário
+    const position = sorted.findIndex(u => u.id === userId);
+    return position !== -1 ? position + 1 : null;
   }
 
   // ==========================================
@@ -147,6 +193,11 @@ export class LeaderboardService {
       elo_gain: entry.elo_gain,
       total_xp: entry.user.total_xp,
       active_title_id: entry.user.active_title_id,
+      // Novo sistema de ranking
+      tier: entry.user.tier,
+      division: entry.user.division,
+      lp: entry.user.lp,
+      displayRank: getDisplayRank(entry.user.tier as Tier, entry.user.division as 1 | 2 | 3 | 4 | null),
     }));
   }
 
