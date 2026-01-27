@@ -1012,17 +1012,37 @@ export default function MultiplayerGame() {
                           <div className="xp-fill" style={{ width: `${Math.round(levelInfo.xpProgress * 100)}%` }} />
                         </div>
                       </div>
-                      {/* PDL/ELO */}
-                      {myXpResult.eloChange !== undefined && (
-                        <div className="pdl-section">
-                          <div className={`pdl-change ${myXpResult.eloChange >= 0 ? 'positive' : 'negative'}`}>
-                            {myXpResult.eloChange >= 0 ? '+' : ''}{myXpResult.eloChange} PDL
-                          </div>
-                          {myXpResult.newEloRating && (
-                            <div className="pdl-total">
-                              ELO: {myXpResult.newEloRating}
+                      {/* LP Ranking */}
+                      {myXpResult.lpChange !== undefined && (
+                        <div className="lp-section">
+                          {/* Promoção/Rebaixamento */}
+                          {myXpResult.promoted && (
+                            <div className="rank-event promotion">
+                              🎉 Promovido para {myXpResult.displayRank}!
                             </div>
                           )}
+                          {myXpResult.demoted && (
+                            <div className="rank-event demotion">
+                              📉 Rebaixado para {myXpResult.displayRank}
+                            </div>
+                          )}
+
+                          {/* LP Change */}
+                          <div className={`lp-change ${myXpResult.lpChange >= 0 ? 'positive' : 'negative'}`}>
+                            {myXpResult.lpChange >= 0 ? '+' : ''}{myXpResult.lpChange} LP
+                          </div>
+
+                          {/* LP Progress Bar */}
+                          <div className="lp-progress-container">
+                            <span className="rank-badge">{myXpResult.displayRank}</span>
+                            <div className="lp-bar">
+                              <div
+                                className="lp-fill"
+                                style={{ width: `${myXpResult.newLp}%` }}
+                              />
+                            </div>
+                            <span className="lp-text">{myXpResult.newLp}/100 LP</span>
+                          </div>
                         </div>
                       )}
                     </div>
