@@ -6,6 +6,7 @@ import passport from 'passport';
 import { Strategy as GoogleStrategy, Profile } from 'passport-google-oauth20';
 import { env } from './env.config';
 import prisma from '../lib/prisma';
+import { avatarService } from '../services/avatar.service';
 
 // ==========================================
 // GOOGLE STRATEGY
@@ -28,7 +29,7 @@ passport.use(
       try {
         const email = profile.emails?.[0]?.value;
         const displayName = profile.displayName || 'Player';
-        const avatarUrl = profile.photos?.[0]?.value;
+        const googleAvatarUrl = profile.photos?.[0]?.value;
 
         if (!email) {
           return done(new Error('Email nao encontrado na conta Google'));
@@ -38,6 +39,15 @@ passport.use(
         let user = await prisma.user.findUnique({
           where: { google_id: profile.id },
         });
+
+        // Baixar e salvar avatar do Google localmente
+        let localAvatarUrl: string | null = null;
+        if (googleAvatarUrl) {
+          const filename = await avatarService.downloadAndSave(googleAvatarUrl, profile.id);
+          if (filename) {
+            localAvatarUrl = avatarService.getLocalAvatarUrl(filename);
+          }
+        }
 
         if (!user) {
           // Check if email already exists
@@ -51,7 +61,7 @@ passport.use(
               where: { email },
               data: {
                 google_id: profile.id,
-                avatar_url: avatarUrl || existingUser.avatar_url,
+                avatar_url: localAvatarUrl || existingUser.avatar_url,
               },
             });
           } else {
@@ -63,18 +73,18 @@ passport.use(
                 email,
                 username,
                 display_name: displayName,
-                avatar_url: avatarUrl,
+                avatar_url: localAvatarUrl,
                 google_id: profile.id,
               },
             });
           }
         } else {
-          // Update last login
+          // Update last login and avatar
           user = await prisma.user.update({
             where: { id: user.id },
             data: {
               last_login_at: new Date(),
-              avatar_url: avatarUrl || user.avatar_url,
+              avatar_url: localAvatarUrl || user.avatar_url,
             },
           });
         }

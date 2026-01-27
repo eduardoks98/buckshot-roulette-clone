@@ -14,6 +14,7 @@ import leaderboardRoutes from './routes/leaderboard.routes';
 import historyRoutes from './routes/history.routes';
 import bugRoutes from './routes/bug.routes';
 import achievementRoutes from './routes/achievement.routes';
+import { AVATARS_DIR } from './services/avatar.service';
 
 export function createServer(): { app: Express; httpServer: http.Server } {
   const app = express();
@@ -97,6 +98,9 @@ export function createServer(): { app: Express; httpServer: http.Server } {
 
   // Achievement routes
   app.use('/api/achievements', achievementRoutes);
+
+  // Avatars - servir arquivos estáticos da pasta de uploads
+  app.use('/api/avatars', express.static(AVATARS_DIR));
 
   // ==========================================
   // ERROR HANDLING
