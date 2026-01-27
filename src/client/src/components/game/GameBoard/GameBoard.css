@@ -318,17 +318,73 @@
   box-shadow: 0 0 20px rgba(212, 164, 24, 0.4), inset 0 0 20px rgba(212, 164, 24, 0.1);
 }
 
-.opponent-card.active::after {
-  content: 'VEZ';
+/* ==========================================
+   TURN BADGE - Shows on active player's card
+   ========================================== */
+.turn-badge {
   position: absolute;
-  top: -8px;
-  right: 10px;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
   background: var(--gold-accent, #d4a418);
   color: #000;
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   font-weight: bold;
-  padding: 2px 8px;
-  border-radius: 4px;
+  padding: 3px 10px;
+  border-radius: 12px;
+  z-index: 10;
+  box-shadow: 0 2px 8px rgba(212, 164, 24, 0.5);
+  white-space: nowrap;
+}
+
+.turn-badge-text {
+  letter-spacing: 0.5px;
+}
+
+.turn-badge-timer {
+  background: rgba(0, 0, 0, 0.3);
+  padding: 1px 6px;
+  border-radius: 8px;
+  font-family: monospace;
+  font-size: 0.8rem;
+}
+
+.turn-badge-timer.caution {
+  background: rgba(245, 158, 11, 0.4);
+  color: #000;
+}
+
+.turn-badge-timer.warning {
+  background: rgba(239, 68, 68, 0.6);
+  color: #fff;
+  animation: timer-pulse 0.5s ease-in-out infinite;
+}
+
+@keyframes timer-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.05); }
+}
+
+/* My turn badge - positioned above my-status */
+.my-turn-badge {
+  position: absolute;
+  top: -16px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, var(--gold-accent, #d4a418) 0%, #f59e0b 100%);
+  animation: my-turn-glow 2s ease-in-out infinite;
+}
+
+@keyframes my-turn-glow {
+  0%, 100% {
+    box-shadow: 0 2px 8px rgba(212, 164, 24, 0.5);
+  }
+  50% {
+    box-shadow: 0 2px 20px rgba(212, 164, 24, 0.8), 0 0 30px rgba(212, 164, 24, 0.4);
+  }
 }
 
 .opponent-card.selected {
@@ -769,6 +825,13 @@
   margin-bottom: 0.4rem;
   margin-top: 0.75rem; /* Espaço para o cartucho não sobrepor */
   flex-shrink: 0;
+  overflow: visible; /* Permitir que o badge apareça acima */
+}
+
+.my-status.my-turn {
+  border-color: var(--gold-accent, #d4a418);
+  box-shadow: 0 0 15px rgba(212, 164, 24, 0.3);
+  margin-top: 1.25rem; /* Espaço extra para o badge */
 }
 
 .my-hp {
@@ -889,81 +952,10 @@
    WAITING TURN
    ========================================== */
 /* ==========================================
-   CURRENT TURN INDICATOR - Com timer integrado
+   CURRENT TURN INDICATOR - DEPRECATED
+   Timer now shows in turn-badge on player cards
    ========================================== */
-.current-turn-indicator {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.75rem;
-  padding: 0.5rem 1rem;
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 25px;
-  margin-top: 0.5rem;
-  flex-shrink: 0;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.current-turn-indicator.my-turn {
-  background: rgba(212, 164, 24, 0.15);
-  border-color: rgba(212, 164, 24, 0.4);
-  animation: my-turn-glow 2s ease-in-out infinite;
-}
-
-.current-turn-indicator.opponent-turn {
-  animation: waiting-pulse 2s ease-in-out infinite;
-}
-
-.turn-player-name {
-  font-size: 1rem;
-  font-weight: 600;
-  color: rgba(255, 255, 255, 0.8);
-  letter-spacing: 0.5px;
-}
-
-.current-turn-indicator.my-turn .turn-player-name {
-  color: var(--gold-accent, #d4a418);
-  text-shadow: 0 0 10px rgba(212, 164, 24, 0.5);
-}
-
-.current-turn-indicator .turn-timer {
-  font-size: 1.1rem;
-  font-weight: bold;
-  padding: 0.25rem 0.6rem;
-  background: rgba(0, 0, 0, 0.4);
-  border-radius: 8px;
-  border: 1px solid rgba(255, 255, 255, 0.15);
-  min-width: 45px;
-  text-align: center;
-  color: #4ade80;
-}
-
-.current-turn-indicator .turn-timer.caution {
-  color: #fbbf24;
-  border-color: rgba(251, 191, 36, 0.3);
-  background: rgba(251, 191, 36, 0.1);
-}
-
-.current-turn-indicator .turn-timer.warning {
-  color: #ef4444;
-  border-color: rgba(239, 68, 68, 0.5);
-  background: rgba(239, 68, 68, 0.15);
-  animation: timer-warning 0.5s ease-in-out infinite;
-}
-
-@keyframes my-turn-glow {
-  0%, 100% {
-    box-shadow: 0 0 10px rgba(212, 164, 24, 0.2);
-  }
-  50% {
-    box-shadow: 0 0 20px rgba(212, 164, 24, 0.4);
-  }
-}
-
-@keyframes waiting-pulse {
-  0%, 100% { opacity: 0.6; }
-  50% { opacity: 1; }
-}
+/* Styles kept for backwards compatibility but component removed */
 
 @keyframes timer-warning {
   0%, 100% { transform: scale(1); }

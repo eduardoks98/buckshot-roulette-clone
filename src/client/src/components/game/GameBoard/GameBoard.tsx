@@ -261,6 +261,18 @@ export default function GameBoard({
             className={`opponent-card ${player.id === currentPlayerId ? 'active' : ''} ${player.id === selectedTarget ? 'selected' : ''} ${!player.alive ? 'dead' : ''} ${player.id === damagedPlayerId ? 'damage' : ''} ${player.id === healedPlayerId ? 'heal' : ''}`}
             onClick={() => player.alive && onSelectTarget(player.id)}
           >
+            {/* Turn indicator badge - shows on the active player's card */}
+            {player.id === currentPlayerId && !hasActiveOverlay && (
+              <div className="turn-badge">
+                <span className="turn-badge-text">VEZ</span>
+                {turnTimer !== undefined && (
+                  <span className={`turn-badge-timer ${turnTimer <= 10 ? 'warning' : turnTimer <= 30 ? 'caution' : ''}`}>
+                    {turnTimer}s
+                  </span>
+                )}
+              </div>
+            )}
+
             <div className="opponent-name">
               {player.name}
               {player.roundWins !== undefined && player.roundWins > 0 && (
@@ -340,7 +352,19 @@ export default function GameBoard({
       </div>
 
       {/* ========== MY STATUS ========== */}
-      <div className={`my-status ${myId === damagedPlayerId ? 'damage' : ''} ${myId === healedPlayerId ? 'heal' : ''}`}>
+      <div className={`my-status ${myId === damagedPlayerId ? 'damage' : ''} ${myId === healedPlayerId ? 'heal' : ''} ${isMyTurn ? 'my-turn' : ''}`}>
+        {/* Turn indicator badge - shows when it's my turn */}
+        {isMyTurn && !hasActiveOverlay && (
+          <div className="turn-badge my-turn-badge">
+            <span className="turn-badge-text">SUA VEZ</span>
+            {turnTimer !== undefined && (
+              <span className={`turn-badge-timer ${turnTimer <= 10 ? 'warning' : turnTimer <= 30 ? 'caution' : ''}`}>
+                {turnTimer}s
+              </span>
+            )}
+          </div>
+        )}
+
         {/* My spent shell */}
         {playerLastShell[myId] && (
           <div className={`my-spent-shell ${playerLastShell[myId]}`} />
@@ -388,19 +412,6 @@ export default function GameBoard({
         {myItems.length === 0 && <p className="no-items">Sem itens</p>}
       </div>
 
-      {/* ========== CURRENT TURN INDICATOR ========== */}
-      {!hasActiveOverlay && (
-        <div className={`current-turn-indicator ${isMyTurn ? 'my-turn' : 'opponent-turn'}`}>
-          <span className="turn-player-name">
-            {isMyTurn ? 'SUA VEZ' : `Vez de ${opponents.find(p => p.id === currentPlayerId)?.name || 'outro jogador'}`}
-          </span>
-          {turnTimer !== undefined && (
-            <span className={`turn-timer ${turnTimer <= 10 ? 'warning' : turnTimer <= 30 ? 'caution' : ''}`}>
-              {turnTimer}s
-            </span>
-          )}
-        </div>
-      )}
 
       {/* ========== ROUND ANNOUNCEMENT OVERLAY ========== */}
       {roundAnnouncement && !gameOverData && (
