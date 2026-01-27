@@ -356,6 +356,10 @@ export default function GameBoard({
         {/* Turn indicator badge - shows when it's my turn */}
         {isMyTurn && !hasActiveOverlay && (
           <div className="turn-badge my-turn-badge">
+            {/* Spent shell inline with badge */}
+            {playerLastShell[myId] && (
+              <div className={`badge-spent-shell ${playerLastShell[myId]}`} />
+            )}
             <span className="turn-badge-text">SUA VEZ</span>
             {turnTimer !== undefined && (
               <span className={`turn-badge-timer ${turnTimer <= 10 ? 'warning' : turnTimer <= 30 ? 'caution' : ''}`}>
@@ -365,8 +369,8 @@ export default function GameBoard({
           </div>
         )}
 
-        {/* My spent shell */}
-        {playerLastShell[myId] && (
+        {/* My spent shell - only show when NOT my turn */}
+        {!isMyTurn && playerLastShell[myId] && (
           <div className={`my-spent-shell ${playerLastShell[myId]}`} />
         )}
 

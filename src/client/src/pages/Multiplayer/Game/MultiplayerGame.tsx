@@ -467,6 +467,16 @@ export default function MultiplayerGame() {
         }
       }
 
+      // Inverter usado - INVERTER a cor da bala revelada (blank↔live)
+      if (data.itemId === 'inverter') {
+        // Inverter cor da revelação da lupa (se estava visível)
+        setRevealedShell(prev => prev === 'blank' ? 'live' : prev === 'live' ? 'blank' : null);
+        // Também inverter posição 0 do Phone (bala atual)
+        setPhoneRevealedPositions(prev => prev.map(p =>
+          p.position === 0 ? { ...p, type: p.type === 'blank' ? 'live' : 'blank' } : p
+        ));
+      }
+
       if (data.shellsRemaining) {
         setShells(data.shellsRemaining);
       }
