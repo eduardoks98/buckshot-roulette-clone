@@ -14,6 +14,13 @@ import {
   calculateXpGain,
   getLevelInfo,
 } from '../../../../shared/utils/xpCalculator';
+import {
+  calculateLpChange,
+  calculatePerformanceScore,
+  getDisplayRank,
+  RankingInput,
+  Tier,
+} from '../../../../shared/utils/rankingCalculator';
 import { PlayerXpResult } from '../../../../shared/types/achievement.types';
 
 // ==========================================
@@ -191,6 +198,12 @@ export class GamePersistenceService {
                 select: {
                   id: true,
                   elo_rating: true,
+                  // Novo sistema de ranking
+                  tier: true,
+                  division: true,
+                  lp: true,
+                  mmr_hidden: true,
+                  games_since_promo: true,
                 },
               },
             },
@@ -198,10 +211,16 @@ export class GamePersistenceService {
         },
       });
 
-      // Coletar ELOs de todos os jogadores para cálculo
+      // Coletar ELOs de todos os jogadores para cálculo (legacy)
       const playersElos: number[] = game.participants.map(p =>
         p.user?.elo_rating || 1000
       );
+
+      // Coletar MMRs para novo sistema de ranking
+      const playersMmrs: number[] = game.participants.map(p =>
+        p.user?.mmr_hidden || 800
+      );
+
       const totalPlayers = game.participants.length;
 
       // Calcular contexto do jogo para o cálculo de performance
@@ -243,9 +262,41 @@ export class GamePersistenceService {
             gameContext,
           };
 
-          // Calcular ELO com performance
+          // Calcular ELO com performance (legacy)
           const eloResult = calculatePerformanceBasedElo(eloInput);
           const eloChange = eloResult.totalChange;
+
+          // ========================================
+          // NOVO SISTEMA DE RANKING (LP + MMR)
+          // ========================================
+
+          // Calcular performance score para o novo sistema
+          const performanceScore = calculatePerformanceScore({
+            kills: stats.kills,
+            deaths: stats.deaths,
+            roundsWon: stats.roundsWon,
+            totalRounds: game.current_round,
+            damageDealt: stats.damageDealt,
+            damageTaken: stats.damageTaken,
+            itemsUsed: stats.itemsUsed,
+          });
+
+          // Preparar input para novo ranking
+          const rankingInput: RankingInput = {
+            currentTier: participant.user?.tier || 'Bronze',
+            currentDivision: participant.user?.division ?? 4,
+            currentLp: participant.user?.lp || 0,
+            currentMmr: participant.user?.mmr_hidden || 800,
+            gamesSincePromo: participant.user?.games_since_promo || 0,
+            position: stats.position,
+            totalPlayers,
+            allPlayersMmr: playersMmrs,
+            performanceScore,
+            wasQuitter: false, // TODO: detectar quitters
+          };
+
+          // Calcular novo LP/MMR
+          const rankingResult = calculateLpChange(rankingInput);
 
           // Calculate XP
           const currentUser = await prisma.user.findUnique({
@@ -271,7 +322,7 @@ export class GamePersistenceService {
           const newTotalXp = currentTotalXp + xpResult.totalXp;
           const newLevelInfo = getLevelInfo(newTotalXp);
 
-          // Update participant stats with eloChange + xpEarned
+          // Update participant stats with eloChange, xpEarned, lpChange, mmrChange
           await prisma.gameParticipant.update({
             where: { id: participant.id },
             data: {
@@ -286,14 +337,22 @@ export class GamePersistenceService {
               shots_fired: stats.shotsFired,
               elo_change: eloChange,
               xp_earned: xpResult.totalXp,
+              lp_change: rankingResult.lpChange,
+              mmr_change: rankingResult.mmrChange,
             },
           });
 
-          // Calcular novo ELO e rank
+          // Calcular novo ELO e rank (legacy)
           const newElo = playerElo + eloChange;
           const newRank = getRankFromElo(newElo);
 
-          // Atualizar User com ELO, rank, stats e XP
+          // Calcular games_since_promo
+          let newGamesSincePromo = (participant.user?.games_since_promo || 0) + 1;
+          if (rankingResult.promoted || rankingResult.demoted) {
+            newGamesSincePromo = 0; // Reset após promoção/rebaixamento
+          }
+
+          // Atualizar User com ELO, rank, stats, XP e NOVO SISTEMA DE RANKING
           await prisma.user.update({
             where: { id: participant.user_id },
             data: {
@@ -303,9 +362,18 @@ export class GamePersistenceService {
               rounds_won: { increment: stats.roundsWon },
               total_kills: { increment: stats.kills },
               total_deaths: { increment: stats.deaths },
+              // Legacy ELO
               elo_rating: newElo,
               rank: newRank,
+              // XP
               total_xp: { increment: xpResult.totalXp },
+              // Novo sistema de ranking
+              tier: rankingResult.newTier,
+              division: rankingResult.newDivision,
+              lp: rankingResult.newLp,
+              mmr_hidden: rankingResult.newMmr,
+              peak_mmr: Math.max(participant.user?.mmr_hidden || 800, rankingResult.newMmr),
+              games_since_promo: newGamesSincePromo,
             },
           });
 
@@ -327,12 +395,24 @@ export class GamePersistenceService {
             previousPrestige: previousLevelInfo.prestigeLevel,
             newPrestige: newLevelInfo.prestigeLevel,
             breakdown: xpResult.breakdown,
+            // Legacy ELO
             eloChange: eloChange,
             newEloRating: newElo,
+            // Novo sistema de ranking
+            lpChange: rankingResult.lpChange,
+            newLp: rankingResult.newLp,
+            mmrChange: rankingResult.mmrChange,
+            newMmr: rankingResult.newMmr,
+            newTier: rankingResult.newTier,
+            newDivision: rankingResult.newDivision,
+            displayRank: rankingResult.displayRank,
+            promoted: rankingResult.promoted,
+            demoted: rankingResult.demoted,
           });
 
-          // Log detalhado do cálculo de ELO e XP
-          console.log(`[ELO] ${participant.user_id}: ${playerElo} -> ${playerElo + eloChange} (base: ${eloResult.baseChange}, perf: ${eloResult.performanceModifier >= 0 ? '+' : ''}${eloResult.performanceModifier}, score: ${(eloResult.performanceScore * 100).toFixed(0)}%)`);
+          // Log detalhado do cálculo de ELO, LP e XP
+          console.log(`[ELO] ${participant.user_id}: ${playerElo} -> ${newElo} (${eloChange >= 0 ? '+' : ''}${eloChange})`);
+          console.log(`[LP] ${participant.user_id}: ${rankingResult.displayRank} (${rankingResult.lpChange >= 0 ? '+' : ''}${rankingResult.lpChange} LP, LP: ${rankingResult.newLp}/100)${rankingResult.promoted ? ' PROMOVIDO!' : ''}${rankingResult.demoted ? ' REBAIXADO!' : ''}`);
           console.log(`[XP] ${participant.user_id}: +${xpResult.totalXp} XP (total: ${newTotalXp}, lvl ${newLevelInfo.displayLevel} P${newLevelInfo.prestigeLevel})`);
         }
       }

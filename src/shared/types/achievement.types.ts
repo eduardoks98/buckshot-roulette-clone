@@ -101,8 +101,21 @@ export interface PlayerXpResult {
   previousPrestige: number;
   newPrestige: number;
   breakdown: XpBreakdown;
+
+  // Legacy ELO (mantido para compatibilidade)
   eloChange?: number;
   newEloRating?: number;
+
+  // Novo Sistema de Ranking (LP + MMR)
+  lpChange?: number;
+  newLp?: number;
+  mmrChange?: number;
+  newMmr?: number;
+  newTier?: string;
+  newDivision?: number | null;
+  displayRank?: string;
+  promoted?: boolean;
+  demoted?: boolean;
 }
 
 // ==========================================

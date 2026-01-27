@@ -40,9 +40,17 @@ model User {
   total_kills   Int @default(0)
   total_deaths  Int @default(0)
 
-  // Ranking
+  // Ranking (Legacy - mantido para compatibilidade)
   elo_rating Int    @default(1000)
   rank       String @default("Bronze")
+
+  // Novo Sistema de Ranking (LP + MMR)
+  tier             String @default("Bronze") // Bronze, Silver, Gold, Platinum, Diamond, Master, Grandmaster, Challenger
+  division         Int?   @default(4)        // 4=IV, 3=III, 2=II, 1=I (null para Master+)
+  lp               Int    @default(0)        // League Points: 0-100
+  mmr_hidden       Int    @default(800)      // MMR oculto (skill real)
+  peak_mmr         Int    @default(800)      // Maior MMR alcançado
+  games_since_promo Int   @default(0)        // Jogos desde última promoção (proteção contra queda)
 
   // Progression
   total_xp Int @default(0)
@@ -77,6 +85,8 @@ model User {
   @@index([elo_rating(sort: Desc)])
   @@index([total_xp(sort: Desc)])
   @@index([google_id])
+  @@index([tier, division, lp])
+  @@index([mmr_hidden(sort: Desc)])
 }
 
 model Session {
@@ -180,9 +190,14 @@ model GameParticipant {
   self_damage  Int @default(0)
   shots_fired  Int @default(0)
 
-  // Elo/XP Changes
+  // Elo/XP Changes (Legacy)
   elo_change Int?
   xp_earned  Int?
+
+  // Novo Sistema de Ranking
+  lp_change  Int?             // Mudança de LP nesta partida
+  mmr_change Int?             // Mudança de MMR nesta partida
+  was_quitter Boolean @default(false) // Se o jogador quitou e não voltou
 
   // Timestamps
   joined_at DateTime  @default(now())
