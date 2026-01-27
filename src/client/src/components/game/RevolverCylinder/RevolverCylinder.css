@@ -336,3 +336,60 @@
     height: 10px;
   }
 }
+
+/* ==========================================
+   COMPACT HEIGHT - Altura limitada
+   ========================================== */
+@media (max-height: 800px) {
+  .revolver-cylinder {
+    transform: scale(0.7);
+  }
+
+  .revolver-cylinder--sm {
+    transform: scale(0.55);
+  }
+
+  .revolver-cylinder--lg {
+    transform: scale(0.95);
+  }
+}
+
+@media (max-height: 700px) {
+  .revolver-cylinder {
+    transform: scale(0.6);
+    gap: 0.3rem;
+  }
+
+  .revolver-cylinder--sm {
+    transform: scale(0.45);
+  }
+
+  .revolver-cylinder--lg {
+    transform: scale(0.8);
+  }
+
+  .revolver-muzzle-flash {
+    width: 65px;
+    height: 50px;
+  }
+}
+
+@media (max-height: 600px) {
+  .revolver-cylinder {
+    transform: scale(0.5);
+    gap: 0.2rem;
+  }
+
+  .revolver-cylinder--sm {
+    transform: scale(0.35);
+  }
+
+  .revolver-cylinder--lg {
+    transform: scale(0.65);
+  }
+
+  .revolver-muzzle-flash {
+    width: 55px;
+    height: 42px;
+  }
+}

@@ -219,14 +219,31 @@ export default function GameBoard({
       {/* ========== HEADER ========== */}
       <div className="game-header">
         <div className="round-info">Rodada {round}/{maxRounds}</div>
-        <div className="shells-info">
-          <span className="shells-remaining">{shells.total} CARTUCHOS</span>
+        <div className={`direction-indicator ${turnDirection === 1 ? 'clockwise' : 'counter-clockwise'}`}>
+          <svg viewBox="0 0 40 40" className="direction-svg">
+            {/* Círculo de fundo */}
+            <circle cx="20" cy="20" r="16" className="direction-circle" />
+            {/* Seta curvada */}
+            <path
+              className="direction-arrow"
+              d={turnDirection === 1
+                ? "M12 20 A8 8 0 1 1 28 20" // Sentido horário
+                : "M28 20 A8 8 0 1 0 12 20"  // Anti-horário
+              }
+              fill="none"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+            />
+            {/* Ponta da seta */}
+            <polygon
+              className="direction-arrow-head"
+              points={turnDirection === 1
+                ? "28,16 32,20 28,24" // Ponta direita
+                : "12,16 8,20 12,24"   // Ponta esquerda
+              }
+            />
+          </svg>
         </div>
-        {turnTimer !== undefined && (
-          <div className={`turn-timer ${turnTimer <= 10 ? 'warning' : turnTimer <= 30 ? 'caution' : ''}`}>
-            {turnTimer}s
-          </div>
-        )}
         <button className="back-btn-small" onClick={onBack}>Sair</button>
       </div>
 
@@ -296,14 +313,6 @@ export default function GameBoard({
           shotResult={shotAnimation}
           size="md"
         />
-
-        {/* Direction Indicator */}
-        <div className={`direction-indicator ${turnDirection === 1 ? 'clockwise' : 'counter-clockwise'}`}>
-          <span className="direction-label">Ordem</span>
-          <span className="direction-arrow">
-            {turnDirection === 1 ? '→' : '←'}
-          </span>
-        </div>
 
         {/* Shoot buttons */}
         {isMyTurn && !hasActiveOverlay && selectedTarget && (
@@ -379,10 +388,17 @@ export default function GameBoard({
         {myItems.length === 0 && <p className="no-items">Sem itens</p>}
       </div>
 
-      {/* ========== WAITING TURN ========== */}
-      {!isMyTurn && !hasActiveOverlay && (
-        <div className="waiting-turn">
-          Vez de {opponents.find(p => p.id === currentPlayerId)?.name || 'outro jogador'}...
+      {/* ========== CURRENT TURN INDICATOR ========== */}
+      {!hasActiveOverlay && (
+        <div className={`current-turn-indicator ${isMyTurn ? 'my-turn' : 'opponent-turn'}`}>
+          <span className="turn-player-name">
+            {isMyTurn ? 'SUA VEZ' : `Vez de ${opponents.find(p => p.id === currentPlayerId)?.name || 'outro jogador'}`}
+          </span>
+          {turnTimer !== undefined && (
+            <span className={`turn-timer ${turnTimer <= 10 ? 'warning' : turnTimer <= 30 ? 'caution' : ''}`}>
+              {turnTimer}s
+            </span>
+          )}
         </div>
       )}
 
