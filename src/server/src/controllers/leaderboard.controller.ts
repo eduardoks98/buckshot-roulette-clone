@@ -36,7 +36,28 @@ export const getLeaderboard = async (req: Request, res: Response) => {
       userId
     );
 
-    res.json({ entries, myRank });
+    // Transformar snake_case para camelCase para o frontend
+    const formattedEntries = entries.map(entry => ({
+      rank: entry.rank,
+      userId: entry.user_id,
+      username: entry.username,
+      displayName: entry.display_name,
+      avatarUrl: entry.avatar_url,
+      gamesPlayed: entry.games_played,
+      gamesWon: entry.games_won,
+      winRate: entry.win_rate,
+      eloRating: entry.elo_rating,
+      eloGain: entry.elo_gain,
+      totalXp: entry.total_xp,
+      activeTitleId: entry.active_title_id,
+      // Novo sistema de ranking
+      tier: entry.tier,
+      division: entry.division,
+      lp: entry.lp,
+      displayRank: entry.displayRank,
+    }));
+
+    res.json({ entries: formattedEntries, myRank });
   } catch (error) {
     console.error('[Leaderboard] Erro ao obter leaderboard:', error instanceof Error ? error.message : error);
     console.error('[Leaderboard] Stack:', error instanceof Error ? error.stack : '');

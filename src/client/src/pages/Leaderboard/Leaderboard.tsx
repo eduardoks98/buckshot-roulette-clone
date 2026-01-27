@@ -34,6 +34,11 @@ interface LeaderboardEntry {
   eloGain?: number;
   totalXp?: number;
   activeTitleId?: string | null;
+  // Novo sistema de ranking
+  tier?: string;
+  division?: number | null;
+  lp?: number;
+  displayRank?: string;
 }
 
 export default function Leaderboard() {
@@ -205,9 +210,20 @@ export default function Leaderboard() {
                 </div>
 
                 <div className="entry-elo">
-                  <span className="elo-value">{entry.eloRating}</span>
-                  {entry.eloGain !== undefined && entry.eloGain > 0 && (
-                    <span className="elo-gain">+{entry.eloGain}</span>
+                  {entry.displayRank ? (
+                    <>
+                      <span className="elo-value">{entry.displayRank}</span>
+                      {entry.lp !== undefined && (
+                        <span className="elo-lp">{entry.lp} LP</span>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <span className="elo-value">{entry.eloRating}</span>
+                      {entry.eloGain !== undefined && entry.eloGain > 0 && (
+                        <span className="elo-gain">+{entry.eloGain}</span>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
