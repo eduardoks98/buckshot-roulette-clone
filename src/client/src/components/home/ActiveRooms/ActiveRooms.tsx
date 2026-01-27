@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSocket } from '../../../context/SocketContext';
 import { useAuth } from '../../../context/AuthContext';
+import { PlayersIcon, RefreshIcon, UserIcon, PlusIcon, TargetCircleIcon } from '../../icons';
 import './ActiveRooms.css';
 
 interface RoomInfo {
@@ -344,12 +345,7 @@ export function ActiveRooms() {
       {/* Header with title and refresh button */}
       <div className="active-rooms__header">
         <h2 className="active-rooms__title">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-            <circle cx="9" cy="7" r="4"/>
-            <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-            <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-          </svg>
+          <PlayersIcon size={20} />
           SALAS DISPONIVEIS
         </h2>
         <button
@@ -358,11 +354,7 @@ export function ActiveRooms() {
           title="Atualizar lista"
           disabled={refreshing}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M23 4v6h-6"/>
-            <path d="M1 20v-6h6"/>
-            <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>
-          </svg>
+          <RefreshIcon size={16} />
         </button>
       </div>
 
@@ -408,10 +400,7 @@ export function ActiveRooms() {
                 </div>
                 <div className="room-card__meta">
                   <span className="room-card__players">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                      <circle cx="12" cy="7" r="4"/>
-                    </svg>
+                    <UserIcon size={14} />
                     {room.playerCount}/{room.maxPlayers}
                   </span>
                   {room.hasPassword && (
@@ -437,20 +426,14 @@ export function ActiveRooms() {
           onClick={handleCreateRoom}
           disabled={creating || joining || !isConnected || !user}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="12" y1="5" x2="12" y2="19"/>
-            <line x1="5" y1="12" x2="19" y2="12"/>
-          </svg>
+          <PlusIcon size={16} />
           {creating ? 'Criando...' : 'Criar Sala'}
         </button>
         <button
           className="btn-secondary btn-solo"
           onClick={() => navigate('/singleplayer')}
         >
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <circle cx="12" cy="12" r="10"/>
-            <circle cx="12" cy="12" r="3"/>
-          </svg>
+          <TargetCircleIcon size={16} />
           Jogar Solo
         </button>
       </div>
