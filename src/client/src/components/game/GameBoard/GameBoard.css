@@ -11,8 +11,7 @@
   padding: 0.5rem;
   display: flex;
   flex-direction: column;
-  max-width: 900px;
-  margin: 0 auto;
+  width: 100%;
   background:
     radial-gradient(ellipse at 20% 30%, rgba(212, 164, 24, 0.03) 0%, transparent 50%),
     radial-gradient(ellipse at 80% 70%, rgba(139, 92, 246, 0.03) 0%, transparent 50%),
