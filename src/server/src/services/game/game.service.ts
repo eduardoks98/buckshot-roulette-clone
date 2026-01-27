@@ -613,6 +613,21 @@ export class GameService {
           return { error: 'Nao pode roubar outra Adrenalina!' };
         }
 
+        // Validar se Handcuffs tem alvos válidos antes de permitir roubo
+        if (itemToSteal.id === 'handcuffs') {
+          // Encontrar alvos válidos para Handcuffs (vivo, não é você, não está algemado, não é imune)
+          const validHandcuffTargets = room.players.filter(p =>
+            p.id !== userId &&           // Não pode algemar a si mesmo
+            p.alive &&                   // Alvo deve estar vivo
+            !p.handcuffed &&             // Não pode algemar quem já está algemado
+            !p.handcuffImmune            // Não pode algemar quem é imune
+          );
+
+          if (validHandcuffTargets.length === 0) {
+            return { error: 'Nao ha alvos validos para as Algemas!' };
+          }
+        }
+
         // Roubar o item do alvo
         const stolenItem = target.items.splice(itemIndex, 1)[0];
 
