@@ -2,7 +2,9 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSocket } from '../../../context/SocketContext';
 import { useAuth } from '../../../context/AuthContext';
+import { useRequireAuth } from '../../../hooks';
 import { PageLayout } from '../../../components/layout/PageLayout';
+import { useSounds } from '../../../audio/useSounds';
 import type { RoomInfo } from '../../../../../shared/types/socket-events.types';
 import './Lobby.css';
 
@@ -15,15 +17,11 @@ interface ActiveGameData {
 export default function Lobby() {
   const navigate = useNavigate();
   const { socket, isConnected, connect } = useSocket();
-  const { user, isAuthenticated, isLoading } = useAuth();
+  const { user } = useAuth();
+  const { playMusic, playJoinRoom, playError } = useSounds();
 
   // Redirecionar para login se não autenticado
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      // Usuário não logado - não pode acessar multiplayer
-      navigate('/');
-    }
-  }, [isLoading, isAuthenticated, navigate]);
+  const { isLoading, isAuthenticated } = useRequireAuth();
 
   // Nome do usuário logado (obrigatório agora)
   const playerName = user?.display_name || '';
@@ -34,6 +32,13 @@ export default function Lobby() {
   const [error, setError] = useState('');
   const [activeGame, setActiveGame] = useState<ActiveGameData | null>(null);
   const [isReconnecting, setIsReconnecting] = useState(false);
+
+  // Tocar musica ambiente do menu
+  useEffect(() => {
+    if (!isLoading) {
+      playMusic('ambient-menu');
+    }
+  }, [isLoading, playMusic]);
 
   // Conectar ao servidor ao montar (apenas se autenticado)
   useEffect(() => {
@@ -58,7 +63,7 @@ export default function Lobby() {
 
     socket.on('roomCreated', (data) => {
       console.log('Sala criada:', data.code);
-      // Servidor gerencia o estado - não precisa salvar no localStorage
+      playJoinRoom(); // Som de sucesso ao criar sala
       navigate('/multiplayer/room', {
         state: {
           roomCode: data.code,
@@ -70,7 +75,7 @@ export default function Lobby() {
 
     socket.on('roomJoined', (data) => {
       console.log('Entrou na sala:', data.code);
-      // Servidor gerencia o estado - não precisa salvar no localStorage
+      playJoinRoom(); // Som de sucesso ao entrar na sala
       navigate('/multiplayer/room', {
         state: {
           roomCode: data.code,
@@ -90,6 +95,7 @@ export default function Lobby() {
     });
 
     socket.on('joinError', (message) => {
+      playError(); // Som de erro
       setError(message);
       setTimeout(() => setError(''), 3000);
     });

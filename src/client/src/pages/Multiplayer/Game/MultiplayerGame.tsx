@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSocket } from '../../../context/SocketContext';
 import { useAuth } from '../../../context/AuthContext';
+import { useRequireAuth } from '../../../hooks';
 import {
   PlayerPublicState,
   RoundStartedPayload,
@@ -24,6 +25,7 @@ import { BugReportModal, GameStateForReport } from '../../../components/common/B
 import { AchievementToast } from '../../../components/common';
 import { GameBoard, GamePlayer, GameItem, ShotResult, RoundAnnouncement, StealModalData, ItemActionModal, TurnDirection } from '../../../components/game';
 import { AWARD_ICONS } from '../../../components/icons';
+import { useSounds } from '../../../audio';
 import './MultiplayerGame.css';
 
 interface LocationState {
@@ -48,16 +50,26 @@ export default function MultiplayerGame() {
   const navigate = useNavigate();
   const location = useLocation();
   const { socket, isConnected } = useSocket();
-  const { isAuthenticated, isLoading, user } = useAuth();
+  const { user } = useAuth();
+  const {
+    playShot, playDamage, playHeal, playItem,
+    playRoundStart, playRoundWin, playGameOver,
+    playTurnChange, playReload, resetTimerWarning, checkTimerWarning,
+    playMusic, stopMusic
+  } = useSounds();
 
   const state = location.state as LocationState | null;
 
   // Redirecionar se não autenticado
+  useRequireAuth();
+
+  // Tocar musica ambiente do jogo
   useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      navigate('/');
-    }
-  }, [isLoading, isAuthenticated, navigate]);
+    playMusic('ambient-game');
+    return () => {
+      stopMusic(true); // Para musica ao sair do jogo
+    };
+  }, [playMusic, stopMusic]);
 
   // Game state
   const [players, setPlayers] = useState<PlayerPublicState[]>([]);
@@ -238,6 +250,11 @@ export default function MultiplayerGame() {
 
     // Round started
     socket.on('roundStarted', (data: RoundStartedPayload) => {
+      // Tocar som de início de round e recarregar
+      playRoundStart();
+      playReload();
+      resetTimerWarning(); // Resetar warning do timer para novo round
+
       setPlayers(data.players);
       setCurrentPlayerId(data.currentPlayer);
       setRound(data.round);
@@ -289,6 +306,10 @@ export default function MultiplayerGame() {
 
     // Turn changed
     socket.on('turnChanged', ({ currentPlayer, players: updatedPlayers, turnElapsed, turnStartTime }) => {
+      // Tocar som de mudança de turno
+      playTurnChange();
+      resetTimerWarning(); // Resetar warning do timer para novo turno
+
       setCurrentPlayerId(currentPlayer);
       setRevealedShell(null);
       setSelectedTarget(null);
@@ -321,6 +342,14 @@ export default function MultiplayerGame() {
 
     // Shot fired
     socket.on('shotFired', (data: ShotFiredPayload) => {
+      // Tocar som do tiro
+      playShot(data.shell === 'live');
+
+      // Som de dano se acertou alguém
+      if (data.shell === 'live' && data.damage > 0) {
+        setTimeout(() => playDamage(), 200); // Delay para sincronizar com animação
+      }
+
       setPlayerLastShell(prev => ({
         ...prev,
         [data.shooter]: data.shell
@@ -368,6 +397,9 @@ export default function MultiplayerGame() {
 
     // Item used
     socket.on('itemUsed', (data: ItemUsedPayload) => {
+      // Tocar som do item
+      playItem(data.itemId);
+
       const userName = data.playerId === myId ? 'Você' : data.playerName;
       const item = ITEMS[data.itemId as ItemId];
       const isMe = data.playerId === myId;
@@ -438,16 +470,19 @@ export default function MultiplayerGame() {
         setTurnDirection(data.newDirection);
       }
 
-      // Efeitos visuais de cura/dano
+      // Efeitos visuais e sonoros de cura/dano
       if (data.itemId === 'cigarettes' && data.healedAmount && data.healedAmount > 0) {
+        playHeal();
         setHealedPlayerId(data.playerId);
         setTimeout(() => setHealedPlayerId(null), 700);
       }
 
       if (data.itemId === 'expired_medicine' && data.damagedAmount && data.damagedAmount > 0) {
+        playDamage();
         setDamagedPlayerId(data.playerId);
         setTimeout(() => setDamagedPlayerId(null), 600);
       } else if (data.itemId === 'expired_medicine' && data.healedAmount && data.healedAmount > 0) {
+        playHeal();
         setHealedPlayerId(data.playerId);
         setTimeout(() => setHealedPlayerId(null), 700);
       }
@@ -568,6 +603,9 @@ export default function MultiplayerGame() {
 
     // Round ended
     socket.on('roundEnded', ({ winnerId, roundWins }) => {
+      // Tocar som de vitória de round
+      playRoundWin();
+
       const winner = players.find(p => p.id === winnerId);
       setMessage(`${winner?.name} venceu a rodada!`);
 
@@ -579,6 +617,10 @@ export default function MultiplayerGame() {
 
     // Game over
     socket.on('gameOver', (data: GameOverPayload) => {
+      // Tocar som de game over (vitória ou derrota)
+      const isWinner = data.winner?.id === myId;
+      playGameOver(isWinner);
+
       localStorage.removeItem('bangshotSession');
       localStorage.removeItem('bangshotReconnect');
       setGameOverData(data);
@@ -614,6 +656,7 @@ export default function MultiplayerGame() {
     // Reconnected
     socket.on('reconnected', (data) => {
       console.log('[Game] Reconectado com sucesso ao jogo:', data.roomCode);
+      console.log('[Game] Dados de reconexão:', { turnElapsed: data.turnElapsed, turnStartTime: data.turnStartTime });
       // Limpar dados de reconexão antigos (novo token será enviado pelo servidor)
       localStorage.removeItem('bangshotReconnect');
       setPlayers(data.players);
@@ -625,6 +668,19 @@ export default function MultiplayerGame() {
       setSelectedTarget(null);
       setSelectedItem(null);
       setMessage('Reconectado ao jogo!');
+
+      // CRÍTICO: Sincronizar timer com o servidor
+      if (data.turnElapsed !== undefined) {
+        const elapsedSec = Math.floor(data.turnElapsed / 1000);
+        const remaining = Math.max(0, (GAME_RULES.TIMERS.TURN_DURATION_MS / 1000) - elapsedSec);
+        console.log('[Game] Timer sincronizado via turnElapsed:', { elapsedSec, remaining });
+        setTurnTimer(remaining);
+      } else if (data.turnStartTime) {
+        const elapsed = Math.floor((Date.now() - data.turnStartTime) / 1000);
+        const remaining = Math.max(0, (GAME_RULES.TIMERS.TURN_DURATION_MS / 1000) - elapsed);
+        console.log('[Game] Timer sincronizado via turnStartTime:', { elapsed, remaining });
+        setTurnTimer(remaining);
+      }
     });
 
     // Reconnect error
@@ -710,7 +766,7 @@ export default function MultiplayerGame() {
       socket.off('roomCreated');
       socket.off('roomJoined');
     };
-  }, [socket, players, myId, selectedItem, navigate]);
+  }, [socket, players, myId, selectedItem, navigate, playShot, playDamage, playHeal, playItem, playRoundStart, playRoundWin, playGameOver, playTurnChange, playReload, resetTimerWarning]);
 
   // Turn timer - decrements for all players to stay in sync
   useEffect(() => {
@@ -722,12 +778,15 @@ export default function MultiplayerGame() {
         if (prev <= 0) {
           return 0;
         }
-        return prev - 1;
+        const newTime = prev - 1;
+        // Verificar se deve tocar warning (apenas uma vez quando chega em 10s)
+        checkTimerWarning(newTime);
+        return newTime;
       });
     }, 1000);
 
     return () => clearInterval(interval);
-  }, [currentPlayerId]);
+  }, [currentPlayerId, checkTimerWarning]);
 
   // Countdown timer for disconnected players
   useEffect(() => {

@@ -2,13 +2,29 @@
 // WAITING ROOM PAGE
 // ==========================================
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSocket } from '../../../context/SocketContext';
 import { useAuth } from '../../../context/AuthContext';
+import {
+  useRequireAuth,
+  useRoomEvents,
+  useRoomActions,
+  useLobbyActions,
+  useGameSession,
+} from '../../../hooks';
+import type {
+  PlayerJoinedPayload,
+  PlayerLeftPayload,
+  RoomPlayerDisconnectedPayload,
+  RoomPlayerReconnectedPayload,
+  HostChangedPayload,
+  BotErrorPayload,
+} from '../../../hooks';
 import { PageLayout, InlineAd } from '../../../components/layout/PageLayout';
-import { PlayerPublicState } from '../../../../../shared/types';
+import { PlayerPublicState, RoundStartedPayload } from '../../../../../shared/types';
 import { GAME_RULES } from '../../../../../shared/constants';
+import { useSounds } from '../../../audio/useSounds';
 import './WaitingRoom.css';
 
 // Verificar se está em modo de desenvolvimento
@@ -21,29 +37,22 @@ interface LocationState {
   fromRematch?: boolean;
 }
 
-interface SavedSession {
-  roomCode: string;
-  playerName: string;
-  isHost: boolean;
-  timestamp: number;
-}
-
 export default function WaitingRoom() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { socket, isConnected, connect } = useSocket();
-  const { isAuthenticated, isLoading, user } = useAuth();
+  const { isConnected, connect } = useSocket();
+  const { user } = useAuth();
+  const { playMusic, playJoinRoom, playLeaveRoom, stopMusic } = useSounds();
+
+  // Hooks customizados
+  useRequireAuth();
+  const { saveSession, clearSession, getSession } = useGameSession();
+  const { startGame, leaveRoom, addBot, removeBot } = useRoomActions();
+  const { joinRoom: emitJoinRoom } = useLobbyActions();
 
   const state = location.state as LocationState | null;
   const reconnectAttempted = useRef(false);
   const gameStarted = useRef(false);
-
-  // Redirecionar se não autenticado
-  useEffect(() => {
-    if (!isLoading && !isAuthenticated) {
-      navigate('/');
-    }
-  }, [isLoading, isAuthenticated, navigate]);
 
   const [roomCode, setRoomCode] = useState(state?.roomCode || '');
   const [isHost, setIsHost] = useState(state?.isHost || false);
@@ -54,247 +63,186 @@ export default function WaitingRoom() {
   const [reconnecting, setReconnecting] = useState(false);
   const [addingBot, setAddingBot] = useState(false);
 
-  // Salvar sessão quando vem do rematch (para permitir reconexão em caso de F5)
+  // Manter musica do menu tocando
+  useEffect(() => {
+    playMusic('ambient-menu');
+  }, [playMusic]);
+
+  // Event handlers
+  const handlePlayerJoined = useCallback((data: PlayerJoinedPayload) => {
+    playJoinRoom(); // Som quando jogador entra
+    setPlayers(data.players);
+  }, [playJoinRoom]);
+
+  const handlePlayerLeft = useCallback((data: PlayerLeftPayload) => {
+    playLeaveRoom(); // Som quando jogador sai
+    setPlayers(data.players);
+  }, [playLeaveRoom]);
+
+  const handlePlayerDisconnected = useCallback((data: RoomPlayerDisconnectedPayload) => {
+    console.log(`[WaitingRoom] ${data.playerName} desconectou temporariamente`);
+    setPlayers(prev => prev.map(p =>
+      p.id === data.playerId ? { ...p, disconnected: true } : p
+    ));
+  }, []);
+
+  const handlePlayerReconnected = useCallback((data: RoomPlayerReconnectedPayload) => {
+    console.log(`[WaitingRoom] ${data.playerName} reconectou (${data.playerId} -> ${data.newSocketId})`);
+    setPlayers(prev => prev.map(p =>
+      p.id === data.playerId ? { ...p, id: data.newSocketId || p.id, disconnected: false } : p
+    ));
+  }, []);
+
+  const handleHostChanged = useCallback((data: HostChangedPayload) => {
+    // Check if current user became host by name comparison
+    if (user?.display_name === data.newHost) {
+      setIsHost(true);
+    }
+  }, [user?.display_name]);
+
+  const handleRoundStarted = useCallback((gameState: RoundStartedPayload) => {
+    gameStarted.current = true;
+    stopMusic(true); // Para musica do menu com fade out
+    navigate('/multiplayer/game', {
+      state: {
+        roomCode,
+        gameState,
+      },
+    });
+  }, [navigate, roomCode, stopMusic]);
+
+  const handleStartError = useCallback((message: string) => {
+    setError(message);
+  }, []);
+
+  const handleLeftRoom = useCallback(() => {
+    clearSession();
+    navigate('/multiplayer');
+  }, [clearSession, navigate]);
+
+  const handleRoomJoined = useCallback((data: { code: string; isHost: boolean; players: PlayerPublicState[] }) => {
+    setRoomCode(data.code);
+    setIsHost(data.isHost);
+    setPlayers(data.players);
+    setReconnecting(false);
+  }, []);
+
+  const handleJoinError = useCallback((message: string) => {
+    console.log('Erro ao reconectar:', message);
+    clearSession();
+    setReconnecting(false);
+    navigate('/multiplayer');
+  }, [clearSession, navigate]);
+
+  const handleBotAdded = useCallback(() => {
+    setAddingBot(false);
+  }, []);
+
+  const handleBotError = useCallback((data: BotErrorPayload) => {
+    setError(data.message);
+    setAddingBot(false);
+  }, []);
+
+  // Registrar eventos via hook
+  useRoomEvents({
+    onPlayerJoined: handlePlayerJoined,
+    onPlayerLeft: handlePlayerLeft,
+    onPlayerDisconnected: handlePlayerDisconnected,
+    onPlayerReconnected: handlePlayerReconnected,
+    onHostChanged: handleHostChanged,
+    onRoundStarted: handleRoundStarted,
+    onStartError: handleStartError,
+    onLeftRoom: handleLeftRoom,
+    onRoomJoined: handleRoomJoined,
+    onJoinError: handleJoinError,
+    onBotAdded: handleBotAdded,
+    onBotError: handleBotError,
+  });
+
+  // Salvar sessão quando vem do rematch
   useEffect(() => {
     if (state?.fromRematch && state.roomCode && user?.display_name) {
-      localStorage.setItem('bangshotSession', JSON.stringify({
+      saveSession({
         roomCode: state.roomCode,
         playerName: user.display_name,
         isHost: state.isHost,
-        timestamp: Date.now(),
-      }));
+      });
       console.log('[WaitingRoom] Sessão salva do rematch:', state.roomCode);
     }
-  }, [state?.fromRematch, state?.roomCode, state?.isHost, user?.display_name]);
-
-  // Handler para sair da sala (chamado pelo botão Voltar)
-  // Este é o ÚNICO lugar que deve emitir leaveRoom explicitamente
-  // Fechar aba/F5 deixa o servidor lidar via disconnect + grace period
-  const handleLeaveRoom = () => {
-    if (socket) {
-      localStorage.removeItem('bangshotSession');
-      socket.emit('leaveRoom');
-    }
-    navigate('/multiplayer');
-  };
+  }, [state?.fromRematch, state?.roomCode, state?.isHost, user?.display_name, saveSession]);
 
   // Tentar reconectar se não tiver state (F5)
   useEffect(() => {
     if (state || reconnectAttempted.current) return;
 
-    const savedSessionStr = localStorage.getItem('bangshotSession');
-    if (!savedSessionStr) {
+    const savedSession = getSession();
+    if (!savedSession) {
       navigate('/multiplayer');
       return;
     }
 
-    try {
-      const savedSession: SavedSession = JSON.parse(savedSessionStr);
+    reconnectAttempted.current = true;
+    setReconnecting(true);
+    setRoomCode(savedSession.roomCode);
 
-      // Verificar se a sessão não expirou (30 minutos)
-      if (Date.now() - savedSession.timestamp > 30 * 60 * 1000) {
-        localStorage.removeItem('bangshotSession');
-        navigate('/multiplayer');
-        return;
-      }
-
-      reconnectAttempted.current = true;
-      setReconnecting(true);
-      setRoomCode(savedSession.roomCode);
-
-      // Se já está conectado, emitir joinRoom IMEDIATAMENTE
-      if (isConnected && socket) {
-        console.log('[WaitingRoom] Já conectado, emitindo joinRoom:', savedSession.roomCode);
-        socket.emit('joinRoom', {
-          code: savedSession.roomCode,
-          playerName: savedSession.playerName,
-        });
-      } else {
-        console.log('[WaitingRoom] Aguardando conexão...');
-        connect();
-      }
-    } catch {
-      localStorage.removeItem('bangshotSession');
-      navigate('/multiplayer');
+    if (isConnected) {
+      console.log('[WaitingRoom] Já conectado, emitindo joinRoom:', savedSession.roomCode);
+      emitJoinRoom(savedSession.roomCode, savedSession.playerName);
+    } else {
+      console.log('[WaitingRoom] Aguardando conexão...');
+      connect();
     }
-  }, [state, isConnected, socket, connect, navigate]);
+  }, [state, isConnected, connect, navigate, getSession, emitJoinRoom]);
 
-  // Tentar reconectar quando socket conectar (fallback se não estava conectado inicialmente)
+  // Tentar reconectar quando socket conectar
   useEffect(() => {
-    if (!reconnecting || !socket || !isConnected) return;
+    if (!reconnecting || !isConnected) return;
 
-    const savedSessionStr = localStorage.getItem('bangshotSession');
-    if (!savedSessionStr) return;
+    const savedSession = getSession();
+    if (!savedSession) return;
 
-    try {
-      const savedSession: SavedSession = JSON.parse(savedSessionStr);
-      console.log('[WaitingRoom] Socket conectou, tentando reconectar à sala:', savedSession.roomCode);
+    console.log('[WaitingRoom] Socket conectou, tentando reconectar à sala:', savedSession.roomCode);
+    emitJoinRoom(savedSession.roomCode, savedSession.playerName);
+  }, [reconnecting, isConnected, getSession, emitJoinRoom]);
 
-      socket.emit('joinRoom', {
-        code: savedSession.roomCode,
-        playerName: savedSession.playerName,
-      });
-    } catch {
-      localStorage.removeItem('bangshotSession');
-      navigate('/multiplayer');
-    }
-  }, [reconnecting, socket, isConnected, navigate]);
-
-  // Escutar eventos de reconexão
+  // Redirecionar se não tiver state nem sessão
   useEffect(() => {
-    if (!socket || !reconnecting) return;
-
-    const handleRoomJoined = (data: { code: string; isHost: boolean; players: PlayerPublicState[] }) => {
-      setRoomCode(data.code);
-      setIsHost(data.isHost);
-      setPlayers(data.players);
-      setReconnecting(false);
-    };
-
-    const handleJoinError = (message: string) => {
-      console.log('Erro ao reconectar:', message);
-      localStorage.removeItem('bangshotSession');
-      setReconnecting(false);
-      navigate('/multiplayer');
-    };
-
-    socket.on('roomJoined', handleRoomJoined);
-    socket.on('joinError', handleJoinError);
-
-    return () => {
-      socket.off('roomJoined', handleRoomJoined);
-      socket.off('joinError', handleJoinError);
-    };
-  }, [socket, reconnecting, navigate]);
-
-  useEffect(() => {
-    if ((!state && !reconnecting && !roomCode) || !socket) {
+    if ((!state && !reconnecting && !roomCode)) {
       if (!reconnecting) {
         navigate('/multiplayer');
       }
-      return;
     }
+  }, [state, reconnecting, roomCode, navigate]);
 
-    // Player joined
-    socket.on('playerJoined', ({ players: newPlayers }) => {
-      setPlayers(newPlayers);
-    });
+  // Handler para sair da sala
+  const handleLeaveRoom = useCallback(() => {
+    clearSession();
+    leaveRoom();
+    navigate('/multiplayer');
+  }, [clearSession, leaveRoom, navigate]);
 
-    // Player left (após grace period expirar ou botão Voltar)
-    socket.on('playerLeft', ({ players: newPlayers }) => {
-      setPlayers(newPlayers);
-    });
-
-    // Player temporarily disconnected (F5) - vaga reservada por 10s
-    socket.on('playerDisconnected', ({ playerId, playerName }) => {
-      console.log(`[WaitingRoom] ${playerName} desconectou temporariamente`);
-      setPlayers(prev => prev.map(p =>
-        p.id === playerId ? { ...p, disconnected: true } : p
-      ));
-    });
-
-    // Player reconnected after F5
-    socket.on('playerReconnected', ({ playerId, newSocketId, playerName }) => {
-      console.log(`[WaitingRoom] ${playerName} reconectou (${playerId} -> ${newSocketId})`);
-      setPlayers(prev => prev.map(p =>
-        p.id === playerId ? { ...p, id: newSocketId || p.id, disconnected: false } : p
-      ));
-    });
-
-    // Host changed
-    socket.on('hostChanged', ({ newHost }) => {
-      const currentPlayer = players.find(p => p.id === socket.id);
-      if (currentPlayer?.name === newHost) {
-        setIsHost(true);
-      }
-    });
-
-    // Game started
-    socket.on('roundStarted', (gameState) => {
-      gameStarted.current = true;
-      navigate('/multiplayer/game', {
-        state: {
-          roomCode,
-          gameState,
-        },
-      });
-    });
-
-    // Start error
-    socket.on('startError', (message) => {
-      setError(message);
-    });
-
-    // Left room
-    socket.on('leftRoom', () => {
-      localStorage.removeItem('bangshotSession');
-      navigate('/multiplayer');
-    });
-
-    return () => {
-      socket.off('playerJoined');
-      socket.off('playerLeft');
-      socket.off('playerDisconnected');
-      socket.off('playerReconnected');
-      socket.off('hostChanged');
-      socket.off('roundStarted');
-      socket.off('startError');
-      socket.off('leftRoom');
-    };
-  }, [socket, state, navigate, roomCode, players]);
-
-  const handleStartGame = () => {
-    if (!socket || !isHost) return;
+  // Handlers para ações
+  const handleStartGame = useCallback(() => {
+    if (!isHost) return;
     setError('');
-    socket.emit('startGame');
-  };
+    startGame();
+  }, [isHost, startGame]);
 
-  // Bot management (Development only)
-  const handleAddBot = () => {
-    if (!socket || !isHost || !isDevelopment) return;
+  const handleAddBot = useCallback(() => {
+    if (!isHost || !isDevelopment) return;
     if (players.length >= GAME_RULES.MAX_PLAYERS) {
       setError('Sala cheia');
       return;
     }
     setAddingBot(true);
     setError('');
-    socket.emit('addBot', {
-      difficulty: 'medium',
-    });
-  };
+    addBot('medium');
+  }, [isHost, players.length, addBot]);
 
-  const handleRemoveBot = (botId: string) => {
-    if (!socket || !isHost || !isDevelopment) return;
-    socket.emit('removeBot', { botId });
-  };
-
-  // Listen for bot events
-  useEffect(() => {
-    if (!socket || !isDevelopment) return;
-
-    const handleBotAdded = () => {
-      setAddingBot(false);
-    };
-
-    const handleBotRemoved = () => {
-      // Bot removed successfully
-    };
-
-    const handleBotError = ({ message }: { message: string }) => {
-      setError(message);
-      setAddingBot(false);
-    };
-
-    socket.on('botAdded', handleBotAdded);
-    socket.on('botRemoved', handleBotRemoved);
-    socket.on('botError', handleBotError);
-
-    return () => {
-      socket.off('botAdded', handleBotAdded);
-      socket.off('botRemoved', handleBotRemoved);
-      socket.off('botError', handleBotError);
-    };
-  }, [socket]);
+  const handleRemoveBot = useCallback((botId: string) => {
+    if (!isHost || !isDevelopment) return;
+    removeBot(botId);
+  }, [isHost, removeBot]);
 
   const handleCopyCode = async () => {
     try {

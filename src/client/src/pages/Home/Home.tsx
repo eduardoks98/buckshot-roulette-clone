@@ -2,6 +2,7 @@
 // HOME PAGE - Landing + LoL-Style Lobby
 // ==========================================
 
+import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Header } from '../../components/layout/Header';
@@ -12,11 +13,20 @@ import { Changelog } from '../../components/home/Changelog';
 import { AdBanner } from '../../components/common/AdBanner';
 import { GoogleIcon, PlayersIcon, StarIcon, AchievementIcon, GridIcon } from '../../components/icons';
 import { ADSENSE_PUBLISHER_ID, AD_SLOTS, ADSENSE_TEST_MODE } from '../../config';
+import { useSounds } from '../../audio/useSounds';
 import './Home.css';
 
 export default function Home() {
   const navigate = useNavigate();
   const { isAuthenticated, isLoading, login, authError, clearAuthError } = useAuth();
+  const { playMusic } = useSounds();
+
+  // Tocar musica ambiente do menu
+  useEffect(() => {
+    if (!isLoading) {
+      playMusic('ambient-menu');
+    }
+  }, [isLoading, playMusic]);
 
   // ==========================================
   // LOADING STATE
