@@ -11,6 +11,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService/TermsOfService';
 import CookiePolicy from './pages/CookiePolicy/CookiePolicy';
 import ChangelogPage from './pages/ChangelogPage/ChangelogPage';
+import AudioTest from './pages/AudioTest/AudioTest';
 
 function App() {
   return (
@@ -30,6 +31,7 @@ function App() {
         <Route path="/terms" element={<TermsOfService />} />
         <Route path="/cookies" element={<CookiePolicy />} />
         <Route path="/changelog" element={<ChangelogPage />} />
+        <Route path="/audio-test" element={<AudioTest />} />
       </Routes>
     </div>
   );
