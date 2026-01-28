@@ -338,6 +338,8 @@ export interface ReconnectedPayload {
   shells: ShellInfo;
   yourItems: Item[];
   yourHp: number;
+  turnElapsed?: number;    // Tempo já decorrido do turno em ms
+  turnStartTime?: number;  // Timestamp de início do turno (fallback)
 }
 
 export interface ReconnectErrorPayload {

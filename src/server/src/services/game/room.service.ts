@@ -674,6 +674,8 @@ export class RoomService {
         },
         yourItems: player.items,
         yourHp: player.hp,
+        // CRÍTICO: Enviar tempo decorrido do turno para sincronizar timer
+        turnElapsed: room.turnStartTime ? Date.now() - room.turnStartTime : 0,
       },
     };
   }
@@ -726,6 +728,8 @@ export class RoomService {
           },
           yourItems: player.items,
           yourHp: player.hp,
+          // CRÍTICO: Enviar tempo decorrido do turno para sincronizar timer
+          turnElapsed: room.turnStartTime ? Date.now() - room.turnStartTime : 0,
         },
       };
     } else {
