@@ -84,58 +84,60 @@ export function SoundControl({ compact = false }: SoundControlProps) {
 
       {showPanel && (
         <div className="sound-control__panel">
-          {/* Sound Effects */}
-          <div className="sound-control__section">
-            <div className="sound-control__header">
-              <span className="sound-control__label">Efeitos</span>
-              <button
-                className={`sound-control__toggle ${enabled ? 'active' : ''}`}
-                onClick={toggleSound}
-              >
-                {enabled ? 'ON' : 'OFF'}
-              </button>
-            </div>
-            {enabled && (
-              <div className="sound-control__slider-row">
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.1"
-                  value={volume}
-                  onChange={handleVolumeChange}
-                  className="sound-control__slider"
-                />
-                <span className="sound-control__value">{Math.round(volume * 100)}%</span>
+          <div className="sound-control__panel-inner">
+            {/* Sound Effects */}
+            <div className="sound-control__section">
+              <div className="sound-control__header">
+                <span className="sound-control__label">Efeitos</span>
+                <button
+                  className={`sound-control__toggle ${enabled ? 'active' : ''}`}
+                  onClick={toggleSound}
+                >
+                  {enabled ? 'ON' : 'OFF'}
+                </button>
               </div>
-            )}
-          </div>
+              {enabled && (
+                <div className="sound-control__slider-row">
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.1"
+                    value={volume}
+                    onChange={handleVolumeChange}
+                    className="sound-control__slider"
+                  />
+                  <span className="sound-control__value">{Math.round(volume * 100)}%</span>
+                </div>
+              )}
+            </div>
 
-          {/* Music */}
-          <div className="sound-control__section">
-            <div className="sound-control__header">
-              <span className="sound-control__label">Música</span>
-              <button
-                className={`sound-control__toggle ${musicEnabled ? 'active' : ''}`}
-                onClick={toggleMusic}
-              >
-                {musicEnabled ? 'ON' : 'OFF'}
-              </button>
-            </div>
-            {musicEnabled && (
-              <div className="sound-control__slider-row">
-                <input
-                  type="range"
-                  min="0"
-                  max="1"
-                  step="0.1"
-                  value={musicVolume}
-                  onChange={handleMusicVolumeChange}
-                  className="sound-control__slider"
-                />
-                <span className="sound-control__value">{Math.round(musicVolume * 100)}%</span>
+            {/* Music */}
+            <div className="sound-control__section">
+              <div className="sound-control__header">
+                <span className="sound-control__label">Música</span>
+                <button
+                  className={`sound-control__toggle ${musicEnabled ? 'active' : ''}`}
+                  onClick={toggleMusic}
+                >
+                  {musicEnabled ? 'ON' : 'OFF'}
+                </button>
               </div>
-            )}
+              {musicEnabled && (
+                <div className="sound-control__slider-row">
+                  <input
+                    type="range"
+                    min="0"
+                    max="1"
+                    step="0.1"
+                    value={musicVolume}
+                    onChange={handleMusicVolumeChange}
+                    className="sound-control__slider"
+                  />
+                  <span className="sound-control__value">{Math.round(musicVolume * 100)}%</span>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       )}
