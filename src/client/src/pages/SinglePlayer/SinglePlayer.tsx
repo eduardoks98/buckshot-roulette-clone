@@ -7,6 +7,7 @@ import {
   getRandomItem as getRandomItemUtil,
 } from '../../../../shared';
 import { GameBoard, GamePlayer, GameItem, ShotResult, RoundAnnouncement, StealModalData } from '../../components/game';
+import { useSounds } from '../../audio';
 import './SinglePlayer.css';
 
 // ========================================
@@ -102,6 +103,10 @@ const generateShells = generateShellsUtil;
 
 export default function SinglePlayer() {
   const navigate = useNavigate();
+  const {
+    playShot, playDamage, playHeal, playItem,
+    playRoundStart, playReload, playGameOver
+  } = useSounds();
   const [gameStarted, setGameStarted] = useState(false);
   const [game, setGame] = useState<GameState>(() => createInitialState(1));
   const [message, setMessage] = useState<string>('');
@@ -154,6 +159,10 @@ export default function SinglePlayer() {
     setGameStarted(true);
     setPlayerLastShell({});
 
+    // Tocar som de início de round e recarregar
+    playRoundStart();
+    playReload();
+
     const liveCount = shells.filter(s => s === 'live').length;
     const blankCount = shells.filter(s => s === 'blank').length;
     setRoundAnnouncement({
@@ -162,7 +171,7 @@ export default function SinglePlayer() {
       blank: blankCount,
       hp: initialState.player.maxHp,
     });
-  }, []);
+  }, [playRoundStart, playReload]);
 
   const startRound = useCallback((roundNumber: number) => {
     const initialState = createInitialState(roundNumber);
@@ -184,6 +193,10 @@ export default function SinglePlayer() {
     });
     setPlayerLastShell({});
 
+    // Tocar som de início de round e recarregar
+    playRoundStart();
+    playReload();
+
     const liveCount = shells.filter(s => s === 'live').length;
     const blankCount = shells.filter(s => s === 'blank').length;
     setRoundAnnouncement({
@@ -192,7 +205,7 @@ export default function SinglePlayer() {
       blank: blankCount,
       hp: initialState.player.maxHp,
     });
-  }, []);
+  }, [playRoundStart, playReload]);
 
   // ========================================
   // MESSAGE SYSTEM
@@ -250,6 +263,9 @@ export default function SinglePlayer() {
   // ========================================
 
   const applyDamage = useCallback((target: 'player' | 'dealer', amount: number) => {
+    // Tocar som de dano
+    playDamage();
+
     if (target === 'player') {
       setPlayerDamageFlash(true);
       setTimeout(() => setPlayerDamageFlash(false), 600);
@@ -265,9 +281,12 @@ export default function SinglePlayer() {
         hp: Math.max(0, prev[target].hp - amount),
       },
     }));
-  }, []);
+  }, [playDamage]);
 
   const applyHealing = useCallback((target: 'player' | 'dealer', amount: number) => {
+    // Tocar som de cura
+    playHeal();
+
     if (target === 'player') {
       setPlayerHealFlash(true);
       setTimeout(() => setPlayerHealFlash(false), 300);
@@ -283,7 +302,7 @@ export default function SinglePlayer() {
         hp: Math.min(prev[target].maxHp, prev[target].hp + amount),
       },
     }));
-  }, []);
+  }, [playHeal]);
 
   // ========================================
   // ROUND & GAME END
@@ -291,10 +310,12 @@ export default function SinglePlayer() {
 
   const checkRoundEnd = useCallback((): boolean => {
     if (game.player.hp <= 0) {
+      playGameOver(false); // Derrota
       setGameOverData({ show: true, victory: false });
       return true;
     } else if (game.dealer.hp <= 0) {
       if (game.currentRound >= 3) {
+        playGameOver(true); // Vitória
         setGameOverData({ show: true, victory: true });
       } else {
         // Next round after delay
@@ -303,7 +324,7 @@ export default function SinglePlayer() {
       return true;
     }
     return false;
-  }, [game.player.hp, game.dealer.hp, game.currentRound, startRound]);
+  }, [game.player.hp, game.dealer.hp, game.currentRound, startRound, playGameOver]);
 
   const handleRestart = useCallback(() => {
     setGameOverData(null);
@@ -316,6 +337,9 @@ export default function SinglePlayer() {
 
   const performShot = useCallback((shooter: 'player' | 'dealer', target: 'player' | 'dealer') => {
     setGame(prev => ({ ...prev, actionInProgress: true }));
+
+    // Tocar som do tiro
+    playShot(currentShell === 'live');
 
     setShotAnimation(currentShell);
     setTimeout(() => setShotAnimation(null), 600);
@@ -363,11 +387,17 @@ export default function SinglePlayer() {
           setGame(prev => ({ ...prev, actionInProgress: false }));
           setGame(prev => {
             if (prev.player.hp <= 0) {
-              setTimeout(() => setGameOverData({ show: true, victory: false }), 100);
+              setTimeout(() => {
+                playGameOver(false); // Derrota
+                setGameOverData({ show: true, victory: false });
+              }, 100);
               return prev;
             } else if (prev.dealer.hp <= 0) {
               if (prev.currentRound >= 3) {
-                setTimeout(() => setGameOverData({ show: true, victory: true }), 100);
+                setTimeout(() => {
+                  playGameOver(true); // Vitória
+                  setGameOverData({ show: true, victory: true });
+                }, 100);
               } else {
                 setTimeout(() => startRound(prev.currentRound + 1), 2000);
               }
@@ -399,7 +429,7 @@ export default function SinglePlayer() {
         }, 3100);
       }
     }, 400);
-  }, [currentShell, game, applyDamage, reloadIfNeeded, startRound]);
+  }, [currentShell, game, applyDamage, reloadIfNeeded, startRound, playShot, playGameOver]);
 
   const shootDealer = useCallback(() => {
     if (game.currentTurn !== 'player' || game.actionInProgress || hasActiveOverlay) return;
@@ -431,6 +461,9 @@ export default function SinglePlayer() {
   const useItem = useCallback((itemIndex: number, user: 'player' | 'dealer') => {
     const item = game[user].items[itemIndex];
     if (!item) return;
+
+    // Tocar som do item
+    playItem(item.id);
 
     setGame(prev => ({
       ...prev,
@@ -598,7 +631,7 @@ export default function SinglePlayer() {
         break;
       }
     }
-  }, [game, currentShell, applyDamage, applyHealing, showMessage, reloadIfNeeded, checkRoundEnd]);
+  }, [game, currentShell, applyDamage, applyHealing, showMessage, reloadIfNeeded, checkRoundEnd, playItem]);
 
   const handlePlayerUseItem = useCallback((itemIndex: number) => {
     if (game.currentTurn !== 'player' || game.actionInProgress || hasActiveOverlay) return;

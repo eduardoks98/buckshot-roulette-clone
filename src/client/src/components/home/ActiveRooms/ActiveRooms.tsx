@@ -6,21 +6,34 @@ import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useSocket } from '../../../context/SocketContext';
 import { useAuth } from '../../../context/AuthContext';
+import {
+  useAutoConnect,
+  useLobbyEvents,
+  useLobbyActions,
+  useGameSession,
+} from '../../../hooks';
+import type { RoomInfo, RoomCreatedPayload, RoomJoinedPayload } from '../../../hooks';
 import { PlayersIcon, RefreshIcon, UserIcon, PlusIcon, TargetCircleIcon, GamepadIcon, LockIcon } from '../../icons';
 import './ActiveRooms.css';
 
-interface RoomInfo {
-  code: string;
-  hostName: string;
-  playerCount: number;
-  maxPlayers: number;
-  hasPassword: boolean;
-}
-
 export function ActiveRooms() {
-  const { socket, isConnected, connect } = useSocket();
-  const { user, isAuthenticated } = useAuth();
+  const { isConnected } = useSocket();
+  const { user } = useAuth();
   const navigate = useNavigate();
+
+  // Hooks customizados
+  useAutoConnect();
+  const { saveSession, clearSession, getSession } = useGameSession();
+  const {
+    listRooms,
+    createRoom,
+    joinRoom: emitJoinRoom,
+    rejoinGame,
+    abandonGame,
+    checkActiveGame,
+  } = useLobbyActions();
+
+  // Estado local
   const [rooms, setRooms] = useState<RoomInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -34,203 +47,156 @@ export function ActiveRooms() {
   const [activeGame, setActiveGame] = useState<{ roomCode: string; gameStarted: boolean } | null>(null);
   const [isReconnecting, setIsReconnecting] = useState(false);
 
-  // Conectar ao socket se necessario
-  useEffect(() => {
-    if (!isConnected && isAuthenticated) {
-      connect();
+  // Handlers para eventos do lobby
+  const handleRoomList = useCallback((data: RoomInfo[]) => {
+    setRooms(data);
+    setLoading(false);
+    setRefreshing(false);
+  }, []);
+
+  const handleRoomListUpdated = useCallback(() => {
+    listRooms();
+  }, [listRooms]);
+
+  const handleRoomCreated = useCallback((data: RoomCreatedPayload) => {
+    console.log('Sala criada:', data.code);
+    setCreating(false);
+    saveSession({
+      roomCode: data.code,
+      playerName: user?.display_name || '',
+      isHost: data.isHost,
+    });
+    navigate('/multiplayer/room', {
+      state: {
+        roomCode: data.code,
+        isHost: data.isHost,
+        players: data.players,
+      },
+    });
+  }, [navigate, saveSession, user?.display_name]);
+
+  const handleRoomJoined = useCallback((data: RoomJoinedPayload) => {
+    console.log('Entrou na sala:', data.code);
+    setJoining(false);
+    setShowPasswordModal(false);
+    saveSession({
+      roomCode: data.code,
+      playerName: user?.display_name || '',
+      isHost: data.isHost,
+    });
+    navigate('/multiplayer/room', {
+      state: {
+        roomCode: data.code,
+        isHost: data.isHost,
+        players: data.players,
+      },
+    });
+  }, [navigate, saveSession, user?.display_name]);
+
+  const handleJoinError = useCallback((message: string) => {
+    setJoining(false);
+    setCreating(false);
+    setJoinError(message);
+
+    // Se erro é "Já está na sala", limpar sessão antiga corrompida
+    if (message.includes('Já está na sala') || message.includes('já está')) {
+      clearSession();
     }
-  }, [isAuthenticated, isConnected, connect]);
 
-  const refreshRooms = useCallback(() => {
-    if (!socket || !isConnected) return;
-    setRefreshing(true);
-    socket.emit('listRooms');
-    setTimeout(() => setRefreshing(false), 500);
-  }, [socket, isConnected]);
+    setTimeout(() => setJoinError(''), 3000);
+  }, [clearSession]);
 
+  const handleRoomDeleted = useCallback((data: { code: string }) => {
+    const session = getSession();
+    if (session && session.roomCode === data.code) {
+      clearSession();
+    }
+    listRooms();
+  }, [clearSession, getSession, listRooms]);
+
+  const handleLeftRoom = useCallback(() => {
+    clearSession();
+  }, [clearSession]);
+
+  const handleAlreadyInGame = useCallback((data: { roomCode: string; gameStarted: boolean }) => {
+    console.log('[ActiveRooms] alreadyInGame:', data);
+    setCreating(false);
+    setJoining(false);
+    setActiveGame({
+      roomCode: data.roomCode,
+      gameStarted: data.gameStarted,
+    });
+  }, []);
+
+  const handleReconnected = useCallback((data: { roomCode: string }) => {
+    console.log('[ActiveRooms] reconnected:', data.roomCode);
+    setIsReconnecting(false);
+    setActiveGame(null);
+    navigate('/multiplayer/game', {
+      state: { roomCode: data.roomCode, reconnected: true, gameState: data },
+    });
+  }, [navigate]);
+
+  const handleGameAbandoned = useCallback(() => {
+    console.log('[ActiveRooms] gameAbandoned');
+    setActiveGame(null);
+  }, []);
+
+  // Registrar event listeners via hook
+  useLobbyEvents({
+    onRoomList: handleRoomList,
+    onRoomListUpdated: handleRoomListUpdated,
+    onRoomCreated: handleRoomCreated,
+    onRoomJoined: handleRoomJoined,
+    onJoinError: handleJoinError,
+    onRoomDeleted: handleRoomDeleted,
+    onLeftRoom: handleLeftRoom,
+    onAlreadyInGame: handleAlreadyInGame,
+    onReconnected: handleReconnected,
+    onGameAbandoned: handleGameAbandoned,
+  });
+
+  // Efeito inicial: solicitar lista e verificar jogo ativo
   useEffect(() => {
-    if (!socket || !isConnected) {
+    if (!isConnected) {
       setLoading(false);
       return;
     }
 
-    // Listener para lista de salas
-    const handleRoomList = (data: RoomInfo[]) => {
-      setRooms(data);
-      setLoading(false);
-      setRefreshing(false);
-    };
+    listRooms();
+    checkActiveGame();
 
-    // Listener para qualquer atualização na lista de salas (real-time)
-    const handleRoomListUpdated = () => {
-      socket.emit('listRooms');
-    };
-
-    // Listener para sala criada - navegar para waiting room
-    const handleRoomCreated = (data: { code: string; isHost: boolean; players: unknown[] }) => {
-      console.log('Sala criada:', data.code);
-      setCreating(false);
-      // Salvar dados da sessão
-      localStorage.setItem('bangshotSession', JSON.stringify({
-        roomCode: data.code,
-        playerName: user?.display_name || '',
-        isHost: data.isHost,
-        timestamp: Date.now(),
-      }));
-      navigate('/multiplayer/room', {
-        state: {
-          roomCode: data.code,
-          isHost: data.isHost,
-          players: data.players,
-        },
-      });
-    };
-
-    // Listener para entrar em sala - navegar para waiting room
-    const handleRoomJoined = (data: { code: string; isHost: boolean; players: unknown[] }) => {
-      console.log('Entrou na sala:', data.code);
-      setJoining(false);
-      setShowPasswordModal(false);
-      // Salvar dados da sessão
-      localStorage.setItem('bangshotSession', JSON.stringify({
-        roomCode: data.code,
-        playerName: user?.display_name || '',
-        isHost: data.isHost,
-        timestamp: Date.now(),
-      }));
-      navigate('/multiplayer/room', {
-        state: {
-          roomCode: data.code,
-          isHost: data.isHost,
-          players: data.players,
-        },
-      });
-    };
-
-    // Listener para erro ao entrar
-    const handleJoinError = (message: string) => {
-      setJoining(false);
-      setCreating(false);
-      setJoinError(message);
-
-      // Se erro é "Já está na sala", limpar sessão antiga corrompida
-      if (message.includes('Já está na sala') || message.includes('já está')) {
-        localStorage.removeItem('bangshotSession');
-      }
-
-      setTimeout(() => setJoinError(''), 3000);
-    };
-
-    // Listener para sala deletada - limpar sessão se era nossa sala
-    const handleRoomDeleted = (data: { code: string }) => {
-      const session = localStorage.getItem('bangshotSession');
-      if (session) {
-        try {
-          const parsed = JSON.parse(session);
-          if (parsed.roomCode === data.code) {
-            localStorage.removeItem('bangshotSession');
-          }
-        } catch {
-          // Se JSON inválido, limpar
-          localStorage.removeItem('bangshotSession');
-        }
-      }
-      // Atualizar lista de salas
-      socket.emit('listRooms');
-    };
-
-    // Listener para ser removido da sala (kicked, left, etc)
-    const handleLeftRoom = () => {
-      localStorage.removeItem('bangshotSession');
-    };
-
-    // Listener para quando usuário já está em um jogo (outra aba ou F5)
-    // NÃO navegar automaticamente - mostrar banner com opções
-    const handleAlreadyInGame = (data: { roomCode: string; gameStarted: boolean }) => {
-      console.log('[ActiveRooms] alreadyInGame:', data);
-      setCreating(false);
-      setJoining(false);
-      // Mostrar banner ao invés de navegar automaticamente
-      setActiveGame({
-        roomCode: data.roomCode,
-        gameStarted: data.gameStarted,
-      });
-    };
-
-    // Listener para reconexão bem-sucedida
-    const handleReconnected = (data: { roomCode: string }) => {
-      console.log('[ActiveRooms] reconnected:', data.roomCode);
-      setIsReconnecting(false);
-      setActiveGame(null);
-      navigate('/multiplayer/game', {
-        state: { roomCode: data.roomCode, reconnected: true, gameState: data },
-      });
-    };
-
-    // Listener para abandono bem-sucedido
-    const handleGameAbandoned = () => {
-      console.log('[ActiveRooms] gameAbandoned');
-      setActiveGame(null);
-    };
-
-    socket.on('roomList', handleRoomList);
-    socket.on('roomListUpdated', handleRoomListUpdated);
-    socket.on('roomDeleted', handleRoomDeleted);
-    socket.on('roomUpdated', handleRoomListUpdated);
-    socket.on('roomCreated', handleRoomCreated);
-    socket.on('roomJoined', handleRoomJoined);
-    socket.on('joinError', handleJoinError);
-    socket.on('leftRoom', handleLeftRoom);
-    socket.on('alreadyInGame', handleAlreadyInGame);
-    socket.on('reconnected', handleReconnected);
-    socket.on('gameAbandoned', handleGameAbandoned);
-
-    // Solicitar lista inicial
-    socket.emit('listRooms');
-
-    // Verificar se usuario ja esta em um jogo ativo
-    socket.emit('checkActiveGame');
-
-    // Atualizar a cada 3 segundos (mais frequente)
+    // Atualizar a cada 3 segundos
     const interval = setInterval(() => {
-      socket.emit('listRooms');
+      listRooms();
     }, 3000);
 
-    return () => {
-      socket.off('roomList', handleRoomList);
-      socket.off('roomListUpdated', handleRoomListUpdated);
-      socket.off('roomDeleted', handleRoomDeleted);
-      socket.off('roomUpdated', handleRoomListUpdated);
-      socket.off('roomCreated', handleRoomCreated);
-      socket.off('roomJoined', handleRoomJoined);
-      socket.off('joinError', handleJoinError);
-      socket.off('leftRoom', handleLeftRoom);
-      socket.off('alreadyInGame', handleAlreadyInGame);
-      socket.off('reconnected', handleReconnected);
-      socket.off('gameAbandoned', handleGameAbandoned);
-      clearInterval(interval);
-    };
-  }, [socket, isConnected, navigate, user]);
+    return () => clearInterval(interval);
+  }, [isConnected, listRooms, checkActiveGame]);
+
+  // Refresh manual
+  const refreshRooms = useCallback(() => {
+    if (!isConnected) return;
+    setRefreshing(true);
+    listRooms();
+    setTimeout(() => setRefreshing(false), 500);
+  }, [isConnected, listRooms]);
 
   // Criar sala diretamente
   const handleCreateRoom = useCallback(() => {
-    if (!socket || !isConnected || !user) {
+    if (!isConnected || !user) {
       setJoinError('Voce precisa estar conectado');
       return;
     }
-    // Limpar sessao antiga antes de criar nova sala
-    localStorage.removeItem('bangshotSession');
+    clearSession();
     setCreating(true);
     setJoinError('');
-    socket.emit('createRoom', {
-      playerName: user.display_name,
-      password: undefined,
-    });
-  }, [socket, isConnected, user]);
+    createRoom(user.display_name);
+  }, [isConnected, user, clearSession, createRoom]);
 
   // Entrar em sala da lista
   const handleJoinRoom = useCallback((code: string, hasPassword: boolean) => {
-    if (!socket || !isConnected || !user) {
+    if (!isConnected || !user) {
       setJoinError('Voce precisa estar conectado');
       return;
     }
@@ -239,20 +205,16 @@ export function ActiveRooms() {
       setShowPasswordModal(true);
       return;
     }
-    // Limpar sessao antiga antes de entrar em nova sala
-    localStorage.removeItem('bangshotSession');
+    clearSession();
     setJoining(true);
     setJoinError('');
-    socket.emit('joinRoom', {
-      code,
-      playerName: user.display_name,
-    });
-  }, [socket, isConnected, user]);
+    emitJoinRoom(code, user.display_name);
+  }, [isConnected, user, clearSession, emitJoinRoom]);
 
   // Entrar com codigo digitado
   const handleJoinByCode = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!socket || !isConnected || !user) {
+    if (!isConnected || !user) {
       setJoinError('Voce precisa estar conectado');
       return;
     }
@@ -265,28 +227,18 @@ export function ActiveRooms() {
       setJoinError('Codigo invalido');
       return;
     }
-    // Limpar sessao antiga antes de entrar em nova sala
-    localStorage.removeItem('bangshotSession');
+    clearSession();
     setJoining(true);
     setJoinError('');
-    socket.emit('joinRoom', {
-      code,
-      playerName: user.display_name,
-      password: joinPassword || undefined,
-    });
+    emitJoinRoom(code, user.display_name, joinPassword || undefined);
   };
 
   // Entrar em sala com senha
   const handleJoinWithPassword = () => {
-    if (!socket || !isConnected || !user || !pendingRoomCode) return;
-    // Limpar sessao antiga antes de entrar em nova sala
-    localStorage.removeItem('bangshotSession');
+    if (!isConnected || !user || !pendingRoomCode) return;
+    clearSession();
     setJoining(true);
-    socket.emit('joinRoom', {
-      code: pendingRoomCode,
-      playerName: user.display_name,
-      password: joinPassword,
-    });
+    emitJoinRoom(pendingRoomCode, user.display_name, joinPassword);
   };
 
   // Fechar modal de senha
@@ -298,18 +250,16 @@ export function ActiveRooms() {
 
   // Reconectar ao jogo ativo
   const handleReconnect = useCallback(() => {
-    if (!activeGame || !socket) return;
+    if (!activeGame) return;
     setIsReconnecting(true);
-    // Servidor sabe quem somos pelo odUserId - não precisa de token
-    socket.emit('rejoinGame', { roomCode: activeGame.roomCode });
-  }, [activeGame, socket]);
+    rejoinGame(activeGame.roomCode);
+  }, [activeGame, rejoinGame]);
 
   // Abandonar jogo ativo
   const handleAbandonGame = useCallback(() => {
-    if (!activeGame || !socket) return;
-    // Notificar servidor para remover jogador da sala
-    socket.emit('abandonGame', { roomCode: activeGame.roomCode });
-  }, [activeGame, socket]);
+    if (!activeGame) return;
+    abandonGame(activeGame.roomCode);
+  }, [activeGame, abandonGame]);
 
   return (
     <div className="active-rooms">
