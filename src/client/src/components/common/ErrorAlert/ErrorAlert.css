@@ -1,0 +1,61 @@
+/* ==========================================
+   ERROR ALERT COMPONENT
+   Reutilizável para exibir mensagens de erro
+   ========================================== */
+
+.error-alert {
+  text-align: center;
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+  color: var(--red-live);
+  background: rgba(230, 57, 70, 0.1);
+  border: 1px solid var(--red-live);
+  border-radius: var(--radius-md);
+}
+
+.error-alert__message {
+  margin: 0;
+  margin-bottom: var(--space-3);
+  font-size: var(--fs-sm);
+  line-height: var(--lh-normal);
+}
+
+.error-alert__message:last-child {
+  margin-bottom: 0;
+}
+
+.error-alert__retry {
+  padding: var(--space-2) var(--space-4);
+  background: transparent;
+  color: var(--red-live);
+  border: 1px solid var(--red-live);
+  border-radius: var(--radius-sm);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.error-alert__retry:hover {
+  background: rgba(230, 57, 70, 0.15);
+}
+
+/* Variante inline (sem margin) */
+.error-alert--inline {
+  margin-bottom: 0;
+  padding: var(--space-2) var(--space-3);
+}
+
+/* Variante compacta */
+.error-alert--compact {
+  padding: var(--space-2) var(--space-3);
+}
+
+.error-alert--compact .error-alert__message {
+  font-size: var(--fs-xs);
+}
+
+.error-alert--compact .error-alert__retry {
+  padding: var(--space-1) var(--space-2);
+  font-size: var(--fs-xs);
+}

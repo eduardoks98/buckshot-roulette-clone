@@ -1,0 +1,93 @@
+/* ==========================================
+   RECENT FORM COMPONENT
+   Exibe forma recente (W/L)
+   ========================================== */
+
+.recent-form {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.recent-form__label {
+  color: var(--text-dim);
+  font-size: var(--fs-sm);
+  white-space: nowrap;
+}
+
+.recent-form__icons {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.recent-form__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: var(--fw-bold);
+  border-radius: var(--radius-sm);
+  text-transform: uppercase;
+}
+
+/* Win */
+.recent-form__icon--win {
+  background: rgba(74, 222, 128, 0.2);
+  color: var(--success);
+  border: 1px solid rgba(74, 222, 128, 0.3);
+}
+
+/* Loss */
+.recent-form__icon--loss {
+  background: rgba(230, 57, 70, 0.2);
+  color: var(--red-live);
+  border: 1px solid rgba(230, 57, 70, 0.3);
+}
+
+/* ==========================================
+   SIZE VARIANTS
+   ========================================== */
+
+/* Small */
+.recent-form--sm .recent-form__label {
+  font-size: var(--fs-xs);
+}
+
+.recent-form--sm .recent-form__icon {
+  width: 18px;
+  height: 18px;
+  font-size: 10px;
+}
+
+/* Medium (default) */
+.recent-form--md .recent-form__icon {
+  width: 24px;
+  height: 24px;
+  font-size: 12px;
+}
+
+/* Large */
+.recent-form--lg .recent-form__label {
+  font-size: var(--fs-base);
+}
+
+.recent-form--lg .recent-form__icon {
+  width: 32px;
+  height: 32px;
+  font-size: 14px;
+}
+
+/* ==========================================
+   LAYOUT VARIANTS
+   ========================================== */
+
+/* Vertical layout */
+.recent-form--vertical {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+/* Centered */
+.recent-form--centered {
+  justify-content: center;
+}
