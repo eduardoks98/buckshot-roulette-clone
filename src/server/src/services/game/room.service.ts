@@ -88,6 +88,7 @@ export interface Player {
   reconnectToken: string | null;
   originalSocketId: string | null;
   odUserId: string | null; // ID do usuário autenticado (para validar múltiplas abas)
+  abandoned: boolean; // true se jogador abandonou a partida permanentemente
   stats: PlayerStats;
 }
 
@@ -146,6 +147,7 @@ export class RoomService {
       reconnectToken: null,
       originalSocketId: null,
       odUserId: odUserId || null,
+      abandoned: false,
       stats: {
         damageDealt: 0,
         damageTaken: 0,
@@ -762,6 +764,7 @@ export class RoomService {
     if (room.started) {
       player.alive = false;
       player.disconnected = true;
+      player.abandoned = true; // Abandonou permanentemente - não ressuscitar em novos rounds
 
       // Verificar se sobrou apenas 1 jogador vivo
       const alivePlayers = room.players.filter(p => p.alive);
@@ -804,7 +807,7 @@ export class RoomService {
 
   // Helper para avançar para próximo jogador
   private advanceToNextPlayer(room: Room): void {
-    const alivePlayers = room.players.filter(p => p.alive && !p.disconnected);
+    const alivePlayers = room.players.filter(p => p.alive && !p.disconnected && !p.abandoned);
     if (alivePlayers.length === 0) return;
 
     // Encontrar próximo jogador vivo

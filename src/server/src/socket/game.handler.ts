@@ -345,10 +345,8 @@ export function registerGameHandlers(
         return;
       }
 
-      if (!target.alive) {
-        socket.emit('actionError', 'Jogador esta eliminado');
-        return;
-      }
+      // Permitir roubar de jogadores mortos/abandonados (eles mantêm itens até fim do round)
+      // A única validação é se tem itens
 
       if (target.items.length === 0) {
         socket.emit('actionError', 'Jogador nao tem itens');

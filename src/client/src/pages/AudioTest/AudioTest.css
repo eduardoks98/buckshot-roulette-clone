@@ -407,6 +407,114 @@
   border-radius: 4px;
 }
 
+/* ==========================================
+   AUDIO EDITOR - Category Tabs and Icon Grid
+   ========================================== */
+
+.audio-editor__categories {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.audio-editor__category-tab {
+  padding: 0.5rem 1rem;
+  border: 1px solid #444;
+  background: rgba(0, 0, 0, 0.3);
+  color: #888;
+  font-size: 0.85rem;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.audio-editor__category-tab:hover {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: #10b981;
+  color: #ccc;
+}
+
+.audio-editor__category-tab--active {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: #10b981;
+  color: #10b981;
+}
+
+.audio-editor__items-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  padding: 0.75rem;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+}
+
+.audio-editor__item-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  padding: 0.5rem;
+  min-height: 60px;
+  border: 1px solid #444;
+  background: rgba(0, 0, 0, 0.3);
+  color: #aaa;
+  font-size: 0.65rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.audio-editor__item-btn:hover {
+  background: rgba(16, 185, 129, 0.1);
+  border-color: #10b981;
+  color: #fff;
+  transform: translateY(-2px);
+}
+
+.audio-editor__item-btn--selected {
+  background: rgba(16, 185, 129, 0.25);
+  border-color: #10b981;
+  color: #10b981;
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.3);
+}
+
+.audio-editor__item-emoji {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.audio-editor__item-name {
+  text-align: center;
+  line-height: 1.1;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.audio-editor__item-btn svg {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+}
+
+.audio-editor__selected-file {
+  text-align: center;
+  padding: 0.5rem;
+  margin-bottom: 0.75rem;
+  background: rgba(16, 185, 129, 0.1);
+  border: 1px solid rgba(16, 185, 129, 0.3);
+  border-radius: 6px;
+  color: #10b981;
+  font-size: 0.85rem;
+  font-family: monospace;
+}
+
 /* Responsividade */
 @media (max-width: 600px) {
   .audio-test {

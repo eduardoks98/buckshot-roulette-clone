@@ -75,6 +75,7 @@ interface Player {
   disconnectTime: number | null;
   reconnectToken: string | null;
   originalSocketId: string | null;
+  abandoned: boolean; // true se jogador abandonou a partida permanentemente
   stats: PlayerStats; // Estatísticas da partida
 }
 
@@ -173,8 +174,11 @@ export class GameService {
     // Determine HP for this round (usando shared/utils/gameUtils)
     const maxHp = getRandomHP();
 
-    // Reset all players
+    // Reset all players (exceto quem abandonou)
     room.players.forEach(player => {
+      // Jogadores que abandonaram não ressuscitam
+      if (player.abandoned) return;
+
       player.hp = maxHp;
       player.maxHp = maxHp;
       player.alive = true;
@@ -287,6 +291,10 @@ export class GameService {
     console.log(`[ITEMS] Sorteado: ${itemCount} itens | MaxHP: ${maxHp} | Excluindo: [${excludeIds.join(', ')}]`);
 
     room.players.forEach(player => {
+      if (player.abandoned) {
+        console.log(`[ITEMS] Player "${player.name}": ABANDONOU, nao recebe itens`);
+        return;
+      }
       if (!player.alive) {
         console.log(`[ITEMS] Player "${player.name}": ELIMINADO, nao recebe itens`);
         return;
@@ -753,8 +761,8 @@ export class GameService {
       nextIndex = (nextIndex + room.turnDirection + room.players.length) % room.players.length;
       attempts++;
 
-      // Skip dead or disconnected players
-      if (!room.players[nextIndex].alive || room.players[nextIndex].disconnected) {
+      // Skip dead, disconnected or abandoned players
+      if (!room.players[nextIndex].alive || room.players[nextIndex].disconnected || room.players[nextIndex].abandoned) {
         continue;
       }
 

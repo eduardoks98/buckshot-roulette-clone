@@ -128,6 +128,7 @@ class BotService {
       reconnectToken: null,
       originalSocketId: null,
       odUserId: null, // Bots não têm conta
+      abandoned: false,
       stats: {
         damageDealt: 0,
         damageTaken: 0,

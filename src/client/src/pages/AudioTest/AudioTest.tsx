@@ -2,7 +2,7 @@
 // AUDIO TEST PAGE - Testar sons e animacoes
 // ==========================================
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, ComponentType } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { PageLayout } from '../../components/layout/PageLayout';
 import {
@@ -28,40 +28,66 @@ import {
 } from '../../components/icons/items';
 import './AudioTest.css';
 
-// Configuracoes dos itens para teste
-const ITEMS = [
-  { id: 'magnifying_glass', name: 'Lupa', Icon: MagnifyingGlassIcon },
-  { id: 'beer', name: 'Cerveja', Icon: BeerIcon },
-  { id: 'cigarette', name: 'Cigarro', Icon: CigaretteIcon },
-  { id: 'handcuffs', name: 'Algemas', Icon: HandcuffsIcon },
-  { id: 'handsaw', name: 'Serra', Icon: HandSawIcon },
-  { id: 'phone', name: 'Telefone', Icon: PhoneIcon },
-  { id: 'inverter', name: 'Inversor', Icon: InverterIcon },
-  { id: 'adrenaline', name: 'Adrenalina', Icon: AdrenalineIcon },
-  { id: 'medicine', name: 'Remedio', Icon: MedicineIcon },
-  { id: 'turn_reverser', name: 'Inversor Turno', Icon: TurnReverserIcon },
-] as const;
+// Tipo para item de audio
+interface AudioItem {
+  id: string;
+  name: string;
+  icon?: string;
+  Icon?: ComponentType<{ size?: number }>;
+}
 
-// Sons de jogo para teste
-const GAME_SOUNDS = [
-  { id: 'round-start', name: 'Inicio Round', action: 'playRoundStart' },
-  { id: 'round-win', name: 'Vitoria Round', action: 'playRoundWin' },
-  { id: 'turn-change', name: 'Mudanca Turno', action: 'playTurnChange' },
-  { id: 'timer-warning', name: 'Timer Warning', action: 'playTimerWarning' },
-  { id: 'reload', name: 'Reload', action: 'playReload' },
-  { id: 'damage', name: 'Dano', action: 'playDamage' },
-  { id: 'heal', name: 'Cura', action: 'playHeal' },
-] as const;
-
-// Sons de UI para teste
-const UI_SOUNDS = [
-  { id: 'click', name: 'Click', action: 'playClick' },
-  { id: 'hover', name: 'Hover', action: 'playHover' },
-  { id: 'success', name: 'Sucesso', action: 'playSuccess' },
-  { id: 'error', name: 'Erro', action: 'playError' },
-  { id: 'join-room', name: 'Entrar Sala', action: 'playJoinRoom' },
-  { id: 'leave-room', name: 'Sair Sala', action: 'playLeaveRoom' },
-] as const;
+// Categorias de audio para o editor
+const AUDIO_CATEGORIES: Record<string, { label: string; items: AudioItem[] }> = {
+  shots: {
+    label: 'Tiros',
+    items: [
+      { id: 'sfx/shot-live.mp3', name: 'Live', icon: '💥' },
+      { id: 'sfx/shot-blank.mp3', name: 'Blank', icon: '💨' },
+      { id: 'sfx/revolver-spin.mp3', name: 'Spin', icon: '🔄' },
+      { id: 'sfx/revolver-cocking.mp3', name: 'Cocking', icon: '⚙️' },
+      { id: 'sfx/damage.mp3', name: 'Dano', icon: '💔' },
+      { id: 'sfx/heal.mp3', name: 'Cura', icon: '💚' },
+      { id: 'sfx/reload.mp3', name: 'Reload', icon: '🔃' },
+    ]
+  },
+  items: {
+    label: 'Itens',
+    items: [
+      { id: 'sfx/items/magnifying-glass.mp3', name: 'Lupa', Icon: MagnifyingGlassIcon },
+      { id: 'sfx/items/beer.mp3', name: 'Cerveja', Icon: BeerIcon },
+      { id: 'sfx/items/cigarette.mp3', name: 'Cigarro', Icon: CigaretteIcon },
+      { id: 'sfx/items/handcuffs.mp3', name: 'Algemas', Icon: HandcuffsIcon },
+      { id: 'sfx/items/handsaw.mp3', name: 'Serra', Icon: HandSawIcon },
+      { id: 'sfx/items/phone.mp3', name: 'Telefone', Icon: PhoneIcon },
+      { id: 'sfx/items/inverter.mp3', name: 'Inversor', Icon: InverterIcon },
+      { id: 'sfx/items/adrenaline.mp3', name: 'Adrenalina', Icon: AdrenalineIcon },
+      { id: 'sfx/items/medicine.mp3', name: 'Remedio', Icon: MedicineIcon },
+      { id: 'sfx/items/turn-reverser.mp3', name: 'Reversor', Icon: TurnReverserIcon },
+    ]
+  },
+  ui: {
+    label: 'UI',
+    items: [
+      { id: 'sfx/ui/click.mp3', name: 'Click', icon: '👆' },
+      { id: 'sfx/ui/hover.mp3', name: 'Hover', icon: '✋' },
+      { id: 'sfx/ui/success.mp3', name: 'Sucesso', icon: '✅' },
+      { id: 'sfx/ui/error.mp3', name: 'Erro', icon: '❌' },
+      { id: 'sfx/ui/join-room.mp3', name: 'Entrar', icon: '🚪' },
+      { id: 'sfx/ui/leave-room.mp3', name: 'Sair', icon: '🚶' },
+    ]
+  },
+  game: {
+    label: 'Game',
+    items: [
+      { id: 'sfx/round-start.mp3', name: 'Round Start', icon: '🎬' },
+      { id: 'sfx/round-win.mp3', name: 'Round Win', icon: '🏆' },
+      { id: 'sfx/turn-change.mp3', name: 'Turno', icon: '🔀' },
+      { id: 'sfx/timer-warning.mp3', name: 'Timer', icon: '⏰' },
+      { id: 'sfx/game-over-win.mp3', name: 'Vitoria', icon: '🎉' },
+      { id: 'sfx/game-over-lose.mp3', name: 'Derrota', icon: '💀' },
+    ]
+  },
+};
 
 export default function AudioTest() {
   const navigate = useNavigate();
@@ -69,17 +95,6 @@ export default function AudioTest() {
 
   // Ref for cylinder with sound
   const cylinderRef = useRef<RevolverCylinderWithSoundRef>(null);
-
-  // Estado do cilindro para sequencias (seção manual)
-  const [cylinderState, setCylinderState] = useState({
-    totalChambers: 8,
-    remainingShells: 8,
-    currentPosition: 0,
-    revealedChambers: [] as RevealedChamber[],
-    spentChambers: [] as number[],
-    isSpinning: false,
-    shotResult: null as 'live' | 'blank' | null,
-  });
 
   // Estado para RevolverCylinderWithSound (seção principal com som)
   const [unifiedCylinderState, setUnifiedCylinderState] = useState({
@@ -93,37 +108,11 @@ export default function AudioTest() {
   // Estado do ultimo som tocado
   const [lastPlayed, setLastPlayed] = useState<string | null>(null);
 
-  // Estado para sequencias
-  const [shellCount, setShellCount] = useState(8);
-  const [isSawed, setIsSawed] = useState(false);
-
   // Estado para controlar se o tiro está em andamento (para desabilitar botões)
   const [isShootingUnified, setIsShootingUnified] = useState(false);
 
-  // Handler para mudar quantidade de balas (sincroniza slider com ambos cilindros)
-  const handleShellCountChange = useCallback((newCount: number) => {
-    setShellCount(newCount);
-    // Sync cylinderState (for sequence section)
-    setCylinderState(prev => ({
-      ...prev,
-      totalChambers: newCount,
-      remainingShells: Math.min(prev.remainingShells, newCount),
-      currentPosition: prev.currentPosition % newCount,
-      spentChambers: prev.spentChambers.filter(p => p < newCount),
-      revealedChambers: prev.revealedChambers.filter(c => c.position < newCount),
-    }));
-    // Sync unifiedCylinderState (for main section)
-    setUnifiedCylinderState(prev => ({
-      ...prev,
-      totalChambers: newCount,
-      remainingShells: Math.min(prev.remainingShells, newCount),
-      currentPosition: prev.currentPosition % newCount,
-      spentChambers: prev.spentChambers.filter(p => p < newCount),
-      revealedChambers: prev.revealedChambers.filter(c => c.position < newCount),
-    }));
-  }, []);
-
   // Estado para Custom Trim Tester
+  const [activeCategory, setActiveCategory] = useState<string>('shots');
   const [customTrimFile, setCustomTrimFile] = useState('sfx/revolver-spin.mp3');
   const [customTrimConfig, setCustomTrimConfig] = useState({
     duration: 0.8,
@@ -216,172 +205,19 @@ export default function AudioTest() {
     setTimeout(() => setIsShootingUnified(false), 900);
   }, [isShootingUnified]);
 
-  // Handler para itens
-  const handleItemSound = useCallback((itemId: string) => {
-    setLastPlayed(`item-${itemId}`);
-    sounds.playItem(itemId);
-  }, [sounds]);
-
-  // Handler para sons de jogo
-  const handleGameSound = useCallback((action: string) => {
-    setLastPlayed(action);
-    const fn = sounds[action as keyof typeof sounds];
-    if (typeof fn === 'function') {
-      (fn as () => void)();
-    }
-  }, [sounds]);
-
-  // Handler para sons de UI
-  const handleUISound = useCallback((action: string) => {
-    setLastPlayed(action);
-    const fn = sounds[action as keyof typeof sounds];
-    if (typeof fn === 'function') {
-      (fn as () => void)();
-    }
-  }, [sounds]);
-
-  // Handler para game over
-  const handleGameOver = useCallback((won: boolean) => {
-    const name = won ? 'game-over-win' : 'game-over-lose';
-    setLastPlayed(name);
-    sounds.playGameOver(won);
-  }, [sounds]);
-
-  // Handlers para sequencias - SINCRONIZADOS com audio
-  // Timeline: spin(0-600ms) -> shot result(600-1000ms) -> reset
-  const handleShotSequence = useCallback((isLive: boolean) => {
-    const name = `shot-sequence-${isLive ? 'live' : 'blank'}${isSawed ? '-sawed' : ''}`;
-    setLastPlayed(name);
-    sounds.playShotSequence(isLive, isSawed);
-
-    // 1. Avança posição E inicia spin JUNTOS (um único movimento)
-    // A câmara atual é marcada como gasta, depois avança para próxima
-    setCylinderState(prev => ({
-      ...prev,
-      isSpinning: true,
-      spentChambers: [...prev.spentChambers, prev.currentPosition],
-      currentPosition: (prev.currentPosition + 1) % prev.totalChambers,
-      remainingShells: Math.max(0, prev.remainingShells - 1),
-    }));
-
-    // 2. Após spin terminar (600ms), para de girar e mostra resultado
-    setTimeout(() => {
-      setCylinderState(prev => ({
-        ...prev,
-        isSpinning: false,
-        shotResult: isLive ? 'live' : 'blank',
-      }));
-    }, 600);
-
-    // 3. Após mais 400ms (1000ms total), limpa o resultado
-    setTimeout(() => {
-      setCylinderState(prev => ({
-        ...prev,
-        shotResult: null,
-      }));
-    }, 1000);
-  }, [sounds, isSawed]);
-
-  const handleReloadSequence = useCallback(() => {
-    setLastPlayed('reload-sequence');
-    sounds.playReloadSequence();
-
-    // Animação: spin por 300ms
-    setCylinderState(prev => ({
-      ...prev,
-      isSpinning: true,
-    }));
-
-    setTimeout(() => {
-      setCylinderState(prev => ({
-        ...prev,
-        isSpinning: false,
-      }));
-    }, 600);
-  }, [sounds]);
-
-  const handleCockingSequence = useCallback(() => {
-    setLastPlayed(`cocking-sequence-${shellCount}`);
-    sounds.playCockingSequence(shellCount);
-
-    // Reset e adiciona balas uma a uma (sincronizado com cocking sounds)
-    setCylinderState(prev => ({
-      ...prev,
-      remainingShells: 0,
-      spentChambers: [],
-      revealedChambers: [],
-    }));
-
-    // Adiciona cada bala com delay de 200ms (igual ao áudio)
-    for (let i = 0; i < shellCount; i++) {
-      setTimeout(() => {
-        setCylinderState(prev => ({
-          ...prev,
-          remainingShells: i + 1,
-        }));
-      }, i * 200);
-    }
-  }, [sounds, shellCount]);
-
-  const handleRoundStartSequence = useCallback(() => {
-    setLastPlayed(`round-start-sequence-${shellCount}`);
-    sounds.playRoundStartSequence(shellCount);
-
-    // 1. Spin começa imediatamente
-    setCylinderState(prev => ({
-      ...prev,
-      isSpinning: true,
-      remainingShells: 0,
-      spentChambers: [],
-      revealedChambers: [],
-      currentPosition: 0,
-    }));
-
-    // 2. Após spin (300ms), para de girar e começa a carregar balas
-    setTimeout(() => {
-      setCylinderState(prev => ({
-        ...prev,
-        isSpinning: false,
-      }));
-    }, 300);
-
-    // 3. Adiciona cada bala com delay de 180ms (sincronizado com cocking)
-    const cockingDelay = 300; // Após spin
-    const delayBetween = 180; // Entre cada bala
-
-    for (let i = 0; i < shellCount; i++) {
-      setTimeout(() => {
-        setCylinderState(prev => ({
-          ...prev,
-          remainingShells: i + 1,
-        }));
-      }, cockingDelay + (i * delayBetween));
-    }
-  }, [sounds, shellCount]);
-
-  // Reset do cilindro (usa quantidade atual do slider) - reseta ambos os estados
+  // Reset do cilindro
   const handleResetCylinder = useCallback(() => {
-    const baseState = {
-      totalChambers: shellCount,
-      remainingShells: shellCount,
+    setUnifiedCylinderState({
+      totalChambers: 8,
+      remainingShells: 8,
       currentPosition: 0,
-      revealedChambers: [] as RevealedChamber[],
-      spentChambers: [] as number[],
-    };
-    setCylinderState({
-      ...baseState,
-      isSpinning: false,
-      shotResult: null,
+      revealedChambers: [],
+      spentChambers: [],
     });
-    setUnifiedCylinderState(baseState);
-  }, [shellCount]);
+  }, []);
 
-  // Revelar bala - atualiza ambos os estados
+  // Revelar bala
   const handleRevealChamber = useCallback((type: 'live' | 'blank') => {
-    setCylinderState(prev => ({
-      ...prev,
-      revealedChambers: [...prev.revealedChambers, { position: prev.currentPosition, type }],
-    }));
     setUnifiedCylinderState(prev => ({
       ...prev,
       revealedChambers: [...prev.revealedChambers, { position: prev.currentPosition, type }],
@@ -471,7 +307,7 @@ export default function AudioTest() {
               spentChambers={unifiedCylinderState.spentChambers}
               isActive={true}
               size="lg"
-              isSawed={isSawed}
+              isSawed={false}
             />
             <div className="audio-test__cylinder-info">
               <span>Posicao: {unifiedCylinderState.currentPosition}</span>
@@ -523,145 +359,6 @@ export default function AudioTest() {
           </div>
         </section>
 
-        {/* Secao de Sequencias (Spin + Sons) */}
-        <section className="audio-test__section audio-test__section--highlight">
-          <h2>Sequencias de Audio (Spin + Sons)</h2>
-          <p className="audio-test__subtitle">Testa as sequencias completas com spin do cilindro</p>
-
-          {/* Controles */}
-          <div className="audio-test__sequence-controls">
-            <div className="audio-test__control-group">
-              <label>Quantidade de balas:</label>
-              <input
-                type="range"
-                min="2"
-                max="8"
-                value={shellCount}
-                onChange={(e) => handleShellCountChange(Number(e.target.value))}
-              />
-              <span className="audio-test__value">{shellCount}</span>
-            </div>
-            <div className="audio-test__control-group">
-              <label>
-                <input
-                  type="checkbox"
-                  checked={isSawed}
-                  onChange={(e) => setIsSawed(e.target.checked)}
-                />
-                Com Serra (2x tiro)
-              </label>
-            </div>
-          </div>
-
-          {/* Botoes de Sequencia */}
-          <div className="audio-test__buttons">
-            <button
-              className="audio-test__btn audio-test__btn--sequence"
-              onClick={handleRoundStartSequence}
-            >
-              Round Start (Spin + {shellCount}x Cocking)
-            </button>
-            <button
-              className="audio-test__btn audio-test__btn--sequence"
-              onClick={handleCockingSequence}
-            >
-              Apenas Cocking ({shellCount}x)
-            </button>
-            <button
-              className="audio-test__btn audio-test__btn--sequence"
-              onClick={handleReloadSequence}
-            >
-              Reload Sequence (Spin + Reload)
-            </button>
-          </div>
-
-          <div className="audio-test__buttons">
-            <button
-              className={`audio-test__btn audio-test__btn--live ${isSawed ? 'audio-test__btn--sawed' : ''}`}
-              onClick={() => handleShotSequence(true)}
-              disabled={cylinderState.isSpinning}
-            >
-              Tiro LIVE Sequence {isSawed ? '(2x)' : ''}
-            </button>
-            <button
-              className="audio-test__btn audio-test__btn--blank"
-              onClick={() => handleShotSequence(false)}
-              disabled={cylinderState.isSpinning}
-            >
-              Tiro BLANK Sequence (teck-teck)
-            </button>
-          </div>
-        </section>
-
-        {/* Secao de Itens */}
-        <section className="audio-test__section">
-          <h2>Sons de Itens</h2>
-          <div className="audio-test__items-grid">
-            {ITEMS.map(({ id, name, Icon }) => (
-              <button
-                key={id}
-                className="audio-test__item-btn"
-                onClick={() => handleItemSound(id)}
-                title={name}
-              >
-                <Icon size={32} />
-                <span>{name}</span>
-              </button>
-            ))}
-          </div>
-        </section>
-
-        {/* Secao de Sons de Jogo */}
-        <section className="audio-test__section">
-          <h2>Sons de Jogo</h2>
-          <div className="audio-test__buttons-grid">
-            {GAME_SOUNDS.map(({ id, name, action }) => (
-              <button
-                key={id}
-                className="audio-test__btn"
-                onClick={() => handleGameSound(action)}
-              >
-                {name}
-              </button>
-            ))}
-          </div>
-        </section>
-
-        {/* Secao de Game Over */}
-        <section className="audio-test__section">
-          <h2>Game Over</h2>
-          <div className="audio-test__buttons">
-            <button
-              className="audio-test__btn audio-test__btn--win"
-              onClick={() => handleGameOver(true)}
-            >
-              Vitoria Final
-            </button>
-            <button
-              className="audio-test__btn audio-test__btn--lose"
-              onClick={() => handleGameOver(false)}
-            >
-              Derrota Final
-            </button>
-          </div>
-        </section>
-
-        {/* Secao de Sons de UI */}
-        <section className="audio-test__section">
-          <h2>Sons de UI</h2>
-          <div className="audio-test__buttons-grid">
-            {UI_SOUNDS.map(({ id, name, action }) => (
-              <button
-                key={id}
-                className="audio-test__btn audio-test__btn--ui"
-                onClick={() => handleUISound(action)}
-              >
-                {name}
-              </button>
-            ))}
-          </div>
-        </section>
-
         {/* Secao de Musica */}
         <section className="audio-test__section">
           <h2>Musica Ambiente</h2>
@@ -696,26 +393,49 @@ export default function AudioTest() {
           </div>
         </section>
 
-        {/* Custom Trim Tester - Ajuste manual de parametros */}
+        {/* Editor de Audio - Seletor com icones + Waveform + Controles */}
         <section className="audio-test__section audio-test__section--highlight">
-          <h2>Custom Trim Tester</h2>
+          <h2>Editor de Audio</h2>
           <p className="audio-test__subtitle">
-            Clique e arraste no waveform para selecionar a regiao. Ajuste os parametros e copie a config!
+            Selecione um arquivo, ajuste no waveform e copie a config!
           </p>
 
           <div className="audio-test__custom-trim">
-            {/* Seletor de arquivo */}
-            <div className="audio-test__control-group" style={{ marginBottom: '1rem' }}>
-              <label>Arquivo:</label>
-              <select
-                value={customTrimFile}
-                onChange={(e) => setCustomTrimFile(e.target.value)}
-                style={{ padding: '0.5rem', borderRadius: '4px', background: '#333', color: '#fff', border: '1px solid #555', minWidth: '200px' }}
-              >
-                {Object.keys(AUDIO_TRIM_CONFIGS).map(path => (
-                  <option key={path} value={path}>{path.split('/').pop()}</option>
-                ))}
-              </select>
+            {/* Tabs de categorias */}
+            <div className="audio-editor__categories">
+              {Object.entries(AUDIO_CATEGORIES).map(([key, cat]) => (
+                <button
+                  key={key}
+                  className={`audio-editor__category-tab ${activeCategory === key ? 'audio-editor__category-tab--active' : ''}`}
+                  onClick={() => setActiveCategory(key)}
+                >
+                  {cat.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Grid de botoes com icones */}
+            <div className="audio-editor__items-grid">
+              {AUDIO_CATEGORIES[activeCategory]?.items.map(item => (
+                <button
+                  key={item.id}
+                  className={`audio-editor__item-btn ${customTrimFile === item.id ? 'audio-editor__item-btn--selected' : ''}`}
+                  onClick={() => setCustomTrimFile(item.id)}
+                  title={item.id}
+                >
+                  {item.Icon ? (
+                    <item.Icon size={24} />
+                  ) : (
+                    <span className="audio-editor__item-emoji">{item.icon}</span>
+                  )}
+                  <span className="audio-editor__item-name">{item.name}</span>
+                </button>
+              ))}
+            </div>
+
+            {/* Arquivo selecionado */}
+            <div className="audio-editor__selected-file">
+              {customTrimFile.split('/').pop()}
             </div>
 
             {/* Waveform Visualizer */}
