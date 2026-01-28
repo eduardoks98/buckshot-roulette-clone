@@ -11,3 +11,8 @@ export { default as LevelBadge } from './LevelBadge/LevelBadge';
 export { default as AchievementToast } from './AchievementToast/AchievementToast';
 export { default as LoadingState } from './LoadingState/LoadingState';
 export { default as EmptyState } from './EmptyState/EmptyState';
+export { ErrorAlert } from './ErrorAlert';
+export type { ErrorAlertProps } from './ErrorAlert';
+export { RecentForm } from './RecentForm';
+export type { RecentFormProps } from './RecentForm';
+export { SoundControl } from './SoundControl';

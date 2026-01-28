@@ -8,6 +8,7 @@ import { useAuth } from '../../../context/AuthContext';
 import { useOnlineCount } from '../../../hooks';
 import LevelBadge from '../../common/LevelBadge/LevelBadge';
 import BugReportModal from '../../common/BugReportModal/BugReportModal';
+import { SoundControl } from '../../common/SoundControl';
 import { getRankColor } from '../../../utils/helpers';
 import {
   BackArrowIcon,
@@ -93,6 +94,7 @@ export function Header({ variant = 'full' }: HeaderProps) {
             <span className="online-count">{onlineCount}</span>
             <span className="online-label">online</span>
           </div>
+          <SoundControl />
           <button
             className="app-header__bug-btn"
             onClick={() => setShowBugReport(true)}
