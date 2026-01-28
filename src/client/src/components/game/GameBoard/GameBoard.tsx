@@ -2,8 +2,8 @@
 // GAME BOARD COMPONENT - Shared UI for Single/Multiplayer
 // ==========================================
 
-import { useMemo } from 'react';
-import { RevolverCylinder } from '../RevolverCylinder';
+import { useMemo, useRef, forwardRef, useImperativeHandle } from 'react';
+import { RevolverCylinderWithSound, RevolverCylinderWithSoundRef } from '../RevolverCylinder';
 import { RoundAnnouncementOverlay } from '../RoundAnnouncementOverlay';
 import {
   HeartFullIcon,
@@ -81,6 +81,11 @@ export interface ItemActionModal {
 
 export type TurnDirection = 1 | -1;
 
+export interface GameBoardRef {
+  triggerShot: (isLive: boolean) => void;
+  triggerReloadSpin: () => void;
+}
+
 export interface GameBoardProps {
   // Game State
   round: number;
@@ -109,14 +114,17 @@ export interface GameBoardProps {
   itemActionModal: ItemActionModal | null;
   gameOverData: React.ReactNode | null;
 
+  // Item selecionado (para adrenalina poder clicar em mortos)
+  selectedItemId?: string | null;
+
   // Direction
   turnDirection?: TurnDirection;
 
   // Animations
-  shotAnimation: 'live' | 'blank' | null;
   damagedPlayerId: string | null;
   healedPlayerId: string | null;
   playerLastShell: Record<string, 'live' | 'blank'>;
+  isSawed?: boolean;
 
   // Actions
   onSelectTarget: (playerId: string) => void;
@@ -168,7 +176,7 @@ function ItemIcon({ item, size = 20 }: { item: GameItem; size?: number }) {
 // MAIN COMPONENT
 // ========================================
 
-export default function GameBoard({
+const GameBoard = forwardRef<GameBoardRef, GameBoardProps>(({
   round,
   maxRounds,
   shells,
@@ -189,10 +197,10 @@ export default function GameBoard({
   itemActionModal,
   gameOverData,
   turnDirection = 1,
-  shotAnimation,
   damagedPlayerId,
   healedPlayerId,
   playerLastShell,
+  isSawed = false,
   onSelectTarget,
   onShoot,
   onShootSelf,
@@ -202,7 +210,17 @@ export default function GameBoard({
   onBack,
   onRoundAnnouncementComplete,
   children,
-}: GameBoardProps) {
+  selectedItemId,
+}, ref) => {
+  // Ref for cylinder with sound
+  const cylinderRef = useRef<RevolverCylinderWithSoundRef>(null);
+
+  // Expose cylinder methods to parent
+  useImperativeHandle(ref, () => ({
+    triggerShot: (isLive: boolean) => cylinderRef.current?.triggerShot(isLive),
+    triggerReloadSpin: () => cylinderRef.current?.triggerReloadSpin(),
+  }), []);
+
   // Check if any overlay is active (blocks interactions)
   const hasActiveOverlay = useMemo(() => {
     return roundAnnouncement !== null ||
@@ -259,7 +277,7 @@ export default function GameBoard({
           <div
             key={player.id}
             className={`opponent-card ${player.id === currentPlayerId ? 'active' : ''} ${player.id === selectedTarget ? 'selected' : ''} ${!player.alive ? 'dead' : ''} ${player.id === damagedPlayerId ? 'damage' : ''} ${player.id === healedPlayerId ? 'heal' : ''}`}
-            onClick={() => player.alive && onSelectTarget(player.id)}
+            onClick={() => (player.alive || selectedItemId === 'adrenaline') && onSelectTarget(player.id)}
           >
             {/* Turn indicator badge - shows on the active player's card */}
             {player.id === currentPlayerId && !hasActiveOverlay && (
@@ -309,7 +327,8 @@ export default function GameBoard({
 
       {/* ========== REVOLVER CYLINDER AREA ========== */}
       <div className="revolver-area">
-        <RevolverCylinder
+        <RevolverCylinderWithSound
+          ref={cylinderRef}
           totalChambers={shells.initialTotal || shells.total}
           remainingShells={shells.total}
           currentPosition={shells.currentPosition || 0}
@@ -320,9 +339,8 @@ export default function GameBoard({
             ...(phoneRevealedPositions || [])
           ]}
           spentChambers={Array.from({ length: (shells.initialTotal || shells.total) - shells.total }, (_, i) => i)}
-          isSpinning={shotAnimation !== null}
           isActive={isMyTurn}
-          shotResult={shotAnimation}
+          isSawed={isSawed}
           size="md"
         />
 
@@ -405,7 +423,7 @@ export default function GameBoard({
         {myItems.map((item, index) => (
           <button
             key={index}
-            className={`item-btn ${hasActiveOverlay ? 'disabled' : ''}`}
+            className={`item-btn ${hasActiveOverlay ? 'disabled' : ''} ${myItems[index].id === selectedItemId ? 'selected' : ''}`}
             onClick={() => canAct && onUseItem(index)}
             disabled={!canAct}
             title={item.name}
@@ -520,4 +538,8 @@ export default function GameBoard({
       {children}
     </div>
   );
-}
+});
+
+GameBoard.displayName = 'GameBoard';
+
+export default GameBoard;

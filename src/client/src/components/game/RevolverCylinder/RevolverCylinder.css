@@ -25,10 +25,23 @@
 }
 
 /* ==========================================
-   SPIN ANIMATION (controlled via JS inline styles)
+   ANIMATION STATES (rotation controlled via JS inline styles)
    ========================================== */
 
-/* Spinning class no longer uses CSS animation - rotation is handled via inline styles */
+/* Advancing: avanço rápido de 1 posição (tiro) */
+.revolver-cylinder--advancing .revolver-cylinder__svg {
+  /* Leve pulse durante o avanço */
+  filter:
+    drop-shadow(0 0 15px rgba(212, 164, 24, 0.4))
+    drop-shadow(0 4px 12px rgba(0, 0, 0, 0.4));
+}
+
+/* Spinning: spin dramático (reload/round start) */
+.revolver-cylinder--spinning .revolver-cylinder__svg {
+  filter:
+    drop-shadow(0 0 25px rgba(212, 164, 24, 0.5))
+    drop-shadow(0 8px 24px rgba(0, 0, 0, 0.5));
+}
 
 /* ==========================================
    SHOT RESULT ANIMATIONS

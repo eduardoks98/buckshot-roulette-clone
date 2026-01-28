@@ -24,6 +24,10 @@ export function useSounds() {
     soundManager.play(isLive ? 'shot-live' : 'shot-blank');
   }, []);
 
+  const playShotSequence = useCallback((isLive: boolean, isSawed: boolean = false) => {
+    soundManager.playShotSequence(isLive, isSawed);
+  }, []);
+
   const playDamage = useCallback(() => {
     soundManager.play('damage');
   }, []);
@@ -58,6 +62,18 @@ export function useSounds() {
 
   const playReload = useCallback(() => {
     soundManager.play('reload');
+  }, []);
+
+  const playReloadSequence = useCallback(() => {
+    soundManager.playReloadSequence();
+  }, []);
+
+  const playCockingSequence = useCallback((shellCount: number, delayBetween?: number) => {
+    soundManager.playCockingSequence(shellCount, delayBetween);
+  }, []);
+
+  const playRoundStartSequence = useCallback((shellCount: number) => {
+    soundManager.playRoundStartSequence(shellCount);
   }, []);
 
   // Reset timer warning flag (para novo turno)
@@ -136,6 +152,7 @@ export function useSounds() {
   return {
     // Play functions - Game
     playShot,
+    playShotSequence,
     playDamage,
     playHeal,
     playItem,
@@ -145,6 +162,9 @@ export function useSounds() {
     playTurnChange,
     playTimerWarning,
     playReload,
+    playReloadSequence,
+    playCockingSequence,
+    playRoundStartSequence,
 
     // Play functions - UI
     playClick,

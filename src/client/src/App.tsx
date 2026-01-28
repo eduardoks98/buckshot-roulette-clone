@@ -31,7 +31,10 @@ function App() {
         <Route path="/terms" element={<TermsOfService />} />
         <Route path="/cookies" element={<CookiePolicy />} />
         <Route path="/changelog" element={<ChangelogPage />} />
-        <Route path="/audio-test" element={<AudioTest />} />
+        {/* AudioTest só disponível em desenvolvimento */}
+        {import.meta.env.DEV && (
+          <Route path="/audio-test" element={<AudioTest />} />
+        )}
       </Routes>
     </div>
   );

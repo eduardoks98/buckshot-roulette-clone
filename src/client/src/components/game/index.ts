@@ -20,4 +20,5 @@ export type {
   ItemActionModal,
   TurnDirection,
   GameBoardProps,
+  GameBoardRef,
 } from './GameBoard/GameBoard';

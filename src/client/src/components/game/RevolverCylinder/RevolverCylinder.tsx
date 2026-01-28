@@ -16,7 +16,8 @@ export interface RevolverCylinderProps {
   currentPosition?: number;  // Current chamber position (0 = first, rotates to point at arrow)
   revealedChambers?: RevealedChamber[];  // Chambers revealed by magnifying glass or phone
   spentChambers?: number[];  // Indexes of chambers that have been fired (empty)
-  isSpinning?: boolean;
+  isSpinning?: boolean;  // Full dramatic spin (reload/round start)
+  isAdvancing?: boolean;  // Single position advance (shot)
   isActive?: boolean;
   shotResult?: 'live' | 'blank' | null;
   size?: 'sm' | 'md' | 'lg';
@@ -36,14 +37,16 @@ export function RevolverCylinder({
   revealedChambers = [],
   spentChambers = [],
   isSpinning = false,
+  isAdvancing = false,
   isActive = false,
   shotResult = null,
   size = 'md',
   className = '',
 }: RevolverCylinderProps) {
-  const [animationPhase, setAnimationPhase] = useState<'idle' | 'spinning' | 'result'>('idle');
+  const [animationPhase, setAnimationPhase] = useState<'idle' | 'advancing' | 'spinning' | 'result'>('idle');
   const [showMuzzleFlash, setShowMuzzleFlash] = useState(false);
   const [displayRotation, setDisplayRotation] = useState(0);
+  const [skipTransition, setSkipTransition] = useState(false); // Para evitar "volta" após spin
   const prevPositionRef = useRef(currentPosition);
 
   // Total chambers is fixed for the round (at least 2)
@@ -100,43 +103,73 @@ export function RevolverCylinder({
     prevPositionRef.current = currentPosition;
   }, [currentPosition, anglePerChamber]);
 
-  // Handle shot animation sequence
+  // Handle advancing animation (single position - shot)
   useEffect(() => {
-    if (isSpinning && animationPhase === 'idle') {
-      setAnimationPhase('spinning');
+    if (isAdvancing && animationPhase === 'idle') {
+      setAnimationPhase('advancing');
 
-      // After spin, show result and stop at the correct position
-      const spinTimer = setTimeout(() => {
+      // Após avançar, mostrar resultado
+      const advanceTimer = setTimeout(() => {
         setAnimationPhase('result');
         if (shotResult) {
           setShowMuzzleFlash(true);
           setTimeout(() => setShowMuzzleFlash(false), 200);
         }
 
-        // Reset after showing result
+        // Reset após mostrar resultado
         const resetTimer = setTimeout(() => {
           setAnimationPhase('idle');
-        }, 800);
+        }, 400);
 
         return () => clearTimeout(resetTimer);
-      }, 600);
+      }, 150); // Avanço rápido de 150ms
+
+      return () => clearTimeout(advanceTimer);
+    }
+
+    if (!isAdvancing && animationPhase === 'advancing') {
+      setAnimationPhase('idle');
+    }
+  }, [isAdvancing, animationPhase, shotResult]);
+
+  // Handle spinning animation (dramatic spin - reload/round start)
+  useEffect(() => {
+    if (isSpinning && animationPhase === 'idle') {
+      setAnimationPhase('spinning');
+
+      // Após spin dramático, parar SEM animação de volta
+      const spinTimer = setTimeout(() => {
+        // Pula transição para não "voltar" 720 graus
+        setSkipTransition(true);
+        setAnimationPhase('idle');
+        // Re-habilita transição após um frame
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            setSkipTransition(false);
+          });
+        });
+      }, 800); // Spin dramático de 800ms
 
       return () => clearTimeout(spinTimer);
     }
 
-    if (!isSpinning && animationPhase !== 'idle') {
-      // Reset if spinning stops externally
-      const resetTimer = setTimeout(() => {
-        setAnimationPhase('idle');
-      }, 1000);
-      return () => clearTimeout(resetTimer);
+    if (!isSpinning && animationPhase === 'spinning') {
+      // Reset se spinning parar externamente
+      setSkipTransition(true);
+      setAnimationPhase('idle');
+      requestAnimationFrame(() => {
+        requestAnimationFrame(() => {
+          setSkipTransition(false);
+        });
+      });
     }
-  }, [isSpinning, animationPhase, shotResult]);
+  }, [isSpinning, animationPhase]);
 
   const cylinderClasses = [
     'revolver-cylinder',
     `revolver-cylinder--${size}`,
     isActive ? 'revolver-cylinder--active' : '',
+    animationPhase === 'advancing' ? 'revolver-cylinder--advancing' : '',
     animationPhase === 'spinning' ? 'revolver-cylinder--spinning' : '',
     animationPhase === 'result' && shotResult === 'live' ? 'revolver-cylinder--shot-live' : '',
     animationPhase === 'result' && shotResult === 'blank' ? 'revolver-cylinder--shot-blank' : '',
@@ -149,16 +182,23 @@ export function RevolverCylinder({
 
   const cylinderRotationStyle = (() => {
     if (animationPhase === 'spinning') {
-      // Spin animation: 2 full rotations (720deg) + final position
+      // Spin dramático: 2 voltas completas (720deg) + posição final
       return {
         transform: `rotate(-${720 + targetRotation}deg)`,
-        transition: 'transform 0.6s cubic-bezier(0.25, 0.1, 0.25, 1)',
+        transition: 'transform 0.8s cubic-bezier(0.25, 0.1, 0.1, 1)',
       };
     }
-    // Idle or result: just show the current position
+    if (animationPhase === 'advancing') {
+      // Avanço de 1 posição: rápido e preciso
+      return {
+        transform: `rotate(-${targetRotation}deg)`,
+        transition: 'transform 0.15s cubic-bezier(0.4, 0, 0.2, 1)',
+      };
+    }
+    // Idle ou result: apenas mostrar posição atual
     return {
       transform: `rotate(-${displayRotation}deg)`,
-      transition: animationPhase === 'idle' ? 'transform 0.5s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
+      transition: (animationPhase === 'idle' && !skipTransition) ? 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)' : 'none',
     };
   })();
 

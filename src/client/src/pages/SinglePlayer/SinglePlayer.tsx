@@ -6,7 +6,7 @@ import {
   ITEMS as SHARED_ITEMS,
   getRandomItem as getRandomItemUtil,
 } from '../../../../shared';
-import { GameBoard, GamePlayer, GameItem, ShotResult, RoundAnnouncement, StealModalData } from '../../components/game';
+import { GameBoard, GameBoardRef, GamePlayer, GameItem, ShotResult, RoundAnnouncement, StealModalData } from '../../components/game';
 import { useSounds } from '../../audio';
 import './SinglePlayer.css';
 
@@ -104,7 +104,7 @@ const generateShells = generateShellsUtil;
 export default function SinglePlayer() {
   const navigate = useNavigate();
   const {
-    playShot, playDamage, playHeal, playItem,
+    playDamage, playHeal, playItem,
     playRoundStart, playReload, playGameOver
   } = useSounds();
   const [gameStarted, setGameStarted] = useState(false);
@@ -116,7 +116,6 @@ export default function SinglePlayer() {
   const [lastShotResult, setLastShotResult] = useState<ShotResult | null>(null);
   const [gameOverData, setGameOverData] = useState<{ show: boolean; victory: boolean } | null>(null);
   const [phoneModal, setPhoneModal] = useState<{ position: number; shell: 'live' | 'blank' } | null>(null);
-  const [shotAnimation, setShotAnimation] = useState<'live' | 'blank' | null>(null);
   const [dealerDamageFlash, setDealerDamageFlash] = useState(false);
   const [playerDamageFlash, setPlayerDamageFlash] = useState(false);
   const [dealerHealFlash, setDealerHealFlash] = useState(false);
@@ -124,6 +123,7 @@ export default function SinglePlayer() {
   const [playerLastShell, setPlayerLastShell] = useState<Record<string, 'live' | 'blank'>>({});
 
   const dealerTimeoutRef = useRef<number | null>(null);
+  const gameBoardRef = useRef<GameBoardRef>(null);
 
   // ========================================
   // COMPUTED VALUES
@@ -338,11 +338,8 @@ export default function SinglePlayer() {
   const performShot = useCallback((shooter: 'player' | 'dealer', target: 'player' | 'dealer') => {
     setGame(prev => ({ ...prev, actionInProgress: true }));
 
-    // Tocar som do tiro
-    playShot(currentShell === 'live');
-
-    setShotAnimation(currentShell);
-    setTimeout(() => setShotAnimation(null), 600);
+    // Trigger shot animation + sound via GameBoard ref
+    gameBoardRef.current?.triggerShot(currentShell === 'live');
 
     const shell = currentShell;
     const sawedOff = game[shooter].sawedOff;
@@ -429,7 +426,7 @@ export default function SinglePlayer() {
         }, 3100);
       }
     }, 400);
-  }, [currentShell, game, applyDamage, reloadIfNeeded, startRound, playShot, playGameOver]);
+  }, [currentShell, game, applyDamage, reloadIfNeeded, startRound, playGameOver]);
 
   const shootDealer = useCallback(() => {
     if (game.currentTurn !== 'player' || game.actionInProgress || hasActiveOverlay) return;
@@ -850,6 +847,7 @@ export default function SinglePlayer() {
   return (
     <div className="singleplayer-page">
       <GameBoard
+        ref={gameBoardRef}
         round={game.currentRound}
         maxRounds={3}
         shells={{
@@ -902,7 +900,6 @@ export default function SinglePlayer() {
             </div>
           </div>
         ) : null}
-        shotAnimation={shotAnimation}
         damagedPlayerId={playerDamageFlash ? 'player' : dealerDamageFlash ? 'dealer' : null}
         healedPlayerId={playerHealFlash ? 'player' : dealerHealFlash ? 'dealer' : null}
         playerLastShell={playerLastShell}
@@ -913,7 +910,11 @@ export default function SinglePlayer() {
         onStealItem={handleStealItem}
         onCancelSteal={cancelSteal}
         onBack={() => navigate('/')}
-        onRoundAnnouncementComplete={() => setRoundAnnouncement(null)}
+        onRoundAnnouncementComplete={() => {
+          setRoundAnnouncement(null);
+          // Spin dramático quando o anúncio do round termina
+          gameBoardRef.current?.triggerReloadSpin();
+        }}
       >
         {/* Phone Modal */}
         {phoneModal && (

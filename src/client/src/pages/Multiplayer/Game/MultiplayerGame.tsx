@@ -23,7 +23,7 @@ import { ItemId } from '../../../../../shared/types';
 import { getLevelInfo } from '../../../../../shared/utils/xpCalculator';
 import { BugReportModal, GameStateForReport } from '../../../components/common/BugReportModal';
 import { AchievementToast } from '../../../components/common';
-import { GameBoard, GamePlayer, GameItem, ShotResult, RoundAnnouncement, StealModalData, ItemActionModal, TurnDirection } from '../../../components/game';
+import { GameBoard, GameBoardRef, GamePlayer, GameItem, ShotResult, RoundAnnouncement, StealModalData, ItemActionModal, TurnDirection } from '../../../components/game';
 import { AWARD_ICONS } from '../../../components/icons';
 import { useSounds } from '../../../audio';
 import './MultiplayerGame.css';
@@ -52,7 +52,7 @@ export default function MultiplayerGame() {
   const { socket, isConnected } = useSocket();
   const { user } = useAuth();
   const {
-    playShot, playDamage, playHeal, playItem,
+    playDamage, playHeal, playItem,
     playRoundStart, playRoundWin, playGameOver,
     playTurnChange, playReload, resetTimerWarning, checkTimerWarning,
     playMusic, stopMusic
@@ -85,7 +85,6 @@ export default function MultiplayerGame() {
   const [selectedItem, setSelectedItem] = useState<number | null>(null);
   const [message, setMessage] = useState('');
   const [turnTimer, setTurnTimer] = useState(GAME_RULES.TIMERS.TURN_DURATION_MS / 1000);
-  const [shotAnimation, setShotAnimation] = useState<'live' | 'blank' | null>(null);
   const [damagedPlayerId, setDamagedPlayerId] = useState<string | null>(null);
   const [healedPlayerId, setHealedPlayerId] = useState<string | null>(null);
   const [lastShotResult, setLastShotResult] = useState<ShotResult | null>(null);
@@ -146,6 +145,9 @@ export default function MultiplayerGame() {
   // Ref to access current overlay state in socket handlers
   const hasActiveOverlayRef = useRef(hasActiveOverlay);
   hasActiveOverlayRef.current = hasActiveOverlay;
+
+  // Ref for GameBoard to trigger shot animations
+  const gameBoardRef = useRef<GameBoardRef>(null);
 
   // Process overlay queue when current overlay finishes
   useEffect(() => {
@@ -342,21 +344,18 @@ export default function MultiplayerGame() {
 
     // Shot fired
     socket.on('shotFired', (data: ShotFiredPayload) => {
-      // Tocar som do tiro
-      playShot(data.shell === 'live');
+      // Trigger shot animation + sound via GameBoard ref
+      gameBoardRef.current?.triggerShot(data.shell === 'live');
 
       // Som de dano se acertou alguém
       if (data.shell === 'live' && data.damage > 0) {
-        setTimeout(() => playDamage(), 200); // Delay para sincronizar com animação
+        setTimeout(() => playDamage(), 500); // Delay para sincronizar com animação (spin + tiro)
       }
 
       setPlayerLastShell(prev => ({
         ...prev,
         [data.shooter]: data.shell
       }));
-
-      setShotAnimation(data.shell);
-      setTimeout(() => setShotAnimation(null), 600);
 
       const shooterName = data.shooter === myId ? 'Você' : data.shooterName;
       const targetName = data.target === myId ? 'você' : data.targetName;
@@ -766,7 +765,7 @@ export default function MultiplayerGame() {
       socket.off('roomCreated');
       socket.off('roomJoined');
     };
-  }, [socket, players, myId, selectedItem, navigate, playShot, playDamage, playHeal, playItem, playRoundStart, playRoundWin, playGameOver, playTurnChange, playReload, resetTimerWarning]);
+  }, [socket, players, myId, selectedItem, navigate, playDamage, playHeal, playItem, playRoundStart, playRoundWin, playGameOver, playTurnChange, playReload, resetTimerWarning]);
 
   // Turn timer - decrements for all players to stay in sync
   useEffect(() => {
@@ -965,6 +964,7 @@ export default function MultiplayerGame() {
   return (
     <div className="multiplayer-game-page">
       <GameBoard
+        ref={gameBoardRef}
         round={round}
         maxRounds={GAME_RULES.MAX_ROUNDS}
         shells={shells}
@@ -983,6 +983,7 @@ export default function MultiplayerGame() {
         lastShotResult={lastShotResult}
         stealModalData={stealModalData}
         itemActionModal={itemActionModal}
+        selectedItemId={selectedItem !== null ? myItems[selectedItem]?.id : null}
         turnDirection={turnDirection}
         gameOverData={gameOverData ? (
           <div className="game-over-overlay">
@@ -1134,7 +1135,6 @@ export default function MultiplayerGame() {
             </div>
           </div>
         ) : null}
-        shotAnimation={shotAnimation}
         damagedPlayerId={damagedPlayerId}
         healedPlayerId={healedPlayerId}
         playerLastShell={playerLastShell}
@@ -1145,7 +1145,11 @@ export default function MultiplayerGame() {
         onStealItem={handleStealItem}
         onCancelSteal={handleCancelSteal}
         onBack={() => navigate('/multiplayer')}
-        onRoundAnnouncementComplete={() => setRoundAnnouncement(null)}
+        onRoundAnnouncementComplete={() => {
+          setRoundAnnouncement(null);
+          // Spin dramático quando o anúncio do round termina
+          gameBoardRef.current?.triggerReloadSpin();
+        }}
       >
         {/* Disconnected Players Alert */}
         {disconnectedPlayers.length > 0 && (

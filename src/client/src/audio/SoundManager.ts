@@ -1,9 +1,10 @@
 // ==========================================
 // SOUND MANAGER - Singleton para gerenciar audio
+// Usa Web Audio API para trim em tempo real
 // ==========================================
 
 export type SoundName =
-  | 'shot-live' | 'shot-blank' | 'damage' | 'heal' | 'reload'
+  | 'shot-live' | 'shot-blank' | 'revolver-spin' | 'revolver-cocking' | 'damage' | 'heal' | 'reload'
   | 'turn-change' | 'round-start' | 'round-win' | 'game-over-win' | 'game-over-lose'
   | 'timer-warning'
   | 'item-magnifying-glass' | 'item-beer' | 'item-cigarette' | 'item-handcuffs'
@@ -19,6 +20,22 @@ interface SoundConfig {
   loop?: boolean;
 }
 
+// Configurações de trim para sons específicos
+interface TrimConfig {
+  duration: number;
+  fadeIn?: number;
+  fadeOut?: number;
+  start?: number;
+  speed?: number;
+}
+
+// Sons que precisam de trim em tempo real
+const TRIM_CONFIGS: Partial<Record<SoundName, TrimConfig>> = {
+  'revolver-spin': { duration: 0.3, fadeOut: 0.08, speed: 1.3 },
+  'revolver-cocking': { duration: 0.5, fadeOut: 0.03, speed: 1.5 },
+  'shot-blank': { duration: 0.12, fadeOut: 0.03 },
+};
+
 class SoundManager {
   private static instance: SoundManager;
   private sounds: Map<string, HTMLAudioElement> = new Map();
@@ -28,12 +45,18 @@ class SoundManager {
   private enabled: boolean = true;
   private musicEnabled: boolean = true;
   private volume: number = 0.7;
-  private musicVolume: number = 0.3; // Música mais baixa por padrão
+  private musicVolume: number = 0.3;
+
+  // Web Audio API para sons com trim
+  private audioContext: AudioContext | null = null;
+  private audioBuffers: Map<string, AudioBuffer> = new Map();
+  private trimmedBuffers: Map<string, AudioBuffer> = new Map();
 
   private constructor() {
     this.loadSettings();
     this.preloadSounds();
     this.preloadMusic();
+    this.preloadTrimmedSounds();
   }
 
   static getInstance(): SoundManager {
@@ -43,10 +66,48 @@ class SoundManager {
     return SoundManager.instance;
   }
 
-  private preloadSounds(): void {
+  private getAudioContext(): AudioContext {
+    if (!this.audioContext) {
+      this.audioContext = new AudioContext();
+    }
+    return this.audioContext;
+  }
+
+  private async preloadTrimmedSounds(): Promise<void> {
+    const soundsToTrim = Object.keys(TRIM_CONFIGS) as SoundName[];
+
+    for (const soundName of soundsToTrim) {
+      const soundPath = this.getSoundPath(soundName);
+      if (!soundPath) continue;
+
+      try {
+        const response = await fetch(soundPath);
+        const arrayBuffer = await response.arrayBuffer();
+        const ctx = this.getAudioContext();
+        const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+
+        // Armazena buffer original
+        this.audioBuffers.set(soundName, audioBuffer);
+
+        // Aplica trim e armazena
+        const config = TRIM_CONFIGS[soundName];
+        if (config) {
+          const trimmedBuffer = this.applyTrim(audioBuffer, config);
+          this.trimmedBuffers.set(soundName, trimmedBuffer);
+          console.debug(`[SoundManager] Trimmed: ${soundName} (${audioBuffer.duration.toFixed(2)}s -> ${trimmedBuffer.duration.toFixed(2)}s)`);
+        }
+      } catch (err) {
+        console.debug(`[SoundManager] Failed to preload trimmed sound: ${soundName}`, err);
+      }
+    }
+  }
+
+  private getSoundPath(name: SoundName): string | null {
     const soundFiles: Record<SoundName, string> = {
       'shot-live': '/audio/sfx/shot-live.mp3',
       'shot-blank': '/audio/sfx/shot-blank.mp3',
+      'revolver-spin': '/audio/sfx/revolver-spin.mp3',
+      'revolver-cocking': '/audio/sfx/revolver-cocking.mp3',
       'damage': '/audio/sfx/damage.mp3',
       'heal': '/audio/sfx/heal.mp3',
       'reload': '/audio/sfx/reload.mp3',
@@ -66,7 +127,99 @@ class SoundManager {
       'item-adrenaline': '/audio/sfx/items/adrenaline.mp3',
       'item-medicine': '/audio/sfx/items/medicine.mp3',
       'item-turn-reverser': '/audio/sfx/items/turn-reverser.mp3',
-      // UI Sounds
+      'ui-click': '/audio/sfx/ui/click.mp3',
+      'ui-hover': '/audio/sfx/ui/hover.mp3',
+      'ui-success': '/audio/sfx/ui/success.mp3',
+      'ui-error': '/audio/sfx/ui/error.mp3',
+      'ui-join-room': '/audio/sfx/ui/join-room.mp3',
+      'ui-leave-room': '/audio/sfx/ui/leave-room.mp3',
+    };
+    return soundFiles[name] || null;
+  }
+
+  private applyTrim(audioBuffer: AudioBuffer, config: TrimConfig): AudioBuffer {
+    const ctx = this.getAudioContext();
+    const { duration, fadeIn = 0, fadeOut = 0, start = 0, speed = 1.0 } = config;
+
+    const sampleRate = audioBuffer.sampleRate;
+    const numChannels = audioBuffer.numberOfChannels;
+    const startSample = Math.floor(start * sampleRate);
+    const outputSamples = Math.floor(duration * sampleRate);
+
+    const outputBuffer = ctx.createBuffer(numChannels, outputSamples, sampleRate);
+
+    for (let channel = 0; channel < numChannels; channel++) {
+      const inputData = audioBuffer.getChannelData(channel);
+      const outputData = outputBuffer.getChannelData(channel);
+
+      for (let i = 0; i < outputSamples; i++) {
+        const sourceIndex = startSample + Math.floor(i * speed);
+        let sample = sourceIndex < inputData.length ? inputData[sourceIndex] : 0;
+
+        // Apply fade in
+        const timeInSeconds = i / sampleRate;
+        if (fadeIn > 0 && timeInSeconds < fadeIn) {
+          sample *= timeInSeconds / fadeIn;
+        }
+
+        // Apply fade out
+        const timeFromEnd = duration - timeInSeconds;
+        if (fadeOut > 0 && timeFromEnd < fadeOut) {
+          sample *= timeFromEnd / fadeOut;
+        }
+
+        outputData[i] = sample;
+      }
+    }
+
+    return outputBuffer;
+  }
+
+  private playBuffer(buffer: AudioBuffer, volume: number = 1): void {
+    const ctx = this.getAudioContext();
+
+    // Resume context if suspended (autoplay policy)
+    if (ctx.state === 'suspended') {
+      ctx.resume();
+    }
+
+    const source = ctx.createBufferSource();
+    const gainNode = ctx.createGain();
+
+    source.buffer = buffer;
+    gainNode.gain.value = volume * this.volume;
+
+    source.connect(gainNode);
+    gainNode.connect(ctx.destination);
+
+    source.start(0);
+  }
+
+  private preloadSounds(): void {
+    const soundFiles: Record<SoundName, string> = {
+      'shot-live': '/audio/sfx/shot-live.mp3',
+      'shot-blank': '/audio/sfx/shot-blank.mp3',
+      'revolver-spin': '/audio/sfx/revolver-spin.mp3',
+      'revolver-cocking': '/audio/sfx/revolver-cocking.mp3',
+      'damage': '/audio/sfx/damage.mp3',
+      'heal': '/audio/sfx/heal.mp3',
+      'reload': '/audio/sfx/reload.mp3',
+      'turn-change': '/audio/sfx/turn-change.mp3',
+      'round-start': '/audio/sfx/round-start.mp3',
+      'round-win': '/audio/sfx/round-win.mp3',
+      'game-over-win': '/audio/sfx/game-over-win.mp3',
+      'game-over-lose': '/audio/sfx/game-over-lose.mp3',
+      'timer-warning': '/audio/sfx/timer-warning.mp3',
+      'item-magnifying-glass': '/audio/sfx/items/magnifying-glass.mp3',
+      'item-beer': '/audio/sfx/items/beer.mp3',
+      'item-cigarette': '/audio/sfx/items/cigarette.mp3',
+      'item-handcuffs': '/audio/sfx/items/handcuffs.mp3',
+      'item-handsaw': '/audio/sfx/items/handsaw.mp3',
+      'item-phone': '/audio/sfx/items/phone.mp3',
+      'item-inverter': '/audio/sfx/items/inverter.mp3',
+      'item-adrenaline': '/audio/sfx/items/adrenaline.mp3',
+      'item-medicine': '/audio/sfx/items/medicine.mp3',
+      'item-turn-reverser': '/audio/sfx/items/turn-reverser.mp3',
       'ui-click': '/audio/sfx/ui/click.mp3',
       'ui-hover': '/audio/sfx/ui/hover.mp3',
       'ui-success': '/audio/sfx/ui/success.mp3',
@@ -99,19 +252,25 @@ class SoundManager {
   play(name: SoundName, config?: SoundConfig): void {
     if (!this.enabled) return;
 
+    // Verificar se tem versão trimada
+    const trimmedBuffer = this.trimmedBuffers.get(name);
+    if (trimmedBuffer) {
+      this.playBuffer(trimmedBuffer, config?.volume ?? 1);
+      return;
+    }
+
+    // Fallback para HTMLAudioElement
     const sound = this.sounds.get(name);
     if (!sound) {
       console.debug(`[SoundManager] Som nao encontrado: ${name}`);
       return;
     }
 
-    // Clone para permitir multiplas reproducoes simultaneas
     const clone = sound.cloneNode() as HTMLAudioElement;
     clone.volume = (config?.volume ?? 1) * this.volume;
     clone.loop = config?.loop ?? false;
 
     clone.play().catch(err => {
-      // Silenciar erros de autoplay bloqueado
       console.debug('[SoundManager] Audio play prevented:', err.message);
     });
   }
@@ -134,6 +293,69 @@ class SoundManager {
     const soundName = itemSoundMap[itemId];
     if (soundName) {
       this.play(soundName);
+    }
+  }
+
+  // ==========================================
+  // SHOT SEQUENCES (spin + shot)
+  // ==========================================
+
+  playShotSequence(isLive: boolean, isSawed: boolean = false): void {
+    if (!this.enabled) return;
+
+    // 1. Play spin first
+    this.play('revolver-spin');
+
+    // 2. After spin delay, play shot(s)
+    setTimeout(() => {
+      if (isLive) {
+        this.play('shot-live');
+        if (isSawed) {
+          setTimeout(() => {
+            this.play('shot-live');
+          }, 100);
+        }
+      } else {
+        // Blank = teck teck (2 cliques)
+        this.play('shot-blank');
+        setTimeout(() => {
+          this.play('shot-blank');
+        }, 80);
+      }
+    }, 300);
+  }
+
+  playReloadSequence(): void {
+    if (!this.enabled) return;
+
+    this.play('revolver-spin');
+    setTimeout(() => {
+      this.play('reload');
+    }, 300);
+  }
+
+  playCockingSequence(shellCount: number, delayBetween: number = 200): void {
+    if (!this.enabled) return;
+
+    for (let i = 0; i < shellCount; i++) {
+      setTimeout(() => {
+        this.play('revolver-cocking');
+      }, i * delayBetween);
+    }
+  }
+
+  playRoundStartSequence(shellCount: number): void {
+    if (!this.enabled) return;
+
+    this.play('revolver-spin');
+
+    const cockingDelay = 300;
+    const delayBetween = 180;
+
+    for (let i = 0; i < shellCount; i++) {
+      setTimeout(() => {
+        this.play('revolver-cocking');
+      }, cockingDelay + (i * delayBetween));
     }
   }
 
@@ -174,12 +396,10 @@ class SoundManager {
   playMusic(name: MusicName): void {
     if (!this.musicEnabled) return;
 
-    // Se já está tocando a mesma música, não fazer nada
     if (this.currentMusicName === name && this.currentMusic && !this.currentMusic.paused) {
       return;
     }
 
-    // Parar música atual com fade out
     this.stopMusic(true);
 
     const music = this.music.get(name);
@@ -194,7 +414,6 @@ class SoundManager {
     music.currentTime = 0;
 
     music.play().then(() => {
-      // Fade in suave
       this.fadeIn(music, this.musicVolume, 2000);
     }).catch(err => {
       console.debug('[SoundManager] Music play prevented:', err.message);
@@ -268,7 +487,6 @@ class SoundManager {
     this.musicVolume = Math.max(0, Math.min(1, volume));
     localStorage.setItem('bangshot_music_volume', String(this.musicVolume));
 
-    // Atualizar volume da música atual
     if (this.currentMusic) {
       this.currentMusic.volume = this.musicVolume;
     }
