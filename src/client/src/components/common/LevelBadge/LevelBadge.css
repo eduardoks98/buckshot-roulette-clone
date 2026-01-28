@@ -3,16 +3,8 @@
    Circular badge with level number and prestige stars
    ========================================== */
 
-/* --- CSS Variables (scoped) --- */
+/* Uses global CSS variables from variables.css */
 .level-badge {
-  --gold-accent: #d4a418;
-  --gold-light: #e8c84a;
-  --bg-dark: #0a0a0a;
-  --text-primary: #ffffff;
-  --text-dim: #888888;
-  --border-color: rgba(255, 255, 255, 0.1);
-  --shadow-glow-gold: 0 0 20px rgba(212, 164, 24, 0.4);
-
   display: inline-flex;
   flex-direction: column;
   align-items: center;

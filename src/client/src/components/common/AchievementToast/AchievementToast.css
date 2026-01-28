@@ -3,17 +3,8 @@
    Notification popup for unlocked achievements
    ========================================== */
 
-/* --- CSS Variables (scoped) --- */
+/* Uses global CSS variables from variables.css */
 .achievement-toast {
-  --gold-accent: #d4a418;
-  --gold-light: #e8c84a;
-  --bg-dark: #0a0a0a;
-  --text-primary: #ffffff;
-  --text-secondary: #e0e0e0;
-  --text-dim: #888888;
-  --border-color: rgba(255, 255, 255, 0.1);
-  --shadow-glow-gold: 0 0 20px rgba(212, 164, 24, 0.4);
-
   position: fixed;
   top: 24px;
   left: 50%;
