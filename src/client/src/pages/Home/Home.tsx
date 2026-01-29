@@ -11,7 +11,8 @@ import { ActiveRooms } from '../../components/home/ActiveRooms';
 import { MiniLeaderboard } from '../../components/home/MiniLeaderboard';
 import { Changelog } from '../../components/home/Changelog';
 import { AdBanner } from '../../components/common/AdBanner';
-import { GoogleIcon, PlayersIcon, StarIcon, AchievementIcon, GridIcon } from '../../components/icons';
+import { MultiProviderLogin } from '../../components/auth/MultiProviderLogin';
+import { PlayersIcon, StarIcon, AchievementIcon, GridIcon } from '../../components/icons';
 import { ADSENSE_PUBLISHER_ID, AD_SLOTS, ADSENSE_TEST_MODE } from '../../config';
 import { useSounds } from '../../audio/useSounds';
 import './Home.css';
@@ -68,10 +69,7 @@ export default function Home() {
             </p>
 
             <div className="landing__cta">
-              <button className="landing__btn landing__btn--primary" onClick={login}>
-                <GoogleIcon size={20} />
-                Entrar com Google
-              </button>
+              <MultiProviderLogin className="landing__providers" />
               <button className="landing__btn landing__btn--secondary" onClick={() => navigate('/singleplayer')}>
                 Jogar Solo (Treino)
               </button>
@@ -139,7 +137,7 @@ export default function Home() {
             <div className="landing__step">
               <div className="landing__step-number">1</div>
               <h3>Crie ou Entre</h3>
-              <p>Faca login com Google e crie uma sala ou entre em uma partida existente.</p>
+              <p>Faca login e crie uma sala ou entre em uma partida existente.</p>
             </div>
             <div className="landing__step">
               <div className="landing__step-number">2</div>
