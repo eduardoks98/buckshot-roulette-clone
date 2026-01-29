@@ -9,7 +9,8 @@ import { authService } from '../services/auth.service';
 import { env } from '../config/env.config';
 
 // ==========================================
-// GOOGLE AUTH
+// GOOGLE AUTH (Legacy - kept for backwards compatibility)
+// Now authentication is primarily handled by Games Admin
 // ==========================================
 
 export const googleAuth = passport.authenticate('google', {

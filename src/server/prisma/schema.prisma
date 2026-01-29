@@ -21,6 +21,7 @@ model User {
 
   // Foreign Keys
   google_id       String? @unique
+  game_user_id    String? @unique // Games Admin game_user_id for centralized auth
   active_title_id String?
 
   // Main Data
@@ -85,6 +86,7 @@ model User {
   @@index([elo_rating(sort: Desc)])
   @@index([total_xp(sort: Desc)])
   @@index([google_id])
+  @@index([game_user_id])
   @@index([tier, division, lp])
   @@index([mmr_hidden(sort: Desc)])
 }

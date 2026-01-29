@@ -1,0 +1,219 @@
+.video-rewarded-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn 0.3s ease;
+}
+
+.video-rewarded-modal {
+  background: var(--color-surface, #1a1a1a);
+  border-radius: 12px;
+  overflow: hidden;
+  max-width: 640px;
+  width: 95%;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.video-rewarded-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  background: rgba(0, 0, 0, 0.3);
+}
+
+.video-rewarded-label {
+  background: var(--color-warning, #f59e0b);
+  color: black;
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.video-rewarded-sponsor {
+  color: var(--color-text-secondary, #888);
+  font-size: 0.875rem;
+  flex: 1;
+}
+
+.video-rewarded-skip {
+  background: transparent;
+  border: 1px solid var(--color-border, #333);
+  color: var(--color-text, #fff);
+  padding: 6px 16px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.875rem;
+  transition: all 0.2s ease;
+}
+
+.video-rewarded-skip:hover {
+  background: var(--color-border, #333);
+}
+
+.video-rewarded-content {
+  position: relative;
+  background: black;
+  aspect-ratio: 16 / 9;
+}
+
+.video-rewarded-video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  cursor: pointer;
+}
+
+.video-rewarded-loading,
+.video-rewarded-error {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  color: var(--color-text-secondary, #888);
+}
+
+.video-rewarded-error button {
+  background: var(--color-primary, #646cff);
+  color: white;
+  border: none;
+  padding: 8px 24px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.spinner {
+  width: 40px;
+  height: 40px;
+  border: 3px solid var(--color-border, #333);
+  border-top-color: var(--color-primary, #646cff);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.video-rewarded-progress {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.video-rewarded-progress-bar {
+  height: 100%;
+  background: var(--color-primary, #646cff);
+  transition: width 0.1s linear;
+}
+
+.video-rewarded-countdown {
+  position: absolute;
+  top: 16px;
+  right: 16px;
+  background: rgba(0, 0, 0, 0.7);
+  color: white;
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 0.875rem;
+}
+
+.video-rewarded-reward {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px;
+  background: linear-gradient(135deg, var(--color-success, #22c55e) 0%, #16a34a 100%);
+  gap: 16px;
+}
+
+.video-rewarded-reward-info {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.video-rewarded-reward-icon {
+  font-size: 2rem;
+}
+
+.video-rewarded-reward-title {
+  margin: 0;
+  font-size: 0.875rem;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.video-rewarded-reward-amount {
+  margin: 4px 0 0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: white;
+}
+
+.video-rewarded-claim-btn {
+  background: white;
+  color: var(--color-success, #22c55e);
+  border: none;
+  padding: 12px 32px;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+}
+
+.video-rewarded-claim-btn:hover {
+  transform: scale(1.05);
+}
+
+.video-rewarded-claim-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+  transform: none;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* Mobile adjustments */
+@media (max-width: 640px) {
+  .video-rewarded-modal {
+    max-height: 100vh;
+    border-radius: 0;
+    height: 100%;
+    width: 100%;
+  }
+
+  .video-rewarded-content {
+    flex: 1;
+    aspect-ratio: auto;
+  }
+
+  .video-rewarded-reward {
+    flex-direction: column;
+    text-align: center;
+  }
+
+  .video-rewarded-reward-info {
+    flex-direction: column;
+  }
+}

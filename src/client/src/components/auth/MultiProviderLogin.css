@@ -1,0 +1,115 @@
+.multi-provider-login {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.multi-provider-login.compact {
+  flex-direction: row;
+  justify-content: center;
+  gap: 1rem;
+}
+
+.provider-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 0.875rem 1.5rem;
+  border: none;
+  border-radius: 8px;
+  font-size: 1rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  width: 100%;
+}
+
+.multi-provider-login.compact .provider-btn {
+  width: auto;
+  padding: 0.75rem;
+}
+
+.multi-provider-login.compact .provider-btn span {
+  display: none;
+}
+
+.provider-loading {
+  padding: 1rem;
+  text-align: center;
+  color: var(--color-text-secondary, #888);
+}
+
+/* Google Button */
+.provider-btn-google {
+  background: #ffffff;
+  color: #1f1f1f;
+  border: 1px solid #dadce0;
+}
+
+.provider-btn-google:hover {
+  background: #f8f9fa;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+}
+
+.provider-btn-google:active {
+  background: #eeeeee;
+}
+
+/* Facebook Button */
+.provider-btn-facebook {
+  background: #1877F2;
+  color: #ffffff;
+}
+
+.provider-btn-facebook:hover {
+  background: #166fe5;
+}
+
+.provider-btn-facebook:active {
+  background: #1565d8;
+}
+
+/* Discord Button */
+.provider-btn-discord {
+  background: #5865F2;
+  color: #ffffff;
+}
+
+.provider-btn-discord:hover {
+  background: #4752c4;
+}
+
+.provider-btn-discord:active {
+  background: #3c45a5;
+}
+
+/* Dark mode adjustments */
+@media (prefers-color-scheme: dark) {
+  .provider-btn-google {
+    background: #131314;
+    color: #e3e3e3;
+    border-color: #3c4043;
+  }
+
+  .provider-btn-google:hover {
+    background: #1f1f1f;
+  }
+
+  .provider-btn-google:active {
+    background: #2a2a2a;
+  }
+}
+
+/* Focus states for accessibility */
+.provider-btn:focus-visible {
+  outline: 2px solid var(--color-primary, #646cff);
+  outline-offset: 2px;
+}
+
+/* Disabled state */
+.provider-btn:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}

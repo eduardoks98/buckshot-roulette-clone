@@ -12,9 +12,18 @@ import prisma from '../lib/prisma';
 // TYPES
 // ==========================================
 
+// Local token payload (BangShot sessions)
 interface TokenPayload {
   userId: string;
   sessionId: string;
+}
+
+// Games Admin token payload (Centralized OAuth)
+interface GamesAdminTokenPayload {
+  sub: string; // game_user_id
+  game: string; // game_code
+  iat: number;
+  exp: number;
 }
 
 interface UserProfile {
@@ -80,6 +89,13 @@ export class AuthService {
   }
 
   async validateToken(token: string): Promise<User | null> {
+    // Try Games Admin token first (centralized OAuth)
+    const gamesAdminUser = await this.validateGamesAdminToken(token);
+    if (gamesAdminUser) {
+      return gamesAdminUser;
+    }
+
+    // Fallback to local token validation (existing sessions)
     try {
       const decoded = jwt.verify(token, env.JWT_SECRET) as TokenPayload;
 
@@ -95,6 +111,115 @@ export class AuthService {
 
       return session.user;
     } catch {
+      return null;
+    }
+  }
+
+  /**
+   * Validate a Games Admin JWT token and sync/create user locally
+   */
+  async validateGamesAdminToken(token: string): Promise<User | null> {
+    try {
+      // Games Admin uses Laravel's APP_KEY (base64 encoded)
+      let secret = env.GAMES_ADMIN_JWT_SECRET;
+      if (!secret) return null;
+
+      // Remove base64: prefix if present
+      if (secret.startsWith('base64:')) {
+        secret = Buffer.from(secret.slice(7), 'base64').toString('utf8');
+      }
+
+      const decoded = jwt.verify(token, secret, { algorithms: ['HS256'] }) as GamesAdminTokenPayload;
+
+      // Verify this token is for our game
+      if (decoded.game !== env.GAME_CODE) {
+        return null;
+      }
+
+      // Find or sync user locally
+      // The 'sub' is the game_user_id from Games Admin
+      const gameUserId = decoded.sub;
+
+      // Try to find user by game_user_id first
+      let user = await prisma.user.findFirst({
+        where: { game_user_id: gameUserId },
+      });
+
+      if (!user) {
+        // Fetch user data from Games Admin and create locally
+        user = await this.syncUserFromGamesAdmin(token, gameUserId);
+      }
+
+      return user;
+    } catch (error) {
+      // Token is not a valid Games Admin token
+      return null;
+    }
+  }
+
+  /**
+   * Sync user data from Games Admin API
+   */
+  async syncUserFromGamesAdmin(token: string, gameUserId: string): Promise<User | null> {
+    try {
+      const response = await fetch(
+        `${env.GAMES_ADMIN_API_URL}/api/games/${env.GAME_CODE}/auth/validate`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ token }),
+        }
+      );
+
+      if (!response.ok) {
+        return null;
+      }
+
+      const data = await response.json();
+      if (!data.valid || !data.user) {
+        return null;
+      }
+
+      const adminUser = data.user;
+
+      // Try to find by email first (for existing users)
+      let user = await prisma.user.findUnique({
+        where: { email: adminUser.email },
+      });
+
+      if (user) {
+        // Update with game_user_id
+        user = await prisma.user.update({
+          where: { id: user.id },
+          data: {
+            game_user_id: gameUserId,
+            display_name: adminUser.display_name,
+            avatar_url: adminUser.avatar_url,
+            last_login_at: new Date(),
+          },
+        });
+      } else {
+        // Create new user
+        user = await prisma.user.create({
+          data: {
+            game_user_id: gameUserId,
+            email: adminUser.email,
+            username: adminUser.username,
+            display_name: adminUser.display_name,
+            avatar_url: adminUser.avatar_url,
+            elo_rating: adminUser.elo_rating || 1000,
+            rank: adminUser.rank || 'Bronze',
+            is_admin: adminUser.is_admin || false,
+            last_login_at: new Date(),
+          },
+        });
+      }
+
+      return user;
+    } catch (error) {
+      console.error('[Auth] Error syncing user from Games Admin:', error);
       return null;
     }
   }

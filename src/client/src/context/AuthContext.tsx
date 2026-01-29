@@ -4,6 +4,8 @@ import { createContext, useContext, useState, useEffect, ReactNode } from 'react
 // TYPES
 // ==========================================
 
+export type OAuthProvider = 'google' | 'facebook' | 'discord';
+
 interface User {
   id: string;
   email: string;
@@ -25,9 +27,19 @@ interface User {
   tier: string;
   division: number | null;
   lp: number;
+  // OAuth providers
+  providers?: OAuthProvider[];
+}
+
+export interface AvailableProvider {
+  id: OAuthProvider;
+  name: string;
+  icon: string;
 }
 
 const TOKEN_KEY = 'bangshot_auth_token';
+const ADMIN_API_URL = import.meta.env.VITE_ADMIN_API_URL || 'https://admin.mysys.shop';
+const GAME_CODE = import.meta.env.VITE_GAME_CODE || 'BANGSHOT';
 
 interface AuthContextType {
   user: User | null;
@@ -36,7 +48,8 @@ interface AuthContextType {
   isAdmin: boolean;
   isLoading: boolean;
   authError: string | null;
-  login: () => void;
+  availableProviders: AvailableProvider[];
+  login: (provider?: OAuthProvider) => void;
   logout: () => void;
   clearAuthError: () => void;
 }
@@ -57,21 +70,30 @@ interface AuthProviderProps {
 
 function getAuthErrorMessage(errorCode: string): string {
   const messages: Record<string, string> = {
-    auth_failed: 'Falha na autenticacao com Google. Tente novamente.',
+    auth_failed: 'Falha na autenticacao. Tente novamente.',
     no_user: 'Nao foi possivel obter dados do usuario.',
     session_failed: 'Erro ao criar sessao. Tente novamente.',
+    invalid_state: 'Estado invalido. Tente novamente.',
+    game_not_found: 'Jogo nao encontrado.',
+    no_authorization_code: 'Codigo de autorizacao nao recebido.',
   };
-  return messages[errorCode] || 'Erro de autenticacao. Tente novamente.';
+  return messages[errorCode] || errorCode || 'Erro de autenticacao. Tente novamente.';
 }
 
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [availableProviders, setAvailableProviders] = useState<AvailableProvider[]>([]);
 
-  // Verificar autenticação ao carregar
+  // Fetch available providers on mount
   useEffect(() => {
-    // Check for token in URL (after Google OAuth callback)
+    fetchAvailableProviders();
+  }, []);
+
+  // Check authentication on load
+  useEffect(() => {
+    // Check for token in URL (after OAuth callback)
     const urlParams = new URLSearchParams(window.location.search);
     const tokenFromUrl = urlParams.get('token');
     const errorFromUrl = urlParams.get('error');
@@ -91,6 +113,20 @@ export function AuthProvider({ children }: AuthProviderProps) {
     checkAuth();
   }, []);
 
+  const fetchAvailableProviders = async () => {
+    try {
+      const response = await fetch(`${ADMIN_API_URL}/api/games/${GAME_CODE}/auth/providers`);
+      if (response.ok) {
+        const data = await response.json();
+        setAvailableProviders(data.providers || []);
+      }
+    } catch (error) {
+      console.error('Erro ao buscar providers:', error);
+      // Default to Google if fetch fails
+      setAvailableProviders([{ id: 'google', name: 'Google', icon: 'google' }]);
+    }
+  };
+
   const getToken = (): string | null => {
     return localStorage.getItem(TOKEN_KEY);
   };
@@ -103,38 +139,67 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
 
     try {
-      const response = await fetch('/api/auth/me', {
+      // Try local server first for more complete user data
+      const localResponse = await fetch('/api/auth/me', {
         headers: {
           'Authorization': `Bearer ${token}`,
         },
       });
 
-      if (response.ok) {
-        const data = await response.json();
+      if (localResponse.ok) {
+        const data = await localResponse.json();
         setUser(data.user);
       } else {
-        // Token invalid, remove it
-        localStorage.removeItem(TOKEN_KEY);
+        // Fallback to Games Admin validation
+        const adminResponse = await fetch(`${ADMIN_API_URL}/api/games/${GAME_CODE}/auth/validate`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ token }),
+        });
+
+        if (adminResponse.ok) {
+          const data = await adminResponse.json();
+          if (data.valid && data.user) {
+            setUser(data.user);
+          } else {
+            localStorage.removeItem(TOKEN_KEY);
+          }
+        } else {
+          localStorage.removeItem(TOKEN_KEY);
+        }
       }
     } catch (error) {
-      console.error('Erro ao verificar autenticação:', error);
+      console.error('Erro ao verificar autenticacao:', error);
+      localStorage.removeItem(TOKEN_KEY);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const login = () => {
-    // Redirecionar para Google OAuth
-    window.location.href = '/api/auth/google';
+  const login = (provider: OAuthProvider = 'google') => {
+    // Redirect to Games Admin OAuth
+    const redirectUrl = encodeURIComponent(window.location.origin);
+    window.location.href = `${ADMIN_API_URL}/api/games/${GAME_CODE}/auth/${provider}/redirect?redirect_url=${redirectUrl}`;
   };
 
   const logout = async () => {
     const token = getToken();
     try {
+      // Logout from local server
       await fetch('/api/auth/logout', {
         method: 'POST',
         headers: token ? { 'Authorization': `Bearer ${token}` } : {},
       });
+
+      // Also logout from Games Admin
+      if (token) {
+        await fetch(`${ADMIN_API_URL}/api/games/${GAME_CODE}/auth/logout`, {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${token}` },
+        }).catch(() => {});
+      }
     } catch (error) {
       console.error('Erro ao fazer logout:', error);
     } finally {
@@ -152,6 +217,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
     isAdmin: user?.is_admin ?? false,
     isLoading,
     authError,
+    availableProviders,
     login,
     logout,
     clearAuthError,

@@ -1,0 +1,91 @@
+.banner-ad {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  background: var(--color-surface, #1a1a1a);
+  border-radius: 8px;
+  overflow: hidden;
+  cursor: pointer;
+}
+
+.banner-ad-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 90px;
+  color: var(--color-text-secondary, #888);
+  font-size: 0.875rem;
+}
+
+.banner-ad-content {
+  position: relative;
+  width: 100%;
+}
+
+.banner-ad-media {
+  width: 100%;
+  height: auto;
+  display: block;
+  object-fit: cover;
+}
+
+.banner-ad-cta {
+  position: absolute;
+  bottom: 8px;
+  right: 8px;
+  background: var(--color-primary, #646cff);
+  color: white;
+  padding: 4px 12px;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  font-weight: 500;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.banner-ad-content:hover .banner-ad-cta {
+  opacity: 1;
+}
+
+.banner-ad-sponsor {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: rgba(0, 0, 0, 0.5);
+  font-size: 0.625rem;
+  color: var(--color-text-secondary, #888);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Position-specific styles */
+.banner-ad-header {
+  width: 100%;
+  max-width: 728px;
+  margin: 0 auto;
+}
+
+.banner-ad-sidebar {
+  width: 300px;
+  max-width: 100%;
+}
+
+.banner-ad-mobile_footer {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  z-index: 100;
+  border-radius: 0;
+}
+
+/* Animation */
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.banner-ad {
+  animation: fadeIn 0.3s ease;
+}
