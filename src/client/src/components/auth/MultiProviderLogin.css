@@ -113,3 +113,23 @@
   opacity: 0.6;
   cursor: not-allowed;
 }
+
+/* Portal Button - Central MySys Login */
+.provider-btn-portal {
+  background: linear-gradient(135deg, #d4af37 0%, #f4d03f 50%, #d4af37 100%);
+  color: #1a1a1a;
+  font-weight: 600;
+  border: 1px solid #b8960c;
+  box-shadow: 0 2px 8px rgba(212, 175, 55, 0.3);
+}
+
+.provider-btn-portal:hover {
+  background: linear-gradient(135deg, #e6c349 0%, #f9e066 50%, #e6c349 100%);
+  box-shadow: 0 4px 12px rgba(212, 175, 55, 0.4);
+  transform: translateY(-1px);
+}
+
+.provider-btn-portal:active {
+  background: linear-gradient(135deg, #c49f2c 0%, #dbc234 50%, #c49f2c 100%);
+  transform: translateY(0);
+}

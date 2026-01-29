@@ -1,5 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Home from './pages/Home/Home';
+import Lobby from './pages/Lobby/Lobby';
 import SinglePlayer from './pages/SinglePlayer/SinglePlayer';
 import WaitingRoom from './pages/Multiplayer/WaitingRoom/WaitingRoom';
 import MultiplayerGame from './pages/Multiplayer/Game/MultiplayerGame';
@@ -12,15 +13,18 @@ import TermsOfService from './pages/TermsOfService/TermsOfService';
 import CookiePolicy from './pages/CookiePolicy/CookiePolicy';
 import ChangelogPage from './pages/ChangelogPage/ChangelogPage';
 import AudioTest from './pages/AudioTest/AudioTest';
+import Callback from './pages/Auth/Callback';
 
 function App() {
   return (
     <div className="app">
       <Routes>
         <Route path="/" element={<Home />} />
+        <Route path="/auth/callback" element={<Callback />} />
+        <Route path="/lobby" element={<Lobby />} />
         <Route path="/singleplayer" element={<SinglePlayer />} />
-        {/* /multiplayer agora redireciona para Home - criacao de sala eh feita la */}
-        <Route path="/multiplayer" element={<Navigate to="/" replace />} />
+        {/* /multiplayer redireciona para /lobby */}
+        <Route path="/multiplayer" element={<Navigate to="/lobby" replace />} />
         <Route path="/multiplayer/room" element={<WaitingRoom />} />
         <Route path="/multiplayer/game" element={<MultiplayerGame />} />
         <Route path="/leaderboard" element={<Leaderboard />} />

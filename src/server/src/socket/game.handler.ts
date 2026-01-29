@@ -10,6 +10,7 @@ import { achievementService, PlayerEndGameStats } from '../services/achievement.
 import { GAME_RULES } from '../../../shared/constants';
 import { Item, ItemId, GameAward } from '../../../shared/types';
 import { logger, LOG_CATEGORIES } from '../services/logger.service';
+import { endMatchSession } from '../services/session.service';
 
 const gameService = new GameService();
 
@@ -568,6 +569,10 @@ export async function handleRoundEnd(
 
     // Calculate awards
     const awards = calculateAwards(room.players);
+
+    // Finalizar sessão de match no games-admin (tracking de tempo)
+    const playerSocketIds = room.players.map(p => p.id);
+    endMatchSession(code, playerSocketIds);
 
     // Persistir no banco de dados (await para obter xpResults)
     const winnerUserData = gameWinner ? socketUserMap.get(gameWinner.id) : null;

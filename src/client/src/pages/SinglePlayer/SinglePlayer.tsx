@@ -7,6 +7,7 @@ import {
   getRandomItem as getRandomItemUtil,
 } from '../../../../shared';
 import { GameBoard, GameBoardRef, GamePlayer, GameItem, ShotResult, RoundAnnouncement, StealModalData } from '../../components/game';
+import { InterstitialAd, VideoRewardedAd } from '../../components/ads';
 import { useSounds } from '../../audio';
 import './SinglePlayer.css';
 
@@ -121,6 +122,11 @@ export default function SinglePlayer() {
   const [dealerHealFlash, setDealerHealFlash] = useState(false);
   const [playerHealFlash, setPlayerHealFlash] = useState(false);
   const [playerLastShell, setPlayerLastShell] = useState<Record<string, 'live' | 'blank'>>({});
+
+  // Ads state
+  const [showInterstitial, setShowInterstitial] = useState(false);
+  const [showRewarded, setShowRewarded] = useState(false);
+  const [rewardClaimed, setRewardClaimed] = useState(false);
 
   const dealerTimeoutRef = useRef<number | null>(null);
   const gameBoardRef = useRef<GameBoardRef>(null);
@@ -327,8 +333,20 @@ export default function SinglePlayer() {
   }, [game.player.hp, game.dealer.hp, game.currentRound, startRound, playGameOver]);
 
   const handleRestart = useCallback(() => {
+    // Show interstitial ad before restarting
+    setShowInterstitial(true);
+  }, []);
+
+  const handleInterstitialClose = useCallback(() => {
+    setShowInterstitial(false);
+    setRewardClaimed(false);
     setGameOverData(null);
     setGameStarted(false);
+  }, []);
+
+  const handleRewardClaimed = useCallback(() => {
+    setRewardClaimed(true);
+    setShowRewarded(false);
   }, []);
 
   // ========================================
@@ -887,6 +905,21 @@ export default function SinglePlayer() {
                 </p>
               </div>
 
+              {/* Rewarded Video Option */}
+              {!rewardClaimed && (
+                <button
+                  className="rewarded-video-btn"
+                  onClick={() => setShowRewarded(true)}
+                >
+                  🎬 Assistir video para bonus
+                </button>
+              )}
+              {rewardClaimed && (
+                <div className="reward-claimed-badge">
+                  ✓ Bonus reivindicado!
+                </div>
+              )}
+
               <button className="back-to-lobby-btn" onClick={handleRestart}>
                 JOGAR NOVAMENTE
               </button>
@@ -898,6 +931,23 @@ export default function SinglePlayer() {
                 Voltar ao Menu
               </button>
             </div>
+
+            {/* Interstitial Ad */}
+            <InterstitialAd
+              isOpen={showInterstitial}
+              onClose={handleInterstitialClose}
+              position="game_over"
+              autoCloseAfter={5}
+            />
+
+            {/* Rewarded Video Ad */}
+            <VideoRewardedAd
+              isOpen={showRewarded}
+              onClose={() => setShowRewarded(false)}
+              onRewardClaimed={handleRewardClaimed}
+              rewardType="bonus"
+              rewardAmount={50}
+            />
           </div>
         ) : null}
         damagedPlayerId={playerDamageFlash ? 'player' : dealerDamageFlash ? 'dealer' : null}

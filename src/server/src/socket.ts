@@ -21,7 +21,7 @@ import { logger, LOG_CATEGORIES } from './services/logger.service';
 export const roomService = new RoomService();
 
 // Map de socket.id para dados do usuário
-export const socketUserMap = new Map<string, { odUserId: string; displayName: string } | null>();
+export const socketUserMap = new Map<string, { odUserId: string; displayName: string; token?: string } | null>();
 
 // Referência ao io server para acesso externo (online count REST endpoint)
 let ioInstance: Server<ClientToServerEvents, ServerToClientEvents> | null = null;
@@ -91,7 +91,7 @@ export function setupSocketIO(httpServer: HttpServer): TypedIOServer {
       try {
         const user = await authService.validateToken(authToken);
         if (user) {
-          socketUserMap.set(socket.id, { odUserId: user.id, displayName: user.display_name });
+          socketUserMap.set(socket.id, { odUserId: user.id, displayName: user.display_name, token: authToken });
 
           logger.info(LOG_CATEGORIES.AUTH, 'Socket autenticado', {
             socketId: socket.id,

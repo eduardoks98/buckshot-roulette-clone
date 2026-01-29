@@ -8,6 +8,7 @@ import { GameService } from '../services/game/game.service';
 import { gamePersistenceService } from '../services/game/game.persistence.service';
 import { achievementService, PlayerEndGameStats } from '../services/achievement.service';
 import { startTurnTimer, RoomWithTimer, calculateAwards } from './game.handler';
+import { startMatchSession, endMatchSession } from '../services/session.service';
 import { Item, PlayerPublicState } from '../../../shared/types';
 import { logger, LOG_CATEGORIES } from '../services/logger.service';
 
@@ -36,19 +37,25 @@ export function setupRoomCallbacks(
   roomService: RoomService
 ): void {
   // Callback quando jogo é cancelado (todos desconectaram)
-  roomService.onGameCancelled = (roomCode: string) => {
+  roomService.onGameCancelled = (roomCode: string, playerIds: string[]) => {
     io.to(roomCode).emit('gameOver', {
       winner: null,
       reason: 'Todos os jogadores abandonaram a partida',
     });
     gamePersistenceService.abandonGame(roomCode)
       .catch(err => console.error('[DB] Erro ao abandonar jogo:', err));
+    // Finalizar sessão de match no games-admin (tracking de tempo)
+    endMatchSession(roomCode, playerIds);
     console.log(`[Room] Jogo ${roomCode} cancelado - todos desconectaram`);
   };
 
   // Callback quando jogador vence por WO
   roomService.onPlayerWonByDefault = async (roomCode: string, player: Player, room: Room) => {
     // Room is now passed as parameter (room is deleted after this callback)
+
+    // Finalizar sessão de match no games-admin (tracking de tempo)
+    const playerSocketIds = room.players.map(p => p.id);
+    endMatchSession(roomCode, playerSocketIds);
 
     // Build player stats
     const sortedPlayers = [...room.players].sort((a, b) => b.roundWins - a.roundWins);
@@ -490,6 +497,10 @@ export function registerRoomHandlers(
       // Persistir no banco de dados
       gamePersistenceService.startGame(result.room.code)
         .catch(err => console.error('[DB] Erro ao iniciar jogo:', err));
+
+      // Iniciar sessão de match no games-admin (tracking de tempo)
+      const playerSocketIds = result.room.players.map(p => p.id);
+      startMatchSession(result.room.code, playerSocketIds);
 
       // Salvar o primeiro round no banco
       gamePersistenceService.saveRound({

@@ -120,21 +120,22 @@ export class AuthService {
    */
   async validateGamesAdminToken(token: string): Promise<User | null> {
     try {
-      // Games Admin uses Laravel's APP_KEY (base64 encoded)
-      let secret = env.GAMES_ADMIN_JWT_SECRET;
-      if (!secret) return null;
-
-      // Remove base64: prefix if present
-      if (secret.startsWith('base64:')) {
-        secret = Buffer.from(secret.slice(7), 'base64').toString('utf8');
-      }
-
-      const decoded = jwt.verify(token, secret, { algorithms: ['HS256'] }) as GamesAdminTokenPayload;
-
-      // Verify this token is for our game
-      if (decoded.game !== env.GAME_CODE) {
+      // Games Admin uses Laravel's APP_KEY as-is (including "base64:" prefix)
+      // The PHP JWT library uses the full string for signing, not the decoded bytes
+      const secret = env.GAMES_ADMIN_JWT_SECRET;
+      if (!secret) {
+        console.log('[Auth] GAMES_ADMIN_JWT_SECRET not configured');
         return null;
       }
+
+      console.log('[Auth] Validating token with secret length:', secret.length);
+      console.log('[Auth] Token preview:', token.substring(0, 50) + '...');
+
+      const decoded = jwt.verify(token, secret, { algorithms: ['HS256'] }) as GamesAdminTokenPayload;
+      console.log('[Auth] Token decoded successfully:', { sub: decoded.sub, game: decoded.game });
+
+      // SSO: Accept tokens from any game (PORTAL, BANGSHOT, etc.)
+      // This allows centralized login via MySys Portal
 
       // Find or sync user locally
       // The 'sub' is the game_user_id from Games Admin
@@ -153,6 +154,7 @@ export class AuthService {
       return user;
     } catch (error) {
       // Token is not a valid Games Admin token
+      console.error('[Auth] validateGamesAdminToken error:', error instanceof Error ? error.message : error);
       return null;
     }
   }
@@ -209,7 +211,7 @@ export class AuthService {
             username: adminUser.username,
             display_name: adminUser.display_name,
             avatar_url: adminUser.avatar_url,
-            elo_rating: adminUser.elo_rating || 1000,
+            elo_rating: adminUser.elo_rating || 0,
             rank: adminUser.rank || 'Bronze',
             is_admin: adminUser.is_admin || false,
             last_login_at: new Date(),
@@ -294,7 +296,7 @@ export class AuthService {
     const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) throw new Error('Usuario nao encontrado');
 
-    const newElo = (user.elo_rating || 1000) + (stats.elo_change || 0);
+    const newElo = (user.elo_rating || 0) + (stats.elo_change || 0);
     const newRank = this.calculateRank(newElo);
 
     return prisma.user.update({

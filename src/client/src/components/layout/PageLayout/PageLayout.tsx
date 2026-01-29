@@ -5,9 +5,10 @@
 import { Header } from '../Header';
 import { Footer } from '../Footer';
 import { PageHeader } from '../PageHeader';
+import { BannerAd } from '../../ads';
 import './PageLayout.css';
 
-// Debug mode para visualizar onde os ads vão ficar
+// Debug mode para visualizar onde os ads vão ficar quando não há ads reais
 const AD_DEBUG = import.meta.env.DEV;
 
 // Tamanhos padrão dos ads
@@ -23,7 +24,6 @@ interface AdPlaceholderProps {
 }
 
 function AdPlaceholder({ position }: AdPlaceholderProps) {
-  if (!AD_DEBUG) return null;
   const size = AD_SIZES[position] || '300x250';
   return (
     <div className={`ad-placeholder ad-placeholder--${position}`}>
@@ -33,10 +33,32 @@ function AdPlaceholder({ position }: AdPlaceholderProps) {
   );
 }
 
+// Side Ad component - uses real BannerAd with fallback to placeholder in dev
+function SideAd({ position }: { position: 'left' | 'right' }) {
+  const positionName = position === 'left' ? 'sidebar_left' : 'sidebar_right';
+  return (
+    <div className={`page-layout__side-ad page-layout__side-ad--${position}`}>
+      <BannerAd
+        position={positionName}
+        className="side-banner-ad"
+        fallback={AD_DEBUG ? <AdPlaceholder position={position} /> : null}
+      />
+    </div>
+  );
+}
+
 // Componente exportado para uso em páginas (ads inline entre seções)
 export function InlineAd({ position = 'inline-top' }: { position?: 'inline-top' | 'inline-bottom' }) {
-  if (!AD_DEBUG) return null;
-  return <AdPlaceholder position={position} />;
+  const positionName = position === 'inline-top' ? 'inline_top' : 'inline_bottom';
+  return (
+    <div className={`inline-ad-container inline-ad-container--${position}`}>
+      <BannerAd
+        position={positionName}
+        className="inline-banner-ad"
+        fallback={AD_DEBUG ? <AdPlaceholder position={position} /> : null}
+      />
+    </div>
+  );
 }
 
 interface PageLayoutProps {
@@ -65,13 +87,13 @@ export function PageLayout({
 
       {/* ===== MAIN BODY WITH SIDE ADS ===== */}
       <div className="page-body">
-        {showSideAds && <AdPlaceholder position="left" />}
+        {showSideAds && <SideAd position="left" />}
 
         <main className="page-content">
           {children}
         </main>
 
-        {showSideAds && <AdPlaceholder position="right" />}
+        {showSideAds && <SideAd position="right" />}
       </div>
 
       {showFooter && <Footer />}

@@ -166,7 +166,7 @@ class HistoryService {
           .map(p => ({
             display_name: p.user?.display_name || p.guest_name || 'Jogador',  // Usar guest_name para bots
             position: p.position,
-            elo_rating: p.user?.elo_rating || 1000,
+            elo_rating: p.user?.elo_rating || 0,
           }));
 
         // Encontrar vencedor
@@ -277,7 +277,7 @@ class HistoryService {
         .map(p => ({
           display_name: p.user?.display_name || p.guest_name || 'Jogador',  // Usar guest_name para bots
           position: p.position,
-          elo_rating: p.user?.elo_rating || 1000,
+          elo_rating: p.user?.elo_rating || 0,
         }));
 
       // Encontrar vencedor

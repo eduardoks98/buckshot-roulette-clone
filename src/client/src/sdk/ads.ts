@@ -3,7 +3,6 @@ import { getToken } from './auth';
 import type {
   AdCreative,
   AdPlacement,
-  AdPlacementType,
   RewardedAdResult,
   AdTrackingEvent,
 } from './types';

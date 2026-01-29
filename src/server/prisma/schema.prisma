@@ -1,5 +1,6 @@
 // ==========================================
 // PRISMA SCHEMA - BANG SHOT
+// Padronizado estilo Laravel (snake_case)
 // ==========================================
 
 generator client {
@@ -12,25 +13,25 @@ datasource db {
 }
 
 // ==========================================
-// USER & AUTHENTICATION
+// USERS & AUTHENTICATION
 // ==========================================
 
 model User {
-  // ID
   id String @id @default(uuid())
 
-  // Foreign Keys
-  google_id       String? @unique
-  game_user_id    String? @unique // Games Admin game_user_id for centralized auth
-  active_title_id String?
+  // OAuth / External IDs
+  google_id    String? @unique
+  facebook_id  String? @unique
+  discord_id   String? @unique
+  game_user_id String? @unique // Games Admin centralized auth
 
-  // Main Data
+  // Profile
   email        String  @unique
   username     String  @unique
   display_name String
   avatar_url   String?
 
-  // Metadata
+  // Flags
   is_admin Boolean @default(false)
 
   // Game Stats
@@ -41,20 +42,21 @@ model User {
   total_kills   Int @default(0)
   total_deaths  Int @default(0)
 
-  // Ranking (Legacy - mantido para compatibilidade)
-  elo_rating Int    @default(1000)
+  // Ranking (Legacy)
+  elo_rating Int    @default(0)
   rank       String @default("Bronze")
 
-  // Novo Sistema de Ranking (LP + MMR)
-  tier             String @default("Bronze") // Bronze, Silver, Gold, Platinum, Diamond, Master, Grandmaster, Challenger
-  division         Int?   @default(4)        // 4=IV, 3=III, 2=II, 1=I (null para Master+)
-  lp               Int    @default(0)        // League Points: 0-100
-  mmr_hidden       Int    @default(800)      // MMR oculto (skill real)
-  peak_mmr         Int    @default(800)      // Maior MMR alcançado
-  games_since_promo Int   @default(0)        // Jogos desde última promoção (proteção contra queda)
+  // Ranking (LP + MMR)
+  tier              String @default("Bronze")
+  division          Int?   @default(4)
+  lp                Int    @default(0)
+  mmr_hidden        Int    @default(800)
+  peak_mmr          Int    @default(800)
+  games_since_promo Int    @default(0)
 
   // Progression
-  total_xp Int @default(0)
+  total_xp        Int     @default(0)
+  active_title_id String?
 
   // Achievement Tracking
   total_sawed_shots         Int @default(0)
@@ -76,29 +78,28 @@ model User {
 
   // Relations
   sessions            Session[]
-  game_participations GameParticipant[]
+  game_participants   GameParticipant[]
   leaderboard_entries LeaderboardEntry[]
-  achievements        UserAchievement[]
+  user_achievements   UserAchievement[]
   game_badges         GameBadge[]
-  titles              UserTitle[]
+  user_titles         UserTitle[]
 
   // Indexes
   @@index([elo_rating(sort: Desc)])
   @@index([total_xp(sort: Desc)])
-  @@index([google_id])
-  @@index([game_user_id])
   @@index([tier, division, lp])
   @@index([mmr_hidden(sort: Desc)])
+  @@index([created_at])
+  @@map("users")
 }
 
 model Session {
-  // ID
   id String @id @default(uuid())
 
   // Foreign Keys
   user_id String
 
-  // Main Data
+  // Data
   token      String   @unique
   expires_at DateTime
 
@@ -109,16 +110,16 @@ model Session {
   user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   // Indexes
-  @@index([token])
   @@index([user_id])
+  @@index([expires_at])
+  @@map("sessions")
 }
 
 // ==========================================
-// GAME DATA
+// GAMES
 // ==========================================
 
 model Game {
-  // ID
   id String @id @default(uuid())
 
   // Identifiers
@@ -146,15 +147,17 @@ model Game {
   game_state_updated_at DateTime?
 
   // Relations
-  participants GameParticipant[]
-  rounds       Round[]
-  achievements UserAchievement[]
-  game_badges  GameBadge[]
+  game_participants GameParticipant[]
+  rounds            Round[]
+  user_achievements UserAchievement[]
+  game_badges       GameBadge[]
 
   // Indexes
   @@index([status])
   @@index([room_code])
   @@index([created_at(sort: Desc)])
+  @@index([winner_id])
+  @@map("games")
 }
 
 enum GameStatus {
@@ -165,22 +168,21 @@ enum GameStatus {
 }
 
 model GameParticipant {
-  // ID
   id String @id @default(uuid())
 
   // Foreign Keys
   game_id String
   user_id String?
 
-  // Player Info (for guests)
+  // Guest Info
   guest_name String?
 
-  // Socket Info (para reconexao)
+  // Socket (reconnection)
   socket_id       String?
   reconnect_token String?
 
-  // Game Results
-  position   Int? // Final position (1st, 2nd, etc.)
+  // Results
+  position   Int?
   rounds_won Int  @default(0)
   kills      Int  @default(0)
   deaths     Int  @default(0)
@@ -192,14 +194,12 @@ model GameParticipant {
   self_damage  Int @default(0)
   shots_fired  Int @default(0)
 
-  // Elo/XP Changes (Legacy)
-  elo_change Int?
-  xp_earned  Int?
-
-  // Novo Sistema de Ranking
-  lp_change  Int?             // Mudança de LP nesta partida
-  mmr_change Int?             // Mudança de MMR nesta partida
-  was_quitter Boolean @default(false) // Se o jogador quitou e não voltou
+  // Ranking Changes
+  elo_change  Int?
+  xp_earned   Int?
+  lp_change   Int?
+  mmr_change  Int?
+  was_quitter Boolean @default(false)
 
   // Timestamps
   joined_at DateTime  @default(now())
@@ -207,7 +207,7 @@ model GameParticipant {
 
   // Relations
   game        Game        @relation(fields: [game_id], references: [id], onDelete: Cascade)
-  user        User?       @relation(fields: [user_id], references: [id])
+  user        User?       @relation(fields: [user_id], references: [id], onDelete: SetNull)
   game_badges GameBadge[]
 
   // Indexes
@@ -215,17 +215,17 @@ model GameParticipant {
   @@index([game_id])
   @@index([user_id])
   @@index([socket_id])
+  @@map("game_participants")
 }
 
 model Round {
-  // ID
   id String @id @default(uuid())
 
   // Foreign Keys
   game_id   String
   winner_id String?
 
-  // Round Data
+  // Data
   round_number Int
   max_hp       Int
   shells_live  Int
@@ -241,6 +241,8 @@ model Round {
   // Indexes
   @@unique([game_id, round_number])
   @@index([game_id])
+  @@index([winner_id])
+  @@map("rounds")
 }
 
 // ==========================================
@@ -248,23 +250,22 @@ model Round {
 // ==========================================
 
 model LeaderboardEntry {
-  // ID
   id String @id @default(uuid())
 
   // Foreign Keys
   user_id String
 
-  // Period Data
+  // Period
   period       LeaderboardPeriod
   period_start DateTime
   period_end   DateTime
 
-  // Stats for this period
+  // Stats
   games_played Int   @default(0)
   games_won    Int   @default(0)
   win_rate     Float @default(0)
   elo_gain     Int   @default(0)
-  peak_elo     Int   @default(1000)
+  peak_elo     Int   @default(0)
 
   // Timestamps
   created_at DateTime @default(now())
@@ -275,8 +276,10 @@ model LeaderboardEntry {
 
   // Indexes
   @@unique([user_id, period, period_start])
-  @@index([period, period_start, elo_gain(sort: Desc)])
   @@index([user_id])
+  @@index([period, period_start])
+  @@index([elo_gain(sort: Desc)])
+  @@map("leaderboard_entries")
 }
 
 enum LeaderboardPeriod {
@@ -291,29 +294,29 @@ enum LeaderboardPeriod {
 // ==========================================
 
 model UserAchievement {
-  // ID
   id String @id @default(uuid())
 
   // Foreign Keys
   user_id        String
-  achievement_id String
   game_id        String?
+  achievement_id String
 
   // Timestamps
   unlocked_at DateTime @default(now())
 
   // Relations
   user User  @relation(fields: [user_id], references: [id], onDelete: Cascade)
-  game Game? @relation(fields: [game_id], references: [id])
+  game Game? @relation(fields: [game_id], references: [id], onDelete: SetNull)
 
   // Indexes
   @@unique([user_id, achievement_id])
   @@index([user_id])
+  @@index([game_id])
   @@index([achievement_id])
+  @@map("user_achievements")
 }
 
 model GameBadge {
-  // ID
   id String @id @default(uuid())
 
   // Foreign Keys
@@ -333,19 +336,20 @@ model GameBadge {
   // Indexes
   @@unique([game_id, user_id, badge_id])
   @@index([game_id])
+  @@index([participant_id])
   @@index([user_id])
   @@index([badge_id])
+  @@map("game_badges")
 }
 
 model UserTitle {
-  // ID
   id String @id @default(uuid())
 
   // Foreign Keys
   user_id  String
   title_id String
 
-  // Title Data
+  // Data
   period    TitlePeriod
   is_active Boolean     @default(true)
 
@@ -357,9 +361,11 @@ model UserTitle {
   user User @relation(fields: [user_id], references: [id], onDelete: Cascade)
 
   // Indexes
+  @@index([user_id])
   @@index([user_id, is_active])
-  @@index([title_id, period])
   @@index([title_id])
+  @@index([expires_at])
+  @@map("user_titles")
 }
 
 enum TitlePeriod {
@@ -369,34 +375,33 @@ enum TitlePeriod {
 }
 
 // ==========================================
-// SERVER LOGS - Para debug e investigacao
+// SERVER LOGS
 // ==========================================
 
 model ServerLog {
-  // ID
   id String @id @default(uuid())
 
-  // Log Data
+  // Data
   level    LogLevel
   category String   @db.VarChar(50)
   message  String   @db.Text
   context  String?  @db.LongText
 
-  // Searchable Fields
+  // Searchable
   room_code String? @db.VarChar(10)
   user_id   String?
   socket_id String? @db.VarChar(50)
 
   // Timestamps
-  timestamp DateTime @default(now())
+  created_at DateTime @default(now())
 
   // Indexes
-  @@index([timestamp])
+  @@index([created_at(sort: Desc)])
   @@index([level])
   @@index([category])
   @@index([room_code])
   @@index([user_id])
-  @@index([socket_id])
+  @@map("server_logs")
 }
 
 enum LogLevel {

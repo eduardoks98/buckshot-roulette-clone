@@ -53,6 +53,8 @@ export default function WaitingRoom() {
   const state = location.state as LocationState | null;
   const reconnectAttempted = useRef(false);
   const gameStarted = useRef(false);
+  const hasRejoined = useRef(false);  // Para controlar reentrada após F5
+  const wasInitiallyConnected = useRef(isConnected);  // Para diferenciar F5 de navegação normal
 
   const [roomCode, setRoomCode] = useState(state?.roomCode || '');
   const [isHost, setIsHost] = useState(state?.isHost || false);
@@ -60,13 +62,33 @@ export default function WaitingRoom() {
 
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
-  const [reconnecting, setReconnecting] = useState(false);
+  const reconnectingRef = useRef(false);  // Usar ref para evitar race condition
   const [addingBot, setAddingBot] = useState(false);
 
   // Manter musica do menu tocando
   useEffect(() => {
     playMusic('ambient-menu');
   }, [playMusic]);
+
+  // SEMPRE conectar ao socket quando entrar na WaitingRoom
+  // Necessário porque após F5, location.state persiste mas socket desconecta
+  useEffect(() => {
+    if (!isConnected) {
+      console.log('[WaitingRoom] Conectando ao socket...');
+      connect();
+    }
+  }, [isConnected, connect]);
+
+  // Reentrar na sala após F5 (quando state existe mas socket RECONECTOU)
+  // wasInitiallyConnected diferencia F5 (socket desconectado no mount) de navegação normal (socket já conectado)
+  useEffect(() => {
+    // Só reentrar se socket RECONECTOU (não estava conectado inicialmente, agora está)
+    if (state?.roomCode && isConnected && !wasInitiallyConnected.current && !hasRejoined.current && user?.display_name) {
+      console.log('[WaitingRoom] Socket reconectou após F5, reentrando na sala:', state.roomCode);
+      hasRejoined.current = true;
+      emitJoinRoom(state.roomCode, user.display_name);
+    }
+  }, [state?.roomCode, isConnected, user?.display_name, emitJoinRoom]);
 
   // Event handlers
   const handlePlayerJoined = useCallback((data: PlayerJoinedPayload) => {
@@ -124,13 +146,13 @@ export default function WaitingRoom() {
     setRoomCode(data.code);
     setIsHost(data.isHost);
     setPlayers(data.players);
-    setReconnecting(false);
+    reconnectingRef.current = false;
   }, []);
 
   const handleJoinError = useCallback((message: string) => {
     console.log('Erro ao reconectar:', message);
     clearSession();
-    setReconnecting(false);
+    reconnectingRef.current = false;
     navigate('/multiplayer');
   }, [clearSession, navigate]);
 
@@ -159,60 +181,77 @@ export default function WaitingRoom() {
     onBotError: handleBotError,
   });
 
-  // Salvar sessão quando vem do rematch
+  // Salvar sessão sempre que entrar na sala (não apenas rematch)
   useEffect(() => {
-    if (state?.fromRematch && state.roomCode && user?.display_name) {
+    if (state?.roomCode && user?.display_name) {
       saveSession({
         roomCode: state.roomCode,
         playerName: user.display_name,
         isHost: state.isHost,
       });
-      console.log('[WaitingRoom] Sessão salva do rematch:', state.roomCode);
+      console.log('[WaitingRoom] Sessão salva:', state.roomCode, 'isHost:', state.isHost);
     }
-  }, [state?.fromRematch, state?.roomCode, state?.isHost, user?.display_name, saveSession]);
+  }, [state?.roomCode, state?.isHost, user?.display_name, saveSession]);
 
   // Tentar reconectar se não tiver state (F5)
+  // IMPORTANTE: NÃO incluir isConnected nas dependências para evitar re-execução
   useEffect(() => {
     if (state || reconnectAttempted.current) return;
 
     const savedSession = getSession();
     if (!savedSession) {
+      console.log('[WaitingRoom] Sem sessão salva, redirecionando para lobby');
       navigate('/multiplayer');
       return;
     }
 
+    console.log('[WaitingRoom] Iniciando reconexão para sala:', savedSession.roomCode);
     reconnectAttempted.current = true;
-    setReconnecting(true);
+    reconnectingRef.current = true;
     setRoomCode(savedSession.roomCode);
 
+    // Verificar se já está conectado (raro, mas possível)
     if (isConnected) {
-      console.log('[WaitingRoom] Já conectado, emitindo joinRoom:', savedSession.roomCode);
+      console.log('[WaitingRoom] Já conectado no mount, emitindo joinRoom:', savedSession.roomCode);
       emitJoinRoom(savedSession.roomCode, savedSession.playerName);
+      reconnectingRef.current = false;
     } else {
-      console.log('[WaitingRoom] Aguardando conexão...');
+      console.log('[WaitingRoom] Aguardando conexão do socket...');
       connect();
     }
-  }, [state, isConnected, connect, navigate, getSession, emitJoinRoom]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state, connect, navigate, getSession, emitJoinRoom]);
 
   // Tentar reconectar quando socket conectar
   useEffect(() => {
-    if (!reconnecting || !isConnected) return;
+    console.log('[WaitingRoom] useEffect conexão check:', {
+      reconnecting: reconnectingRef.current,
+      isConnected,
+      hasSession: !!getSession()
+    });
+
+    if (!reconnectingRef.current || !isConnected) return;
 
     const savedSession = getSession();
-    if (!savedSession) return;
+    if (!savedSession) {
+      console.log('[WaitingRoom] Socket conectou mas sem sessão salva');
+      reconnectingRef.current = false;
+      return;
+    }
 
-    console.log('[WaitingRoom] Socket conectou, tentando reconectar à sala:', savedSession.roomCode);
+    console.log('[WaitingRoom] Socket conectou! Emitindo joinRoom para:', savedSession.roomCode);
     emitJoinRoom(savedSession.roomCode, savedSession.playerName);
-  }, [reconnecting, isConnected, getSession, emitJoinRoom]);
+    reconnectingRef.current = false;
+  }, [isConnected, getSession, emitJoinRoom]);
 
   // Redirecionar se não tiver state nem sessão
+  // Só redireciona se reconnectAttempted já foi true (evita redirect antes do check de sessão)
   useEffect(() => {
-    if ((!state && !reconnecting && !roomCode)) {
-      if (!reconnecting) {
-        navigate('/multiplayer');
-      }
+    if (!state && !reconnectingRef.current && !roomCode && reconnectAttempted.current) {
+      console.log('[WaitingRoom] Redirecionando para lobby - reconexão falhou ou sem dados');
+      navigate('/multiplayer');
     }
-  }, [state, reconnecting, roomCode, navigate]);
+  }, [state, roomCode, navigate]);
 
   // Handler para sair da sala
   const handleLeaveRoom = useCallback(() => {

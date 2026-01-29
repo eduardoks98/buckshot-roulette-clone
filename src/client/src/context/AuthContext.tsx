@@ -1,4 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { initiateOAuthLogin } from '../services/oauth.service';
 
 // ==========================================
 // TYPES
@@ -49,7 +50,7 @@ interface AuthContextType {
   isLoading: boolean;
   authError: string | null;
   availableProviders: AvailableProvider[];
-  login: (provider?: OAuthProvider) => void;
+  login: () => void;
   logout: () => void;
   clearAuthError: () => void;
 }
@@ -93,21 +94,33 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
   // Check authentication on load
   useEffect(() => {
-    // Check for token in URL (after OAuth callback)
     const urlParams = new URLSearchParams(window.location.search);
     const tokenFromUrl = urlParams.get('token');
     const errorFromUrl = urlParams.get('error');
+    const ssoHint = urlParams.get('sso');
 
+    // Handle legacy token in URL (for backwards compatibility)
     if (tokenFromUrl) {
       localStorage.setItem(TOKEN_KEY, tokenFromUrl);
-      // Clean URL
       window.history.replaceState({}, document.title, window.location.pathname);
     }
 
     if (errorFromUrl) {
       setAuthError(getAuthErrorMessage(errorFromUrl));
-      // Clean URL
       window.history.replaceState({}, document.title, window.location.pathname);
+    }
+
+    // Check if we have a local token
+    const existingToken = localStorage.getItem(TOKEN_KEY);
+
+    // SSO hint from Portal - user is logged in there, auto-initiate OAuth
+    if (ssoHint === '1' && !existingToken) {
+      console.log('[Auth] SSO hint detected, initiating OAuth flow');
+      // Clean URL first
+      window.history.replaceState({}, document.title, window.location.pathname);
+      // Initiate OAuth login
+      initiateOAuthLogin();
+      return;
     }
 
     checkAuth();
@@ -178,10 +191,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   };
 
-  const login = (provider: OAuthProvider = 'google') => {
-    // Redirect to Games Admin OAuth
-    const redirectUrl = encodeURIComponent(window.location.origin);
-    window.location.href = `${ADMIN_API_URL}/api/games/${GAME_CODE}/auth/${provider}/redirect?redirect_url=${redirectUrl}`;
+  const login = () => {
+    // Use OAuth 2.0 + PKCE flow for secure authentication
+    initiateOAuthLogin();
   };
 
   const logout = async () => {

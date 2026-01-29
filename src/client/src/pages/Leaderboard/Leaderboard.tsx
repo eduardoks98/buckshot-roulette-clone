@@ -12,6 +12,7 @@ import { LoadingState } from '../../components/common/LoadingState';
 import { EmptyState } from '../../components/common/EmptyState';
 import { getRankIcon } from '../../utils/helpers';
 import { AdBanner } from '../../components/common/AdBanner';
+import { MultiProviderLogin } from '../../components/auth/MultiProviderLogin';
 import './Leaderboard.css';
 
 // AdSense config
@@ -235,9 +236,7 @@ export default function Leaderboard() {
         {!user && (
           <div className="login-prompt">
             <p>Faca login para aparecer no ranking!</p>
-            <button className="login-btn" onClick={() => navigate('/profile')}>
-              Entrar com Google
-            </button>
+            <MultiProviderLogin compact />
           </div>
         )}
 

@@ -24,6 +24,7 @@ import { getLevelInfo } from '../../../../../shared/utils/xpCalculator';
 import { BugReportModal, GameStateForReport } from '../../../components/common/BugReportModal';
 import { AchievementToast } from '../../../components/common';
 import { GameBoard, GameBoardRef, GamePlayer, GameItem, ShotResult, RoundAnnouncement, StealModalData, ItemActionModal, TurnDirection } from '../../../components/game';
+import { InterstitialAd, VideoRewardedAd } from '../../../components/ads';
 import { AWARD_ICONS } from '../../../components/icons';
 import { useSounds } from '../../../audio';
 import './MultiplayerGame.css';
@@ -111,6 +112,11 @@ export default function MultiplayerGame() {
 
   // Rematch state
   const [isRequestingRematch, setIsRequestingRematch] = useState(false);
+
+  // Ads state
+  const [showInterstitial, setShowInterstitial] = useState(false);
+  const [showRewarded, setShowRewarded] = useState(false);
+  const [rewardClaimed, setRewardClaimed] = useState(false);
 
   // Estado para rastrear item roubado que precisa de alvo (Adrenaline + Handcuffs/Adrenaline)
   const [pendingStolenItem, setPendingStolenItem] = useState<{
@@ -895,12 +901,27 @@ export default function MultiplayerGame() {
   const handleRematch = useCallback(() => {
     if (!socket || !state?.roomCode || !me?.name) return;
 
+    // Show interstitial ad before rematch
+    setShowInterstitial(true);
+  }, [socket, state?.roomCode, me?.name]);
+
+  // Handle interstitial close and proceed with rematch
+  const handleInterstitialClose = useCallback(() => {
+    setShowInterstitial(false);
+    if (!socket || !state?.roomCode || !me?.name) return;
+
     setIsRequestingRematch(true);
     socket.emit('requestRematch', {
       previousRoomCode: state.roomCode,
       playerName: me.name,
     });
   }, [socket, state?.roomCode, me?.name]);
+
+  // Handle rewarded video completion
+  const handleRewardClaimed = useCallback(() => {
+    setRewardClaimed(true);
+    setShowRewarded(false);
+  }, []);
 
   // Helper to log events for bug reports
   const logEvent = useCallback((event: string) => {
@@ -1120,6 +1141,21 @@ export default function MultiplayerGame() {
                 );
               })()}
 
+              {/* Rewarded Video Option */}
+              {!rewardClaimed && (
+                <button
+                  className="rewarded-video-btn"
+                  onClick={() => setShowRewarded(true)}
+                >
+                  🎬 Assistir video para bonus XP
+                </button>
+              )}
+              {rewardClaimed && (
+                <div className="reward-claimed-badge">
+                  ✓ Bonus XP reivindicado!
+                </div>
+              )}
+
               <div className="game-over-actions">
                 <button
                   className="rematch-btn"
@@ -1133,6 +1169,23 @@ export default function MultiplayerGame() {
                 </button>
               </div>
             </div>
+
+            {/* Interstitial Ad */}
+            <InterstitialAd
+              isOpen={showInterstitial}
+              onClose={handleInterstitialClose}
+              position="game_over"
+              autoCloseAfter={5}
+            />
+
+            {/* Rewarded Video Ad */}
+            <VideoRewardedAd
+              isOpen={showRewarded}
+              onClose={() => setShowRewarded(false)}
+              onRewardClaimed={handleRewardClaimed}
+              rewardType="XP"
+              rewardAmount={50}
+            />
           </div>
         ) : null}
         damagedPlayerId={damagedPlayerId}

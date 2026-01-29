@@ -96,10 +96,18 @@ export function ActiveRooms() {
   const handleJoinError = useCallback((message: string) => {
     setJoining(false);
     setCreating(false);
+    setIsReconnecting(false);
     setJoinError(message);
 
+    // Se erro indica que a sala não existe mais ou usuário não está nela, limpar activeGame e sessão
+    if (message.includes('não encontrada') || message.includes('not found') ||
+        message.includes('não existe') || message.includes('não está nesta sala')) {
+      console.log('[ActiveRooms] Sala não existe ou usuário removido, limpando activeGame');
+      setActiveGame(null);
+      clearSession();
+    }
     // Se erro é "Já está na sala", limpar sessão antiga corrompida
-    if (message.includes('Já está na sala') || message.includes('já está')) {
+    else if (message.includes('Já está na sala') || message.includes('já está')) {
       clearSession();
     }
 

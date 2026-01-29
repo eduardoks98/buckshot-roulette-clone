@@ -218,7 +218,7 @@ export class GamePersistenceService {
 
       // Coletar ELOs de todos os jogadores para cálculo (legacy)
       const playersElos: number[] = game.participants.map(p =>
-        p.user?.elo_rating || 1000
+        p.user?.elo_rating || 0
       );
 
       // Coletar MMRs para novo sistema de ranking
@@ -245,7 +245,7 @@ export class GamePersistenceService {
 
         if (participant && participant.user_id) {
           const isWinner = participant.user_id === winnerUserId;
-          const playerElo = participant.user?.elo_rating || 1000;
+          const playerElo = participant.user?.elo_rating || 0;
 
           // Preparar input para cálculo de ELO com performance
           const eloInput: EloCalculationInput = {

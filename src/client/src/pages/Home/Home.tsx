@@ -1,15 +1,11 @@
 // ==========================================
-// HOME PAGE - Landing + LoL-Style Lobby
+// HOME PAGE - Landing Page
 // ==========================================
 
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Header } from '../../components/layout/Header';
 import { Footer } from '../../components/layout/Footer';
-import { ActiveRooms } from '../../components/home/ActiveRooms';
-import { MiniLeaderboard } from '../../components/home/MiniLeaderboard';
-import { Changelog } from '../../components/home/Changelog';
 import { AdBanner } from '../../components/common/AdBanner';
 import { MultiProviderLogin } from '../../components/auth/MultiProviderLogin';
 import { PlayersIcon, StarIcon, AchievementIcon, GridIcon } from '../../components/icons';
@@ -19,7 +15,7 @@ import './Home.css';
 
 export default function Home() {
   const navigate = useNavigate();
-  const { isAuthenticated, isLoading, login, authError, clearAuthError } = useAuth();
+  const { isAuthenticated, isLoading, authError, clearAuthError } = useAuth();
   const { playMusic } = useSounds();
 
   // Tocar musica ambiente do menu
@@ -44,37 +40,42 @@ export default function Home() {
   }
 
   // ==========================================
-  // LANDING PAGE (Non-Authenticated)
+  // LANDING PAGE (Always shown)
   // ==========================================
-  if (!isAuthenticated) {
-    return (
-      <div className="landing">
-        {authError && (
-          <div className="auth-error-banner">
-            <span>{authError}</span>
-            <button className="auth-error-close" onClick={clearAuthError}>X</button>
-          </div>
-        )}
+  return (
+    <div className="landing">
+      {authError && (
+        <div className="auth-error-banner">
+          <span>{authError}</span>
+          <button className="auth-error-close" onClick={clearAuthError}>X</button>
+        </div>
+      )}
 
-        {/* Hero Section */}
-        <section className="landing__hero">
-          <div className="landing__hero-content">
-            <h1 className="landing__title">
-              BANG<span className="landing__title-accent">SHOT</span>
-            </h1>
-            <p className="landing__tagline">Roleta Russa Multiplayer Online</p>
-            <p className="landing__description">
-              Teste sua sorte e estrategia neste jogo de tensao onde cada tiro pode ser o ultimo.
-              Jogue contra amigos ou desafie jogadores do mundo todo.
-            </p>
+      {/* Hero Section */}
+      <section className="landing__hero">
+        <div className="landing__hero-content">
+          <h1 className="landing__title">
+            BANG<span className="landing__title-accent">SHOT</span>
+          </h1>
+          <p className="landing__tagline">Roleta Russa Multiplayer Online</p>
+          <p className="landing__description">
+            Teste sua sorte e estrategia neste jogo de tensao onde cada tiro pode ser o ultimo.
+            Jogue contra amigos ou desafie jogadores do mundo todo.
+          </p>
 
-            <div className="landing__cta">
-              <MultiProviderLogin className="landing__providers" />
-              <button className="landing__btn landing__btn--secondary" onClick={() => navigate('/singleplayer')}>
-                Jogar Solo (Treino)
+          <div className="landing__cta">
+            {isAuthenticated ? (
+              <button className="landing__btn landing__btn--primary" onClick={() => navigate('/lobby')}>
+                Multiplayer
               </button>
-            </div>
+            ) : (
+              <MultiProviderLogin className="landing__providers" />
+            )}
+            <button className="landing__btn landing__btn--secondary" onClick={() => navigate('/singleplayer')}>
+              Jogar Solo (Treino)
+            </button>
           </div>
+        </div>
 
           <div className="landing__hero-visual">
             <div className="landing__gun-icon">
@@ -174,42 +175,4 @@ export default function Home() {
         <Footer />
       </div>
     );
-  }
-
-  // ==========================================
-  // LOBBY PAGE (Authenticated) - LoL Style
-  // ==========================================
-  return (
-    <div className="lobby-container">
-      <Header />
-
-      {/* ===== MAIN BODY ===== */}
-      <main className="lobby-body">
-        {/* Left Column - Active Rooms */}
-        <section className="lobby-body__left">
-          <ActiveRooms />
-        </section>
-
-        {/* Right Column - Leaderboard + Changelog + Ad */}
-        <section className="lobby-body__right">
-          <MiniLeaderboard />
-          <Changelog />
-          {/* Ad Banner - Lobby */}
-          {ADSENSE_PUBLISHER_ID && AD_SLOTS.lobby && (
-            <div className="lobby-ad">
-              <AdBanner
-                publisherId={ADSENSE_PUBLISHER_ID}
-                slotId={AD_SLOTS.lobby}
-                format="rectangle"
-                className="ad-lobby"
-                testMode={ADSENSE_TEST_MODE}
-              />
-            </div>
-          )}
-        </section>
-      </main>
-
-      <Footer />
-    </div>
-  );
 }

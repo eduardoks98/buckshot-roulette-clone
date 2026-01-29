@@ -102,7 +102,7 @@ export class RoomService {
   private rematchRooms: Map<string, string> = new Map();
 
   // Callbacks para comunicação com handlers
-  onGameCancelled?: (roomCode: string) => void;
+  onGameCancelled?: (roomCode: string, playerIds: string[]) => void;
   onPlayerWonByDefault?: (roomCode: string, player: Player, room: Room) => void;
   onPlayerEliminated?: (roomCode: string, player: Player) => void;
   onRoomDeleted?: (roomCode: string) => void; // Called when room is deleted after grace period
@@ -369,7 +369,7 @@ export class RoomService {
       if (alivePlayers.length === 0) {
         // Todos desistiram - cancelar jogo
         console.log(`[Room] Todos jogadores abandonaram - cancelando jogo ${code}`);
-        this.onGameCancelled?.(code);
+        this.onGameCancelled?.(code, room.players.map(p => p.id));
         this.rooms.delete(code);
         return { code, room, players: [], deleted: true, gracePeriodStarted: false, playerName, gameInProgress: true };
       }
@@ -404,17 +404,17 @@ export class RoomService {
 
     // Se não há mais jogadores
     if (room.players.length === 0) {
-      // Waiting room vazia - iniciar grace period de 60s
-      console.log(`[Room] Sala ${code} está vazia - iniciando grace period de 60s`);
+      // Waiting room vazia - deletar em 5s (evita DDoS de criação de salas)
+      console.log(`[Room] Sala ${code} está vazia - deletando em 5s`);
       room.emptyRoomTimeout = setTimeout(() => {
         // Verificar se a sala ainda existe e está vazia
         const currentRoom = this.rooms.get(code);
         if (currentRoom && currentRoom.players.length === 0) {
-          console.log(`[Room] Grace period expirado - deletando sala ${code}`);
+          console.log(`[Room] Deletando sala vazia ${code}`);
           this.rooms.delete(code);
           this.onRoomDeleted?.(code);
         }
-      }, 60000); // 60 segundos
+      }, 5000); // 5 segundos - evita spam de salas
 
       return { code, room, players: [], deleted: false, gracePeriodStarted: true, playerName };
     }
@@ -575,7 +575,7 @@ export class RoomService {
     if (allDeadOrDisconnected) {
       // CANCELAR jogo - ninguém ganhou
       console.log(`[Room] Todos jogadores abandonaram - cancelando jogo ${roomCode}`);
-      this.onGameCancelled?.(roomCode);
+      this.onGameCancelled?.(roomCode, room.players.map(p => p.id));
       this.rooms.delete(roomCode);
       return;
     }
@@ -624,15 +624,16 @@ export class RoomService {
       this.onHostChanged?.(roomCode, room.players[0].name);
     }
 
-    // Se sala ficou vazia, iniciar grace period de 60s para deletar
+    // Se sala ficou vazia, deletar em 5s (evita DDoS)
     if (room.players.length === 0) {
-      console.log(`[Room] Sala ${roomCode} está vazia - iniciando grace period de 60s`);
+      console.log(`[Room] Sala ${roomCode} está vazia - deletando em 5s`);
       room.emptyRoomTimeout = setTimeout(() => {
         if (this.rooms.has(roomCode)) {
+          console.log(`[Room] Deletando sala vazia ${roomCode}`);
           this.rooms.delete(roomCode);
           this.onRoomDeleted?.(roomCode);
         }
-      }, 60000);
+      }, 5000); // 5 segundos
     } else {
       // Notificar que jogador saiu definitivamente
       this.onPlayerLeft?.(roomCode, room.players.map(p => this.toPublicPlayer(p)));

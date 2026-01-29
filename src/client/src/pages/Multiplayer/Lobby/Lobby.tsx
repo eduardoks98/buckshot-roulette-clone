@@ -4,6 +4,7 @@ import { useSocket } from '../../../context/SocketContext';
 import { useAuth } from '../../../context/AuthContext';
 import { useRequireAuth } from '../../../hooks';
 import { PageLayout } from '../../../components/layout/PageLayout';
+import { BannerAd } from '../../../components/ads';
 import { useSounds } from '../../../audio/useSounds';
 import type { RoomInfo } from '../../../../../shared/types/socket-events.types';
 import './Lobby.css';
@@ -359,6 +360,11 @@ export default function Lobby() {
                 ))
               )}
             </div>
+          </div>
+
+          {/* Banner Ad - Lobby */}
+          <div className="lobby-ad-container">
+            <BannerAd position="lobby" className="lobby-banner-ad" />
           </div>
         </div>
       </div>

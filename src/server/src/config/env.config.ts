@@ -6,7 +6,8 @@ import dotenv from 'dotenv';
 import path from 'path';
 
 // Carregar variáveis de ambiente
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+// O __dirname no dist é: dist/server/src/config, então precisamos subir 4 níveis
+dotenv.config({ path: path.resolve(__dirname, '../../../../.env') });
 
 export const ENV = {
   // Server
@@ -36,6 +37,13 @@ export const ENV = {
   GAMES_ADMIN_API_URL: process.env.GAMES_ADMIN_API_URL || 'https://admin.mysys.shop',
   GAMES_ADMIN_JWT_SECRET: process.env.GAMES_ADMIN_JWT_SECRET || '',
   GAME_CODE: process.env.GAME_CODE || 'BANGSHOT',
+
+  // OAuth 2.0 (SSO with Portal)
+  OAUTH_CLIENT_ID: process.env.OAUTH_CLIENT_ID || 'BANGSHOT',
+  OAUTH_CLIENT_SECRET: process.env.OAUTH_CLIENT_SECRET || '',
+  OAUTH_AUTHORIZE_URL: process.env.OAUTH_AUTHORIZE_URL || 'https://mysys.shop/oauth/authorize',
+  OAUTH_TOKEN_URL: process.env.OAUTH_TOKEN_URL || 'https://mysys.shop/oauth/token',
+  OAUTH_REDIRECT_URI: process.env.OAUTH_REDIRECT_URI || 'https://bangshot.mysys.shop/auth/callback',
 } as const;
 
 // Alias para compatibilidade
