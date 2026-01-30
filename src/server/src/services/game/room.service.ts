@@ -345,6 +345,17 @@ export class RoomService {
     if (room.players.find(p => p.id === socketId)) {
       return { error: 'Já está na sala' };
     }
+
+    // Impedir múltiplas abas do mesmo usuário na mesma sala
+    if (odUserId) {
+      const alreadyInRoom = room.players.find(
+        p => p.odUserId === odUserId && !p.disconnected
+      );
+      if (alreadyInRoom) {
+        return { error: 'Você já está nesta sala em outra aba' };
+      }
+    }
+
     if (room.password && room.password !== password) {
       return { error: 'Senha incorreta' };
     }

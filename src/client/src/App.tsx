@@ -14,10 +14,22 @@ import CookiePolicy from './pages/CookiePolicy/CookiePolicy';
 import ChangelogPage from './pages/ChangelogPage/ChangelogPage';
 import AudioTest from './pages/AudioTest/AudioTest';
 import Callback from './pages/Auth/Callback';
+import { useSocket } from './context/SocketContext';
+import { SessionInvalidatedModal } from './components/common/SessionInvalidatedModal';
+
+// TabSyncProvider no main.tsx já gerencia overlay e sincronização automaticamente
 
 function App() {
+  const { isSessionInvalidated, sessionInvalidatedReason } = useSocket();
+
   return (
     <div className="app">
+      {/* Modal de sessão invalidada (limite de 1 aba) */}
+      <SessionInvalidatedModal
+        isVisible={isSessionInvalidated}
+        reason={sessionInvalidatedReason}
+      />
+
       <Routes>
         <Route path="/" element={<Home />} />
         <Route path="/auth/callback" element={<Callback />} />

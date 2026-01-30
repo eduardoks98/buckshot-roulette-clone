@@ -15,8 +15,11 @@ type TypedSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 interface SocketContextType {
   socket: TypedSocket | null;
   isConnected: boolean;
+  isSessionInvalidated: boolean;
+  sessionInvalidatedReason: string | null;
   connect: () => void;
   disconnect: () => void;
+  clearSessionInvalidated: () => void;
 }
 
 // ==========================================
@@ -36,10 +39,18 @@ interface SocketProviderProps {
 export function SocketProvider({ children }: SocketProviderProps) {
   const [socket, setSocket] = useState<TypedSocket | null>(null);
   const [isConnected, setIsConnected] = useState(false);
+  const [isSessionInvalidated, setIsSessionInvalidated] = useState(false);
+  const [sessionInvalidatedReason, setSessionInvalidatedReason] = useState<string | null>(null);
 
   // Usar ref para evitar criacao duplicada de socket em React.StrictMode
   const socketRef = useRef<TypedSocket | null>(null);
   const connectingRef = useRef(false);
+
+  // Limpar estado de sessão invalidada
+  const clearSessionInvalidated = useCallback(() => {
+    setIsSessionInvalidated(false);
+    setSessionInvalidatedReason(null);
+  }, []);
 
   const connect = useCallback(() => {
     // Evitar conexoes duplicadas
@@ -97,6 +108,13 @@ export function SocketProvider({ children }: SocketProviderProps) {
       connectingRef.current = false;
     });
 
+    // Listener para invalidação de sessão (limite de 1 aba por usuário)
+    newSocket.on('sessionInvalidated', (data) => {
+      console.log('Sessão invalidada:', data.reason);
+      setIsSessionInvalidated(true);
+      setSessionInvalidatedReason(data.reason);
+    });
+
     setSocket(newSocket);
   }, []);
 
@@ -131,8 +149,11 @@ export function SocketProvider({ children }: SocketProviderProps) {
   const value: SocketContextType = {
     socket,
     isConnected,
+    isSessionInvalidated,
+    sessionInvalidatedReason,
     connect,
     disconnect,
+    clearSessionInvalidated,
   };
 
   return (

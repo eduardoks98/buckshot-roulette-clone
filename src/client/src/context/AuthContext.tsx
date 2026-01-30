@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { initiateOAuthLogin, clearPKCEValues } from '../services/oauth.service';
+import { initiateOAuthLogin } from '../services/oauth.service';
 
 // ==========================================
 // TYPES
@@ -39,8 +39,20 @@ export interface AvailableProvider {
 }
 
 const TOKEN_KEY = 'bangshot_auth_token';
+const SSO_COOKIE_NAME = 'mysys_token';
 const ADMIN_API_URL = import.meta.env.VITE_ADMIN_API_URL || 'https://admin.mysys.shop';
 const GAME_CODE = import.meta.env.VITE_GAME_CODE || 'BANGSHOT';
+
+// Helper to get cookie value
+function getCookie(name: string): string | null {
+  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+  return match ? decodeURIComponent(match[2]) : null;
+}
+
+// Helper to clear cookie
+function clearCookie(name: string, domain: string) {
+  document.cookie = `${name}=; path=/; domain=${domain}; expires=Thu, 01 Jan 1970 00:00:00 GMT; secure; samesite=lax`;
+}
 
 interface AuthContextType {
   user: User | null;
@@ -97,9 +109,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const urlParams = new URLSearchParams(window.location.search);
     const tokenFromUrl = urlParams.get('token');
     const errorFromUrl = urlParams.get('error');
-    const ssoHint = urlParams.get('sso');
 
-    // Handle legacy token in URL (for backwards compatibility)
+    // Handle token in URL (from OAuth callback)
     if (tokenFromUrl) {
       localStorage.setItem(TOKEN_KEY, tokenFromUrl);
       window.history.replaceState({}, document.title, window.location.pathname);
@@ -110,19 +121,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       window.history.replaceState({}, document.title, window.location.pathname);
     }
 
-    // Check if we have a local token
-    const existingToken = localStorage.getItem(TOKEN_KEY);
-
-    // SSO hint from Portal - user is logged in there, auto-initiate OAuth
-    if (ssoHint === '1' && !existingToken) {
-      console.log('[Auth] SSO hint detected, initiating OAuth flow');
-      // Clean URL first
-      window.history.replaceState({}, document.title, window.location.pathname);
-      // Initiate OAuth login
-      initiateOAuthLogin();
-      return;
-    }
-
+    // SSO is now handled via cookie in checkAuth()
     checkAuth();
   }, []);
 
@@ -145,6 +144,24 @@ export function AuthProvider({ children }: AuthProviderProps) {
   };
 
   const checkAuth = async () => {
+    // Check for cross-domain SSO cookie first
+    const ssoToken = getCookie(SSO_COOKIE_NAME);
+    const localToken = localStorage.getItem(TOKEN_KEY);
+
+    // If SSO cookie exists but no local token, sync the token
+    if (ssoToken && !localToken) {
+      console.log('[Auth] SSO cookie detected, syncing token');
+      localStorage.setItem(TOKEN_KEY, ssoToken);
+    }
+
+    // If SSO cookie is gone but local token exists, clear local session (logged out from another app)
+    if (!ssoToken && localToken) {
+      console.log('[Auth] SSO cookie gone, clearing local session');
+      localStorage.removeItem(TOKEN_KEY);
+      setIsLoading(false);
+      return;
+    }
+
     const token = getToken();
     if (!token) {
       setIsLoading(false);
@@ -216,7 +233,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
       console.error('Erro ao fazer logout:', error);
     } finally {
       localStorage.removeItem(TOKEN_KEY);
-      clearPKCEValues(); // Limpar valores PKCE do sessionStorage
+      // Clear SSO cookie
+      clearCookie(SSO_COOKIE_NAME, '.mysys.shop');
       setUser(null);
     }
   };

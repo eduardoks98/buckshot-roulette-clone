@@ -88,7 +88,7 @@ export class GamePersistenceService {
           status: GameStatus.WAITING,
           has_password: params.hasPassword,
           max_players: params.maxPlayers || 4,
-          participants: {
+          game_participants: {
             create: {
               user_id: params.hostUserId || null,
               guest_name: params.hostUserId ? null : params.hostGuestName,
@@ -197,7 +197,7 @@ export class GamePersistenceService {
           ended_at: new Date(),
         },
         include: {
-          participants: {
+          game_participants: {
             include: {
               user: {
                 select: {
@@ -217,16 +217,16 @@ export class GamePersistenceService {
       });
 
       // Coletar ELOs de todos os jogadores para cálculo (legacy)
-      const playersElos: number[] = game.participants.map(p =>
+      const playersElos: number[] = game.game_participants.map(p =>
         p.user?.elo_rating || 0
       );
 
       // Coletar MMRs para novo sistema de ranking
-      const playersMmrs: number[] = game.participants.map(p =>
+      const playersMmrs: number[] = game.game_participants.map(p =>
         p.user?.mmr_hidden || 800
       );
 
-      const totalPlayers = game.participants.length;
+      const totalPlayers = game.game_participants.length;
 
       // Calcular contexto do jogo para o cálculo de performance
       const gameContext = {
@@ -239,7 +239,7 @@ export class GamePersistenceService {
       // Update each participant with their stats
       for (const stats of playerStats) {
         // Find participant by odUserId
-        const participant = game.participants.find(
+        const participant = game.game_participants.find(
           p => stats.odUserId && p.user_id === stats.odUserId
         );
 
@@ -424,7 +424,7 @@ export class GamePersistenceService {
           // PROCESSAR GUEST/BOT (sem user_id)
           // ========================================
           // Tentar encontrar pelo socket_id (odId)
-          const guestParticipant = game.participants.find(
+          const guestParticipant = game.game_participants.find(
             p => !p.user_id && p.socket_id === stats.odId
           );
 
@@ -531,7 +531,7 @@ export class GamePersistenceService {
       return await prisma.game.findUnique({
         where: { room_code: roomCode },
         include: {
-          participants: {
+          game_participants: {
             include: {
               user: {
                 select: {
@@ -631,7 +631,7 @@ export class GamePersistenceService {
   async getInProgressGames(): Promise<Array<{
     roomCode: string;
     gameState: object | null;
-    participants: Array<{
+    game_participants: Array<{
       odUserId: string | null;
       guestName: string | null;
       socketId: string | null;
@@ -647,7 +647,7 @@ export class GamePersistenceService {
         select: {
           room_code: true,
           game_state: true,
-          participants: {
+          game_participants: {
             select: {
               user_id: true,
               guest_name: true,
@@ -661,7 +661,7 @@ export class GamePersistenceService {
       return games.map(game => ({
         roomCode: game.room_code,
         gameState: game.game_state ? JSON.parse(game.game_state) : null,
-        participants: game.participants.map(p => ({
+        game_participants: game.game_participants.map(p => ({
           odUserId: p.user_id,
           guestName: p.guest_name,
           socketId: p.socket_id,

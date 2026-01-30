@@ -26,6 +26,20 @@ interface GamesAdminTokenPayload {
   exp: number;
 }
 
+// Games Admin API validation response
+interface GamesAdminValidateResponse {
+  valid: boolean;
+  user?: {
+    email: string;
+    username: string;
+    display_name: string;
+    avatar_url?: string;
+    elo_rating?: number;
+    rank?: string;
+    is_admin?: boolean;
+  };
+}
+
 interface UserProfile {
   id: string;
   email: string;
@@ -179,7 +193,7 @@ export class AuthService {
         return null;
       }
 
-      const data = await response.json();
+      const data = await response.json() as GamesAdminValidateResponse;
       if (!data.valid || !data.user) {
         return null;
       }

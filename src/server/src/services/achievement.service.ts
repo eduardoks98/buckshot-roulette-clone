@@ -215,7 +215,7 @@ class AchievementService {
         total_info_item_uses: true,
         items_used_bitmask: true,
         best_win_streak: true,
-        achievements: {
+        user_achievements: {
           select: { achievement_id: true },
         },
       },
@@ -223,7 +223,7 @@ class AchievementService {
 
     if (!user) return [];
 
-    const alreadyUnlocked = new Set(user.achievements.map(a => a.achievement_id));
+    const alreadyUnlocked = new Set(user.user_achievements.map(a => a.achievement_id));
     const newlyUnlocked: AchievementUnlocked[] = [];
 
     // Check each milestone condition
@@ -298,7 +298,7 @@ class AchievementService {
         const distinctOpponents = await prisma.gameParticipant.findMany({
           where: {
             game: {
-              participants: {
+              game_participants: {
                 some: { user_id: userId },
               },
             },

@@ -16,3 +16,4 @@ export type { ErrorAlertProps } from './ErrorAlert';
 export { RecentForm } from './RecentForm';
 export type { RecentFormProps } from './RecentForm';
 export { SoundControl } from './SoundControl';
+export { SyncingOverlay } from './SessionInvalidatedModal';

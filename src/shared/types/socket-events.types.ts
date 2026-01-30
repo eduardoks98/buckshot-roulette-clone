@@ -151,6 +151,9 @@ export interface ServerToClientEvents {
 
   // Online count
   onlineCount: (data: { total: number; inQueue: number }) => void;
+
+  // Session invalidation (single tab enforcement)
+  sessionInvalidated: (data: SessionInvalidatedPayload) => void;
 }
 
 export interface BotAddedPayload {
@@ -373,4 +376,8 @@ export interface ShellEjectedPayload {
 export interface RematchRoomReadyPayload {
   newRoomCode: string;
   previousRoomCode: string;
+}
+
+export interface SessionInvalidatedPayload {
+  reason: string;
 }

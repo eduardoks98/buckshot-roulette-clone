@@ -133,7 +133,7 @@ class HistoryService {
         include: {
           game: {
             include: {
-              participants: {
+              game_participants: {
                 include: {
                   user: {
                     select: {
@@ -161,7 +161,7 @@ class HistoryService {
         const game = participation.game;
 
         // Encontrar oponentes (outros participantes)
-        const opponents = game.participants
+        const opponents = game.game_participants
           .filter(p => p.user_id !== userId)
           .map(p => ({
             display_name: p.user?.display_name || p.guest_name || 'Jogador',  // Usar guest_name para bots
@@ -170,7 +170,7 @@ class HistoryService {
           }));
 
         // Encontrar vencedor
-        const winnerParticipant = game.participants.find(p => p.position === 1);
+        const winnerParticipant = game.game_participants.find(p => p.position === 1);
         const winner = winnerParticipant?.user
           ? {
               id: winnerParticipant.user.id,
@@ -242,7 +242,7 @@ class HistoryService {
       const game = await prisma.game.findUnique({
         where: { id: gameId },
         include: {
-          participants: {
+          game_participants: {
             include: {
               user: {
                 select: {
@@ -266,13 +266,13 @@ class HistoryService {
       }
 
       // Encontrar participação do usuário
-      const userParticipation = game.participants.find(p => p.user_id === userId);
+      const userParticipation = game.game_participants.find(p => p.user_id === userId);
       if (!userParticipation) {
         return null;
       }
 
       // Mapear oponentes
-      const opponents = game.participants
+      const opponents = game.game_participants
         .filter(p => p.user_id !== userId)
         .map(p => ({
           display_name: p.user?.display_name || p.guest_name || 'Jogador',  // Usar guest_name para bots
@@ -281,7 +281,7 @@ class HistoryService {
         }));
 
       // Encontrar vencedor
-      const winnerParticipant = game.participants.find(p => p.position === 1);
+      const winnerParticipant = game.game_participants.find(p => p.position === 1);
       const winner = winnerParticipant?.user
         ? {
             id: winnerParticipant.user.id,
@@ -295,7 +295,7 @@ class HistoryService {
           : null;
 
       // Mapear participantes
-      const participants = game.participants.map(p => ({
+      const participants = game.game_participants.map(p => ({
         user_id: p.user_id,
         display_name: p.user?.display_name || p.guest_name || 'Jogador',  // Usar guest_name para bots
         position: p.position,
@@ -371,7 +371,7 @@ class HistoryService {
           damage_dealt: true,
           game: {
             select: {
-              participants: {
+              game_participants: {
                 select: {
                   user_id: true,
                 },

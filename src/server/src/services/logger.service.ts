@@ -174,7 +174,7 @@ class LoggerService {
 
       const deleted = await prisma.serverLog.deleteMany({
         where: {
-          timestamp: { lt: oneYearAgo },
+          created_at: { lt: oneYearAgo },
         },
       });
 

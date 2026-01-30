@@ -5,6 +5,7 @@
 import { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useTabSync } from '../../context/TabSyncContext';
 import { Footer } from '../../components/layout/Footer';
 import { AdBanner } from '../../components/common/AdBanner';
 import { MultiProviderLogin } from '../../components/auth/MultiProviderLogin';
@@ -13,17 +14,20 @@ import { ADSENSE_PUBLISHER_ID, AD_SLOTS, ADSENSE_TEST_MODE } from '../../config'
 import { useSounds } from '../../audio/useSounds';
 import './Home.css';
 
+// TabSyncProvider no main.tsx já gerencia overlay e sincronização automaticamente
+
 export default function Home() {
   const navigate = useNavigate();
   const { isAuthenticated, isLoading, authError, clearAuthError } = useAuth();
   const { playMusic } = useSounds();
+  const { isFocused } = useTabSync();
 
-  // Tocar musica ambiente do menu
+  // Tocar musica ambiente do menu (só quando focado)
   useEffect(() => {
-    if (!isLoading) {
+    if (!isLoading && isFocused) {
       playMusic('ambient-menu');
     }
-  }, [isLoading, playMusic]);
+  }, [isLoading, isFocused, playMusic]);
 
   // ==========================================
   // LOADING STATE
@@ -42,6 +46,7 @@ export default function Home() {
   // ==========================================
   // LANDING PAGE (Always shown)
   // ==========================================
+  // Overlay é gerenciado automaticamente pelo TabSyncProvider
   return (
     <div className="landing">
       {authError && (

@@ -62,3 +62,5 @@ export type { UseAutoCloseMessageOptions, UseAutoCloseMessageReturn } from './us
 
 export { useGameSession } from './useGameSession';
 export type { GameSession, ReconnectData, UseGameSessionReturn } from './useGameSession';
+
+export { useSingleTab } from './useSingleTab';
