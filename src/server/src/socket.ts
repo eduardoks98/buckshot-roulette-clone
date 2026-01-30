@@ -29,9 +29,9 @@ const userActiveSocketMap = new Map<string, string>();
 // Referência ao io server para acesso externo (online count REST endpoint)
 let ioInstance: Server<ClientToServerEvents, ServerToClientEvents> | null = null;
 
-export function getOnlineCount(): { total: number; inQueue: number } {
+export function getOnlineCount(): { total: number; inQueue: number; userIds: string[] } {
   if (!ioInstance) {
-    return { total: 0, inQueue: 0 };
+    return { total: 0, inQueue: 0, userIds: [] };
   }
 
   // Contar usuários únicos (por odUserId) + conexões anônimas
@@ -50,6 +50,7 @@ export function getOnlineCount(): { total: number; inQueue: number } {
   return {
     total: uniqueUserIds.size + anonymousCount,
     inQueue: 0, // Futuro: matchmaking queue
+    userIds: Array.from(uniqueUserIds), // IDs dos usuários autenticados
   };
 }
 
