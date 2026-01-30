@@ -23,6 +23,9 @@ export const roomService = new RoomService();
 // Map de socket.id para dados do usuário
 export const socketUserMap = new Map<string, { odUserId: string; displayName: string; token?: string } | null>();
 
+// Map de userId para socket.id (para limitação de 1 aba por usuário)
+const userActiveSocketMap = new Map<string, string>();
+
 // Referência ao io server para acesso externo (online count REST endpoint)
 let ioInstance: Server<ClientToServerEvents, ServerToClientEvents> | null = null;
 
@@ -91,7 +94,9 @@ export function setupSocketIO(httpServer: HttpServer): TypedIOServer {
       try {
         const user = await authService.validateToken(authToken);
         if (user) {
+          // Registrar conexão (permite múltiplas abas por usuário)
           socketUserMap.set(socket.id, { odUserId: user.id, displayName: user.display_name, token: authToken });
+          userActiveSocketMap.set(user.id, socket.id);
 
           logger.info(LOG_CATEGORIES.AUTH, 'Socket autenticado', {
             socketId: socket.id,
@@ -147,6 +152,15 @@ export function setupSocketIO(httpServer: HttpServer): TypedIOServer {
 
       // Limpar dados do usuário
       socketUserMap.delete(socket.id);
+
+      // Limpar mapa de usuário ativo (apenas se este era o socket ativo)
+      if (userData?.odUserId) {
+        const activeSocketId = userActiveSocketMap.get(userData.odUserId);
+        if (activeSocketId === socket.id) {
+          userActiveSocketMap.delete(userData.odUserId);
+        }
+      }
+
       // A lógica de desconexão será tratada no room.handler
 
       // Broadcast online count atualizado
