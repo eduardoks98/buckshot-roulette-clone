@@ -272,6 +272,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     try {
       pusher = new Pusher(REVERB_KEY, {
+        cluster: 'mt1', // Required by Pusher.js, ignored by Reverb
         wsHost: REVERB_HOST,
         wsPort: parseInt(REVERB_PORT),
         wssPort: parseInt(REVERB_PORT),
