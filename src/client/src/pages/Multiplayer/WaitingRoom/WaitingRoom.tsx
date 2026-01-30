@@ -46,7 +46,8 @@ export default function WaitingRoom() {
 
   // Hooks customizados
   useRequireAuth();
-  const { saveSession, clearSession, getSession } = useGameSession();
+  // Nota: saveSession e getSession são deprecated - servidor gerencia via getRoomByUserId()
+  const { clearSession } = useGameSession();
   const { startGame, leaveRoom, addBot, removeBot } = useRoomActions();
   const { joinRoom: emitJoinRoom } = useLobbyActions();
 
@@ -181,68 +182,20 @@ export default function WaitingRoom() {
     onBotError: handleBotError,
   });
 
-  // Salvar sessão sempre que entrar na sala (não apenas rematch)
-  useEffect(() => {
-    if (state?.roomCode && user?.display_name) {
-      saveSession({
-        roomCode: state.roomCode,
-        playerName: user.display_name,
-        isHost: state.isHost,
-      });
-      console.log('[WaitingRoom] Sessão salva:', state.roomCode, 'isHost:', state.isHost);
-    }
-  }, [state?.roomCode, state?.isHost, user?.display_name, saveSession]);
+  // Nota: Session não é mais salva no cliente - servidor gerencia via getRoomByUserId()
+  // O useEffect abaixo foi removido pois era redundante
 
-  // Tentar reconectar se não tiver state (F5)
-  // IMPORTANTE: NÃO incluir isConnected nas dependências para evitar re-execução
+  // Se não tiver state (F5 ou acesso direto), redirecionar para lobby
+  // O servidor vai emitir 'alreadyInGame' se usuário estiver em uma sala
   useEffect(() => {
     if (state || reconnectAttempted.current) return;
 
-    const savedSession = getSession();
-    if (!savedSession) {
-      console.log('[WaitingRoom] Sem sessão salva, redirecionando para lobby');
-      navigate('/multiplayer');
-      return;
-    }
-
-    console.log('[WaitingRoom] Iniciando reconexão para sala:', savedSession.roomCode);
+    console.log('[WaitingRoom] Sem state, redirecionando para lobby (servidor notificará via alreadyInGame se estiver em sala)');
     reconnectAttempted.current = true;
-    reconnectingRef.current = true;
-    setRoomCode(savedSession.roomCode);
+    navigate('/multiplayer');
+  }, [state, navigate]);
 
-    // Verificar se já está conectado (raro, mas possível)
-    if (isConnected) {
-      console.log('[WaitingRoom] Já conectado no mount, emitindo joinRoom:', savedSession.roomCode);
-      emitJoinRoom(savedSession.roomCode, savedSession.playerName);
-      reconnectingRef.current = false;
-    } else {
-      console.log('[WaitingRoom] Aguardando conexão do socket...');
-      connect();
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state, connect, navigate, getSession, emitJoinRoom]);
-
-  // Tentar reconectar quando socket conectar
-  useEffect(() => {
-    console.log('[WaitingRoom] useEffect conexão check:', {
-      reconnecting: reconnectingRef.current,
-      isConnected,
-      hasSession: !!getSession()
-    });
-
-    if (!reconnectingRef.current || !isConnected) return;
-
-    const savedSession = getSession();
-    if (!savedSession) {
-      console.log('[WaitingRoom] Socket conectou mas sem sessão salva');
-      reconnectingRef.current = false;
-      return;
-    }
-
-    console.log('[WaitingRoom] Socket conectou! Emitindo joinRoom para:', savedSession.roomCode);
-    emitJoinRoom(savedSession.roomCode, savedSession.playerName);
-    reconnectingRef.current = false;
-  }, [isConnected, getSession, emitJoinRoom]);
+  // Nota: Reconexão via localStorage foi removida - servidor gerencia via alreadyInGame
 
   // Redirecionar se não tiver state nem sessão
   // Só redireciona se reconnectAttempted já foi true (evita redirect antes do check de sessão)

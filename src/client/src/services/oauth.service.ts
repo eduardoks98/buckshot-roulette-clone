@@ -2,9 +2,6 @@
 // OAUTH SERVICE - PKCE Implementation
 // ==========================================
 
-const STORAGE_KEY_VERIFIER = 'oauth_code_verifier';
-const STORAGE_KEY_STATE = 'oauth_state';
-
 /**
  * Generate a cryptographically random string
  */
@@ -22,13 +19,6 @@ export function generateCodeVerifier(): string {
 }
 
 /**
- * Generate a state parameter for CSRF protection (32 random bytes)
- */
-export function generateState(): string {
-  return generateRandomString(32);
-}
-
-/**
  * Generate code challenge from verifier using SHA-256
  * Returns base64url encoded hash
  */
@@ -43,33 +33,38 @@ export async function generateCodeChallenge(verifier: string): Promise<string> {
 }
 
 /**
- * Store PKCE values in sessionStorage
+ * Encode state with verifier (base64url JSON)
+ * State contém: { nonce: random, verifier: codeVerifier }
  */
-export function storePKCEValues(codeVerifier: string, state: string): void {
-  sessionStorage.setItem(STORAGE_KEY_VERIFIER, codeVerifier);
-  sessionStorage.setItem(STORAGE_KEY_STATE, state);
+function encodeState(verifier: string): string {
+  const nonce = generateRandomString(16);
+  const payload = JSON.stringify({ n: nonce, v: verifier });
+  const base64 = btoa(payload);
+  return base64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
 /**
- * Get stored code verifier
+ * Decode state to extract verifier
  */
-export function getStoredCodeVerifier(): string | null {
-  return sessionStorage.getItem(STORAGE_KEY_VERIFIER);
+function decodeState(state: string): { nonce: string; verifier: string } | null {
+  try {
+    // Restore base64 padding
+    let base64 = state.replace(/-/g, '+').replace(/_/g, '/');
+    while (base64.length % 4) base64 += '=';
+
+    const payload = atob(base64);
+    const data = JSON.parse(payload);
+    return { nonce: data.n, verifier: data.v };
+  } catch {
+    return null;
+  }
 }
 
 /**
- * Get stored state
- */
-export function getStoredState(): string | null {
-  return sessionStorage.getItem(STORAGE_KEY_STATE);
-}
-
-/**
- * Clear stored PKCE values
+ * Clear stored PKCE values (no-op now, kept for compatibility)
  */
 export function clearPKCEValues(): void {
-  sessionStorage.removeItem(STORAGE_KEY_VERIFIER);
-  sessionStorage.removeItem(STORAGE_KEY_STATE);
+  // No-op - state is self-contained now
 }
 
 /**
@@ -104,11 +99,10 @@ export async function initiateOAuthLogin(): Promise<void> {
 
   // Generate PKCE values
   const codeVerifier = generateCodeVerifier();
-  const state = generateState();
   const codeChallenge = await generateCodeChallenge(codeVerifier);
 
-  // Store for later verification
-  storePKCEValues(codeVerifier, state);
+  // Encode verifier in state (no sessionStorage needed!)
+  const state = encodeState(codeVerifier);
 
   // Build and redirect to authorization URL
   const authUrl = buildAuthorizationUrl(authorizeUrl, clientId, redirectUri, codeChallenge, state);
@@ -124,23 +118,18 @@ export async function exchangeCodeForTokens(
   code: string,
   state: string
 ): Promise<{ success: boolean; token?: string; user?: unknown; error?: string }> {
-  // Verify state
-  const storedState = getStoredState();
-  if (!storedState || storedState !== state) {
-    console.error('[OAuth] State mismatch - possible CSRF attack');
-    clearPKCEValues();
+  // Decode state to extract verifier
+  const stateData = decodeState(state);
+  if (!stateData) {
+    console.error('[OAuth] Invalid state format');
     return { success: false, error: 'Invalid state parameter' };
   }
 
-  // Get code verifier
-  const codeVerifier = getStoredCodeVerifier();
+  const codeVerifier = stateData.verifier;
   if (!codeVerifier) {
-    console.error('[OAuth] Code verifier not found');
+    console.error('[OAuth] Code verifier not found in state');
     return { success: false, error: 'Code verifier not found' };
   }
-
-  // Clear stored values
-  clearPKCEValues();
 
   const redirectUri = import.meta.env.VITE_OAUTH_REDIRECT_URI || `${window.location.origin}/auth/callback`;
 

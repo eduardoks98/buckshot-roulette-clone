@@ -1,14 +1,23 @@
 // ==========================================
-// USE GAME SESSION - Gerencia sessão do jogo
+// USE GAME SESSION - Gerencia reconexão do jogo
 // ==========================================
+// NOTA: A funcionalidade de "session" foi removida pois era redundante.
+// O servidor já sabe em qual sala o usuário está via getRoomByUserId().
+// Agora usamos apenas checkActiveGame via socket.
 
 import { useCallback } from 'react';
 
-const SESSION_KEY = 'bangshotSession';
-const RECONNECT_KEY = 'bangshotReconnect';
-const SESSION_EXPIRY_MS = 30 * 60 * 1000; // 30 minutos
+// Chave para dados de reconexão (sessionStorage para maior segurança)
+const RECONNECT_KEY = 'bangshot_reconnect';
+
+// Chaves legadas para limpeza durante migração
+const LEGACY_SESSION_KEY = 'bangshotSession';
+const LEGACY_RECONNECT_KEY = 'bangshotReconnect';
+const LEGACY_SESSION_KEY_NEW = 'bangshot_session';
+
 const RECONNECT_EXPIRY_MS = 5 * 60 * 1000; // 5 minutos
 
+// Interface mantida para compatibilidade (deprecated)
 export interface GameSession {
   roomCode: string;
   playerName: string;
@@ -24,11 +33,11 @@ export interface ReconnectData {
 }
 
 export interface UseGameSessionReturn {
-  /** Salvar sessão do jogo */
+  /** @deprecated Session não é mais usado - servidor gerencia via socket */
   saveSession: (session: Omit<GameSession, 'timestamp'>) => void;
-  /** Obter sessão salva (null se expirada ou inexistente) */
+  /** @deprecated Session não é mais usado - use checkActiveGame via socket */
   getSession: () => GameSession | null;
-  /** Limpar sessão */
+  /** @deprecated Session não é mais usado */
   clearSession: () => void;
   /** Salvar dados de reconexão */
   saveReconnectData: (data: Omit<ReconnectData, 'timestamp'>) => void;
@@ -41,64 +50,72 @@ export interface UseGameSessionReturn {
 }
 
 /**
- * Hook para gerenciar sessão do jogo no localStorage
- * Centraliza lógica de persistência e expiração
+ * Hook para gerenciar reconexão do jogo
  *
- * @example
- * function WaitingRoom() {
- *   const { saveSession, getSession, clearSession } = useGameSession();
+ * NOTA: As funções de "session" estão deprecated e são noop.
+ * O servidor usa getRoomByUserId() para saber se o usuário está em uma sala.
+ * O cliente usa checkActiveGame via socket ao montar o componente.
  *
- *   // Salvar ao entrar na sala
- *   saveSession({ roomCode: 'ABC123', playerName: 'Player1', isHost: true });
- *
- *   // Verificar sessão anterior
- *   const session = getSession();
- *   if (session) {
- *     // Reconectar...
- *   }
- * }
+ * Apenas os dados de reconexão (reconnectToken) são mantidos para
+ * permitir reconexão após F5/refresh durante o jogo.
  */
 export function useGameSession(): UseGameSessionReturn {
-  const saveSession = useCallback((session: Omit<GameSession, 'timestamp'>) => {
-    localStorage.setItem(SESSION_KEY, JSON.stringify({
-      ...session,
-      timestamp: Date.now(),
-    }));
+  // ============================================
+  // DEPRECATED: Funções de session são noop
+  // O servidor é a fonte da verdade via getRoomByUserId()
+  // ============================================
+
+  const saveSession = useCallback((_session: Omit<GameSession, 'timestamp'>) => {
+    // Noop - servidor gerencia via getRoomByUserId()
+    // Apenas limpar chaves antigas se existirem
+    localStorage.removeItem(LEGACY_SESSION_KEY);
+    localStorage.removeItem(LEGACY_SESSION_KEY_NEW);
   }, []);
 
   const getSession = useCallback((): GameSession | null => {
-    const saved = localStorage.getItem(SESSION_KEY);
-    if (!saved) return null;
-
-    try {
-      const session: GameSession = JSON.parse(saved);
-
-      // Verificar expiração
-      if (Date.now() - session.timestamp > SESSION_EXPIRY_MS) {
-        localStorage.removeItem(SESSION_KEY);
-        return null;
-      }
-
-      return session;
-    } catch {
-      localStorage.removeItem(SESSION_KEY);
-      return null;
-    }
+    // Sempre retorna null - use checkActiveGame via socket
+    // Limpar chaves antigas se existirem
+    localStorage.removeItem(LEGACY_SESSION_KEY);
+    localStorage.removeItem(LEGACY_SESSION_KEY_NEW);
+    return null;
   }, []);
 
   const clearSession = useCallback(() => {
-    localStorage.removeItem(SESSION_KEY);
+    // Limpar chaves antigas que possam existir
+    localStorage.removeItem(LEGACY_SESSION_KEY);
+    localStorage.removeItem(LEGACY_SESSION_KEY_NEW);
   }, []);
 
+  // ============================================
+  // RECONNECT: Funções ativas para reconexão
+  // ============================================
+
   const saveReconnectData = useCallback((data: Omit<ReconnectData, 'timestamp'>) => {
-    localStorage.setItem(RECONNECT_KEY, JSON.stringify({
+    // Usar sessionStorage para segurança (expira ao fechar aba)
+    sessionStorage.setItem(RECONNECT_KEY, JSON.stringify({
       ...data,
       timestamp: Date.now(),
     }));
+    // Limpar localStorage antigo se existir
+    localStorage.removeItem(RECONNECT_KEY);
+    localStorage.removeItem(LEGACY_RECONNECT_KEY);
   }, []);
 
   const getReconnectData = useCallback((): ReconnectData | null => {
-    const saved = localStorage.getItem(RECONNECT_KEY);
+    // Tentar sessionStorage primeiro (novo)
+    let saved = sessionStorage.getItem(RECONNECT_KEY);
+
+    // Migração: se não encontrou em sessionStorage, tentar localStorage (antigo)
+    if (!saved) {
+      saved = localStorage.getItem(RECONNECT_KEY) || localStorage.getItem(LEGACY_RECONNECT_KEY);
+      if (saved) {
+        // Migrar para sessionStorage e limpar localStorage
+        sessionStorage.setItem(RECONNECT_KEY, saved);
+        localStorage.removeItem(RECONNECT_KEY);
+        localStorage.removeItem(LEGACY_RECONNECT_KEY);
+      }
+    }
+
     if (!saved) return null;
 
     try {
@@ -106,24 +123,31 @@ export function useGameSession(): UseGameSessionReturn {
 
       // Verificar expiração
       if (Date.now() - data.timestamp > RECONNECT_EXPIRY_MS) {
-        localStorage.removeItem(RECONNECT_KEY);
+        sessionStorage.removeItem(RECONNECT_KEY);
         return null;
       }
 
       return data;
     } catch {
-      localStorage.removeItem(RECONNECT_KEY);
+      sessionStorage.removeItem(RECONNECT_KEY);
       return null;
     }
   }, []);
 
   const clearReconnectData = useCallback(() => {
+    sessionStorage.removeItem(RECONNECT_KEY);
+    // Limpar chaves antigas também
     localStorage.removeItem(RECONNECT_KEY);
+    localStorage.removeItem(LEGACY_RECONNECT_KEY);
   }, []);
 
   const clearAll = useCallback(() => {
-    localStorage.removeItem(SESSION_KEY);
+    // Limpar todas as chaves (novas e antigas)
+    sessionStorage.removeItem(RECONNECT_KEY);
     localStorage.removeItem(RECONNECT_KEY);
+    localStorage.removeItem(LEGACY_SESSION_KEY);
+    localStorage.removeItem(LEGACY_SESSION_KEY_NEW);
+    localStorage.removeItem(LEGACY_RECONNECT_KEY);
   }, []);
 
   return {

@@ -6,14 +6,23 @@
 /** Token de autenticação */
 export const AUTH_TOKEN_KEY = 'bangshot_auth_token';
 
-/** Sessão do jogo (sala atual) */
-export const SESSION_KEY = 'bangshotSession';
+/**
+ * @deprecated Session não é mais usado - servidor gerencia via getRoomByUserId()
+ * Mantido apenas para limpeza de dados legados
+ */
+export const SESSION_KEY = 'bangshot_session';
+export const LEGACY_SESSION_KEY = 'bangshotSession';
 
-/** Dados de reconexão ao jogo */
-export const RECONNECT_KEY = 'bangshotReconnect';
+/**
+ * Dados de reconexão ao jogo (agora em sessionStorage para maior segurança)
+ */
+export const RECONNECT_KEY = 'bangshot_reconnect';
+export const LEGACY_RECONNECT_KEY = 'bangshotReconnect';
 
 // ===== Expiration Times =====
-/** Tempo de expiração da sessão (30 minutos) */
+/**
+ * @deprecated Session não é mais usado
+ */
 export const SESSION_EXPIRY_MS = 30 * 60 * 1000;
 
 /** Tempo de expiração dos dados de reconexão (5 minutos) */

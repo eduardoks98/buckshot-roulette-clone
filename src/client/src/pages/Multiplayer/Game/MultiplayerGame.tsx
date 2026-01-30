@@ -219,7 +219,24 @@ export default function MultiplayerGame() {
     if (!socket || !isConnected) return;
     if (reconnectAttemptedRef.current) return;
 
-    const saved = localStorage.getItem('bangshotReconnect');
+    // Helper para limpar todas as chaves de reconexão
+    const clearReconnectData = () => {
+      sessionStorage.removeItem('bangshot_reconnect');
+      localStorage.removeItem('bangshot_reconnect');
+      localStorage.removeItem('bangshotReconnect');
+    };
+
+    // Tentar sessionStorage primeiro (seguro), depois localStorage (migração)
+    let saved = sessionStorage.getItem('bangshot_reconnect');
+    if (!saved) {
+      saved = localStorage.getItem('bangshot_reconnect') || localStorage.getItem('bangshotReconnect');
+      if (saved) {
+        // Migrar para sessionStorage
+        sessionStorage.setItem('bangshot_reconnect', saved);
+        localStorage.removeItem('bangshot_reconnect');
+        localStorage.removeItem('bangshotReconnect');
+      }
+    }
     if (!saved) return;
 
     try {
@@ -227,14 +244,14 @@ export default function MultiplayerGame() {
 
       // Verificar se a sessão não expirou (5 minutos)
       if (Date.now() - data.timestamp > 5 * 60 * 1000) {
-        localStorage.removeItem('bangshotReconnect');
+        clearReconnectData();
         return;
       }
 
       // Verificar se já está na sala com este socket.id
       const alreadyInRoom = players.some(p => p.id === socket.id);
       if (alreadyInRoom) {
-        localStorage.removeItem('bangshotReconnect');
+        clearReconnectData();
         return;
       }
 
@@ -248,7 +265,7 @@ export default function MultiplayerGame() {
         reconnectToken: data.reconnectToken,
       });
     } catch {
-      localStorage.removeItem('bangshotReconnect');
+      clearReconnectData();
     }
   }, [socket, isConnected, players]);
 
@@ -626,8 +643,12 @@ export default function MultiplayerGame() {
       const isWinner = data.winner?.id === myId;
       playGameOver(isWinner);
 
-      localStorage.removeItem('bangshotSession');
+      // Limpar dados de sessão e reconexão (todas as chaves)
+      sessionStorage.removeItem('bangshot_reconnect');
+      localStorage.removeItem('bangshot_reconnect');
       localStorage.removeItem('bangshotReconnect');
+      localStorage.removeItem('bangshot_session');
+      localStorage.removeItem('bangshotSession');
       setGameOverData(data);
       setIsRequestingRematch(false);
     });
@@ -663,6 +684,8 @@ export default function MultiplayerGame() {
       console.log('[Game] Reconectado com sucesso ao jogo:', data.roomCode);
       console.log('[Game] Dados de reconexão:', { turnElapsed: data.turnElapsed, turnStartTime: data.turnStartTime });
       // Limpar dados de reconexão antigos (novo token será enviado pelo servidor)
+      sessionStorage.removeItem('bangshot_reconnect');
+      localStorage.removeItem('bangshot_reconnect');
       localStorage.removeItem('bangshotReconnect');
       setPlayers(data.players);
       setCurrentPlayerId(data.currentPlayer);
@@ -692,19 +715,25 @@ export default function MultiplayerGame() {
     socket.on('reconnectError', (data) => {
       console.log('[Game] Erro ao reconectar:', data.message);
       // Limpar dados de reconexão inválidos
+      sessionStorage.removeItem('bangshot_reconnect');
+      localStorage.removeItem('bangshot_reconnect');
       localStorage.removeItem('bangshotReconnect');
       setMessage(`Erro: ${data.message}`);
     });
 
     // Reconnect credentials
     socket.on('reconnectCredentials', (data: { roomCode: string; playerName: string; reconnectToken: string }) => {
-      localStorage.setItem('bangshotReconnect', JSON.stringify({
+      // Usar sessionStorage para segurança (expira ao fechar aba)
+      sessionStorage.setItem('bangshot_reconnect', JSON.stringify({
         roomCode: data.roomCode,
         playerName: data.playerName,
         reconnectToken: data.reconnectToken,
         timestamp: Date.now(),
       }));
-      console.log('[Game] Credenciais de reconexão salvas:', data.roomCode);
+      // Limpar localStorage antigo
+      localStorage.removeItem('bangshot_reconnect');
+      localStorage.removeItem('bangshotReconnect');
+      console.log('[Game] Credenciais de reconexão salvas (sessionStorage):', data.roomCode);
     });
 
     // Achievements unlocked

@@ -14,6 +14,38 @@ import { logger, LOG_CATEGORIES } from '../services/logger.service';
 
 const gameService = new GameService();
 
+// Set para prevenir chamadas duplicadas de leaveRoom
+// Quando um socket chama leaveRoom, adicionamos ao set por 5 segundos
+const recentLeaveRoomCalls = new Set<string>();
+
+// ==========================================
+// MUTEX PARA PREVENIR RACE CONDITIONS
+// ==========================================
+
+// Lock por userId para operações de sala (previne múltiplas salas ao abrir várias abas)
+const userOperationLocks = new Map<string, Promise<void>>();
+
+async function withUserLock<T>(userId: string, operation: () => Promise<T>): Promise<T> {
+  // Aguardar lock existente (se houver)
+  const existingLock = userOperationLocks.get(userId);
+  if (existingLock) {
+    console.log(`[Lock] Aguardando lock para userId ${userId}`);
+    await existingLock;
+  }
+
+  // Criar novo lock
+  let resolveLock: () => void;
+  const lockPromise = new Promise<void>(resolve => { resolveLock = resolve; });
+  userOperationLocks.set(userId, lockPromise);
+
+  try {
+    return await operation();
+  } finally {
+    resolveLock!();
+    userOperationLocks.delete(userId);
+  }
+}
+
 // Helper to convert Player to PlayerPublicState
 function toPublicPlayer(player: Player): PlayerPublicState {
   return {
@@ -202,7 +234,7 @@ export function setupRoomCallbacks(
       .catch(err => console.error('[DB] Erro ao deletar jogo após grace period:', err));
     // Notificar todos os clientes que a sala foi deletada
     io.emit('roomDeleted', { code: roomCode });
-    console.log(`[Room] Sala ${roomCode} deletada após grace period de 60s`);
+    console.log(`[Room] Sala ${roomCode} deletada após grace period de 5s`);
   };
 
   // Callback quando jogador desconecta temporariamente na WaitingRoom (F5)
@@ -254,38 +286,90 @@ export function registerRoomHandlers(
     try {
       const userData = socketUserMap.get(socket.id);
 
-      // Validação por userId: se usuário está logado, verificar se já está em algum jogo
+      // DEBUG: Log para identificar problema de múltiplas salas
+      console.log(`[CreateRoom] ========== INICIO ==========`);
+      console.log(`[CreateRoom] socket.id: ${socket.id}`);
+      console.log(`[CreateRoom] playerName: ${playerName}`);
+      console.log(`[CreateRoom] userData:`, userData ? { odUserId: userData.odUserId, displayName: userData.displayName } : 'undefined');
+
+      // Se usuário autenticado, usar lock para prevenir race condition de múltiplas abas
       if (userData?.odUserId) {
-        const existingByUserId = roomService.getRoomByUserId(userData.odUserId);
-        if (existingByUserId) {
-          // Já está em um jogo - emitir evento para redirecionar
-          socket.emit('alreadyInGame', {
-            roomCode: existingByUserId.code,
-            gameStarted: existingByUserId.room.started,
+        await withUserLock(userData.odUserId, async () => {
+          // Verificar DENTRO do lock se já está em algum jogo
+          const existingByUserId = roomService.getRoomByUserId(userData.odUserId);
+          console.log(`[CreateRoom] getRoomByUserId(${userData.odUserId}) [com lock]:`, existingByUserId ? { code: existingByUserId.code, started: existingByUserId.room.started, playerDisconnected: existingByUserId.player.disconnected } : 'null');
+
+          if (existingByUserId) {
+            // Já está em um jogo - emitir evento para redirecionar
+            socket.emit('alreadyInGame', {
+              roomCode: existingByUserId.code,
+              gameStarted: existingByUserId.room.started,
+            });
+            console.log(`[CreateRoom] BLOQUEADO por userId (com lock) - já em ${existingByUserId.code}`);
+            return;
+          }
+
+          console.log(`[CreateRoom] Verificações passaram (com lock) - criando sala...`);
+
+          // Criar sala DENTRO do lock
+          const result = roomService.createRoom(socket.id, playerName, password, userData.odUserId);
+
+          socket.join(result.room.code);
+
+          // Persistir no banco de dados
+          gamePersistenceService.createGame({
+            roomCode: result.room.code,
+            hostUserId: userData.odUserId,
+            hostGuestName: undefined,
+            hostSocketId: socket.id,
+            hasPassword: !!password,
+          }).catch(err => console.error('[DB] Erro ao criar jogo:', err));
+
+          socket.emit('roomCreated', {
+            code: result.room.code,
+            players: result.players,
+            isHost: true,
+            hasPassword: !!password,
           });
-          console.log(`[Room] ${playerName} (userId: ${userData.odUserId}) já está em ${existingByUserId.code} - emitindo alreadyInGame`);
-          return;
-        }
+
+          // Notificar todos os clientes que uma nova sala foi criada
+          io.emit('roomListUpdated');
+
+          logger.info(LOG_CATEGORIES.ROOM, `Sala criada: ${result.room.code}`, {
+            roomCode: result.room.code,
+            socketId: socket.id,
+            playerName,
+            userId: userData.odUserId,
+            hasPassword: !!password,
+          });
+        });
+        return; // Importante: sair após o lock (operação já concluída dentro do callback)
       }
+
+      // Fallback para guests (sem odUserId) - sem lock necessário
+      console.log(`[CreateRoom] WARN: userData não tem odUserId - verificação por userId PULADA!`);
 
       // Validação por socket.id (fallback para guests)
       const existingRoom = roomService.getRoomByPlayer(socket.id);
+      console.log(`[CreateRoom] getRoomByPlayer(${socket.id}):`, existingRoom ? existingRoom.code : 'null');
       if (existingRoom) {
         socket.emit('joinError', `Você já está na sala ${existingRoom.code}. Saia primeiro.`);
-        console.log(`[Room] ${playerName} tentou criar sala mas já está em ${existingRoom.code}`);
+        console.log(`[CreateRoom] BLOQUEADO por socketId - já em ${existingRoom.code}`);
         return;
       }
 
-      const result = roomService.createRoom(socket.id, playerName, password, userData?.odUserId);
+      console.log(`[CreateRoom] Verificações passaram - criando sala...`);
+
+      const result = roomService.createRoom(socket.id, playerName, password);
 
       socket.join(result.room.code);
 
       // Persistir no banco de dados
       gamePersistenceService.createGame({
         roomCode: result.room.code,
-        hostUserId: userData?.odUserId,
-        hostGuestName: userData ? undefined : playerName,
-        hostSocketId: socket.id,  // Socket ID do host
+        hostUserId: undefined,
+        hostGuestName: playerName,
+        hostSocketId: socket.id,
         hasPassword: !!password,
       }).catch(err => console.error('[DB] Erro ao criar jogo:', err));
 
@@ -303,7 +387,7 @@ export function registerRoomHandlers(
         roomCode: result.room.code,
         socketId: socket.id,
         playerName,
-        userId: userData?.odUserId,
+        userId: undefined,
         hasPassword: !!password,
       });
     } catch (error) {
@@ -413,6 +497,15 @@ export function registerRoomHandlers(
   // ==========================================
   socket.on('leaveRoom', () => {
     try {
+      // Prevenir chamadas duplicadas (ex: componente remonta, múltiplos eventos)
+      if (recentLeaveRoomCalls.has(socket.id)) {
+        console.log(`[Room] leaveRoom duplicado ignorado para socket ${socket.id}`);
+        socket.emit('leftRoom'); // Ainda emitir para o cliente não ficar travado
+        return;
+      }
+      recentLeaveRoomCalls.add(socket.id);
+      setTimeout(() => recentLeaveRoomCalls.delete(socket.id), 5000);
+
       const result = roomService.leaveRoom(socket.id);
 
       if (result) {
@@ -447,8 +540,8 @@ export function registerRoomHandlers(
               .catch(err => console.error('[DB] Erro ao deletar jogo:', err));
             io.emit('roomDeleted', { code: result.code });
           } else if (result.gracePeriodStarted) {
-            // Sala vazia em waiting room - grace period iniciado (60s)
-            console.log(`[Room] Sala ${result.code} em grace period de 60s`);
+            // Sala vazia em waiting room - grace period iniciado (5s)
+            console.log(`[Room] Sala ${result.code} em grace period de 5s`);
             io.emit('roomListUpdated');
           } else {
             // Sala ainda tem jogadores

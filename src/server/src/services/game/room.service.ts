@@ -307,6 +307,35 @@ export class RoomService {
       };
     }
 
+    // FIX: Verificar se mesmo usuário já está na sala (por odUserId) - evita duplicatas
+    // Isso acontece quando reconecta antes do handleDisconnect marcar disconnected: true
+    console.log(`[Room] joinRoom DEBUG - odUserId: ${odUserId}, players:`, room.players.map(p => ({ id: p.id, odUserId: p.odUserId, disconnected: p.disconnected })));
+    if (odUserId) {
+      const existingByUserId = room.players.find(
+        p => p.odUserId === odUserId && !p.disconnected
+      );
+      console.log(`[Room] joinRoom DEBUG - existingByUserId:`, existingByUserId ? { id: existingByUserId.id, odUserId: existingByUserId.odUserId } : 'null');
+
+      if (existingByUserId) {
+        // Mesmo usuário já na sala com outro socket - atualizar socket ID
+        const oldSocketId = existingByUserId.id;
+        existingByUserId.id = socketId;
+
+        if (room.host === oldSocketId) {
+          room.host = socketId;
+        }
+
+        console.log(`[Room] Jogador ${playerName} reconectou (odUserId match) - socket ${oldSocketId} -> ${socketId}`);
+        this.onPlayerReconnected?.(code, oldSocketId, socketId, playerName);
+
+        return {
+          room,
+          players: room.players.map(p => this.toPublicPlayer(p)),
+          isReconnect: true,
+        };
+      }
+    }
+
     // Verificar se sala está cheia (contando apenas jogadores NÃO-desconectados como ocupando vagas)
     const activePlayersCount = room.players.filter(p => !p.disconnected).length;
     if (activePlayersCount >= GAME_RULES.MAX_PLAYERS) {

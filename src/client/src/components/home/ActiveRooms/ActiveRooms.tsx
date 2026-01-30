@@ -23,7 +23,8 @@ export function ActiveRooms() {
 
   // Hooks customizados
   useAutoConnect();
-  const { saveSession, clearSession, getSession } = useGameSession();
+  // Nota: saveSession e getSession são deprecated (noop) - servidor gerencia via socket
+  const { clearSession } = useGameSession();
   const {
     listRooms,
     createRoom,
@@ -61,11 +62,7 @@ export function ActiveRooms() {
   const handleRoomCreated = useCallback((data: RoomCreatedPayload) => {
     console.log('Sala criada:', data.code);
     setCreating(false);
-    saveSession({
-      roomCode: data.code,
-      playerName: user?.display_name || '',
-      isHost: data.isHost,
-    });
+    // Nota: session não é mais salva no cliente - servidor gerencia via getRoomByUserId()
     navigate('/multiplayer/room', {
       state: {
         roomCode: data.code,
@@ -73,17 +70,13 @@ export function ActiveRooms() {
         players: data.players,
       },
     });
-  }, [navigate, saveSession, user?.display_name]);
+  }, [navigate]);
 
   const handleRoomJoined = useCallback((data: RoomJoinedPayload) => {
     console.log('Entrou na sala:', data.code);
     setJoining(false);
     setShowPasswordModal(false);
-    saveSession({
-      roomCode: data.code,
-      playerName: user?.display_name || '',
-      isHost: data.isHost,
-    });
+    // Nota: session não é mais salva no cliente - servidor gerencia via getRoomByUserId()
     navigate('/multiplayer/room', {
       state: {
         roomCode: data.code,
@@ -91,7 +84,7 @@ export function ActiveRooms() {
         players: data.players,
       },
     });
-  }, [navigate, saveSession, user?.display_name]);
+  }, [navigate]);
 
   const handleJoinError = useCallback((message: string) => {
     setJoining(false);
@@ -115,12 +108,12 @@ export function ActiveRooms() {
   }, [clearSession]);
 
   const handleRoomDeleted = useCallback((data: { code: string }) => {
-    const session = getSession();
-    if (session && session.roomCode === data.code) {
-      clearSession();
-    }
+    // Limpar activeGame state se for a mesma sala
+    setActiveGame(prev => prev?.roomCode === data.code ? null : prev);
+    // Limpar qualquer dado de sessão legado
+    clearSession();
     listRooms();
-  }, [clearSession, getSession, listRooms]);
+  }, [clearSession, listRooms]);
 
   const handleLeftRoom = useCallback(() => {
     clearSession();
@@ -196,11 +189,16 @@ export function ActiveRooms() {
       setJoinError('Voce precisa estar conectado');
       return;
     }
+    // Se já está em uma sala, não permitir criar outra
+    if (activeGame) {
+      setJoinError(`Voce ja esta na sala ${activeGame.roomCode}`);
+      return;
+    }
     clearSession();
     setCreating(true);
     setJoinError('');
     createRoom(user.display_name);
-  }, [isConnected, user, clearSession, createRoom]);
+  }, [isConnected, user, activeGame, clearSession, createRoom]);
 
   // Entrar em sala da lista
   const handleJoinRoom = useCallback((code: string, hasPassword: boolean) => {
@@ -384,7 +382,7 @@ export function ActiveRooms() {
         <button
           className="btn-primary btn-create-room"
           onClick={handleCreateRoom}
-          disabled={creating || joining || !isConnected || !user}
+          disabled={creating || joining || !isConnected || !user || !!activeGame}
         >
           <PlusIcon size={16} />
           {creating ? 'Criando...' : 'Criar Sala'}

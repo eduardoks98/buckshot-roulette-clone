@@ -59,9 +59,9 @@ export default function Callback() {
       console.log('[OAuth Callback] Authentication successful');
       setStatus('success');
 
-      // Redirect to multiplayer lobby
+      // Redirect to home page (user can then click "Multiplayer" to go to lobby)
       setTimeout(() => {
-        navigate('/multiplayer', { replace: true });
+        navigate('/', { replace: true });
       }, 500);
     };
 
@@ -83,7 +83,7 @@ export default function Callback() {
           <>
             <div className="callback-success">✓</div>
             <h2>Login realizado!</h2>
-            <p>Redirecionando para o jogo...</p>
+            <p>Redirecionando...</p>
           </>
         )}
 

@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { initiateOAuthLogin } from '../services/oauth.service';
+import { initiateOAuthLogin, clearPKCEValues } from '../services/oauth.service';
 
 // ==========================================
 // TYPES
@@ -216,6 +216,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       console.error('Erro ao fazer logout:', error);
     } finally {
       localStorage.removeItem(TOKEN_KEY);
+      clearPKCEValues(); // Limpar valores PKCE do sessionStorage
       setUser(null);
     }
   };
