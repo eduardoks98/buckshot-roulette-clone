@@ -1,5 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { initiateOAuthLogin } from '../services/oauth.service';
+import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 
 // ==========================================
 // TYPES
@@ -7,28 +6,31 @@ import { initiateOAuthLogin } from '../services/oauth.service';
 
 export type OAuthProvider = 'google' | 'facebook' | 'discord';
 
-interface User {
+interface GameUser {
   id: string;
+  sub?: string;
   email: string;
   username: string;
   display_name: string;
+  nickname?: string;
   avatar_url: string | null;
+  elo_rating: number;
+  rank: string;
+  is_admin: boolean;
+}
+
+interface User extends GameUser {
   games_played: number;
   games_won: number;
   rounds_played: number;
   rounds_won: number;
   total_kills: number;
   total_deaths: number;
-  elo_rating: number;
-  rank: string;
   total_xp: number;
-  is_admin: boolean;
   active_title_id: string | null;
-  // New ranking system
   tier: string;
   division: number | null;
   lp: number;
-  // OAuth providers
   providers?: OAuthProvider[];
 }
 
@@ -38,21 +40,59 @@ export interface AvailableProvider {
   icon: string;
 }
 
-const TOKEN_KEY = 'bangshot_auth_token';
-const SSO_COOKIE_NAME = 'mysys_token';
-const ADMIN_API_URL = import.meta.env.VITE_ADMIN_API_URL || 'https://admin.mysys.shop';
-const GAME_CODE = import.meta.env.VITE_GAME_CODE || 'BANGSHOT';
+// ==========================================
+// CONSTANTS
+// ==========================================
 
-// Helper to get cookie value
+const TOKEN_KEY = 'bangshot_auth_token';
+const COOKIE_NAME = 'mysys_token';
+const AUTH_URL = import.meta.env.VITE_AUTH_URL || 'https://mysys.shop';
+const GAME_CODE = import.meta.env.VITE_GAME_CODE || 'BANGSHOT';
+const SYNC_CHANNEL = 'mysys_auth_sync';
+
+// Reverb WebSocket config
+const REVERB_KEY = import.meta.env.VITE_REVERB_APP_KEY || '';
+const REVERB_HOST = import.meta.env.VITE_REVERB_HOST || 'admin.mysys.shop';
+const REVERB_PORT = import.meta.env.VITE_REVERB_PORT || '8080';
+
+// ==========================================
+// HELPERS
+// ==========================================
+
 function getCookie(name: string): string | null {
   const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
-  return match ? decodeURIComponent(match[2]) : null;
+  return match ? match[2] : null;
 }
 
-// Helper to clear cookie
-function clearCookie(name: string, domain: string) {
-  document.cookie = `${name}=; path=/; domain=${domain}; expires=Thu, 01 Jan 1970 00:00:00 GMT; secure; samesite=lax`;
+function deleteCookie(name: string): void {
+  // Try with domain
+  const hostname = window.location.hostname;
+  const parts = hostname.split('.');
+  const baseDomain = parts.length > 2 ? '.' + parts.slice(-2).join('.') : hostname;
+
+  document.cookie = `${name}=; domain=${baseDomain}; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
+  document.cookie = `${name}=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT`;
 }
+
+function decodeJWT(token: string): GameUser | null {
+  try {
+    const payload = token.split('.')[1];
+    const decoded = atob(payload.replace(/-/g, '+').replace(/_/g, '/'));
+    return JSON.parse(decoded);
+  } catch {
+    return null;
+  }
+}
+
+function isTokenExpired(token: string): boolean {
+  const payload = decodeJWT(token);
+  if (!payload || !(payload as any).exp) return true;
+  return (payload as any).exp * 1000 < Date.now();
+}
+
+// ==========================================
+// CONTEXT TYPES
+// ==========================================
 
 interface AuthContextType {
   user: User | null;
@@ -81,169 +121,231 @@ interface AuthProviderProps {
   children: ReactNode;
 }
 
-function getAuthErrorMessage(errorCode: string): string {
-  const messages: Record<string, string> = {
-    auth_failed: 'Falha na autenticacao. Tente novamente.',
-    no_user: 'Nao foi possivel obter dados do usuario.',
-    session_failed: 'Erro ao criar sessao. Tente novamente.',
-    invalid_state: 'Estado invalido. Tente novamente.',
-    game_not_found: 'Jogo nao encontrado.',
-    no_authorization_code: 'Codigo de autorizacao nao recebido.',
-  };
-  return messages[errorCode] || errorCode || 'Erro de autenticacao. Tente novamente.';
-}
-
 export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null);
+  const [token, setToken] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
-  const [availableProviders, setAvailableProviders] = useState<AvailableProvider[]>([]);
+  const [availableProviders] = useState<AvailableProvider[]>([
+    { id: 'google', name: 'Google', icon: 'google' },
+    { id: 'discord', name: 'Discord', icon: 'discord' },
+    { id: 'facebook', name: 'Facebook', icon: 'facebook' },
+  ]);
 
-  // Fetch available providers on mount
-  useEffect(() => {
-    fetchAvailableProviders();
-  }, []);
-
-  // Check authentication on load
-  useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const tokenFromUrl = urlParams.get('token');
-    const errorFromUrl = urlParams.get('error');
-
-    // Handle token in URL (from OAuth callback)
-    if (tokenFromUrl) {
-      localStorage.setItem(TOKEN_KEY, tokenFromUrl);
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
-
-    if (errorFromUrl) {
-      setAuthError(getAuthErrorMessage(errorFromUrl));
-      window.history.replaceState({}, document.title, window.location.pathname);
-    }
-
-    // SSO is now handled via cookie in checkAuth()
-    checkAuth();
-  }, []);
-
-  const fetchAvailableProviders = async () => {
+  // Fetch full user data from local server
+  const fetchFullUserData = useCallback(async (authToken: string): Promise<User | null> => {
     try {
-      const response = await fetch(`${ADMIN_API_URL}/api/games/${GAME_CODE}/auth/providers`);
-      if (response.ok) {
-        const data = await response.json();
-        setAvailableProviders(data.providers || []);
-      }
-    } catch (error) {
-      console.error('Erro ao buscar providers:', error);
-      // Default to Google if fetch fails
-      setAvailableProviders([{ id: 'google', name: 'Google', icon: 'google' }]);
-    }
-  };
-
-  const getToken = (): string | null => {
-    return localStorage.getItem(TOKEN_KEY);
-  };
-
-  const checkAuth = async () => {
-    // Check for cross-domain SSO cookie first
-    const ssoToken = getCookie(SSO_COOKIE_NAME);
-    const localToken = localStorage.getItem(TOKEN_KEY);
-
-    // If SSO cookie exists but no local token, sync the token
-    if (ssoToken && !localToken) {
-      console.log('[Auth] SSO cookie detected, syncing token');
-      localStorage.setItem(TOKEN_KEY, ssoToken);
-    }
-
-    // If SSO cookie is gone but local token exists, clear local session (logged out from another app)
-    if (!ssoToken && localToken) {
-      console.log('[Auth] SSO cookie gone, clearing local session');
-      localStorage.removeItem(TOKEN_KEY);
-      setIsLoading(false);
-      return;
-    }
-
-    const token = getToken();
-    if (!token) {
-      setIsLoading(false);
-      return;
-    }
-
-    try {
-      // Try local server first for more complete user data
-      const localResponse = await fetch('/api/auth/me', {
+      const response = await fetch('/api/auth/me', {
         headers: {
-          'Authorization': `Bearer ${token}`,
+          'Authorization': `Bearer ${authToken}`,
         },
       });
 
-      if (localResponse.ok) {
-        const data = await localResponse.json();
-        setUser(data.user);
-      } else {
-        // Fallback to Games Admin validation
-        const adminResponse = await fetch(`${ADMIN_API_URL}/api/games/${GAME_CODE}/auth/validate`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ token }),
-        });
-
-        if (adminResponse.ok) {
-          const data = await adminResponse.json();
-          if (data.valid && data.user) {
-            setUser(data.user);
-          } else {
-            localStorage.removeItem(TOKEN_KEY);
-          }
-        } else {
-          localStorage.removeItem(TOKEN_KEY);
-        }
+      if (response.ok) {
+        const data = await response.json();
+        return data.user;
       }
     } catch (error) {
-      console.error('Erro ao verificar autenticacao:', error);
-      localStorage.removeItem(TOKEN_KEY);
-    } finally {
-      setIsLoading(false);
+      console.error('[Auth] Error fetching full user data:', error);
     }
-  };
+    return null;
+  }, []);
 
-  const login = () => {
-    // Use OAuth 2.0 + PKCE flow for secure authentication
-    initiateOAuthLogin();
-  };
+  // Handle user login from token
+  const handleUserLogin = useCallback(async (authToken: string) => {
+    const jwtUser = decodeJWT(authToken);
+    if (!jwtUser) {
+      setUser(null);
+      setToken(null);
+      localStorage.removeItem(TOKEN_KEY);
+      return;
+    }
 
-  const logout = async () => {
-    const token = getToken();
+    // Store token
+    localStorage.setItem(TOKEN_KEY, authToken);
+    setToken(authToken);
+
+    // Try to get full user data from local server
+    const fullUser = await fetchFullUserData(authToken);
+
+    if (fullUser) {
+      setUser(fullUser);
+    } else {
+      // Use JWT data as fallback with defaults
+      const userId = jwtUser.sub || jwtUser.id;
+      setUser({
+        ...jwtUser,
+        id: userId,
+        games_played: 0,
+        games_won: 0,
+        rounds_played: 0,
+        rounds_won: 0,
+        total_kills: 0,
+        total_deaths: 0,
+        total_xp: 0,
+        active_title_id: null,
+        tier: 'BRONZE',
+        division: 4,
+        lp: 0,
+      });
+    }
+  }, [fetchFullUserData]);
+
+  // Initialize auth state
+  useEffect(() => {
+    const initAuth = async () => {
+      // Check for token in URL (after OAuth redirect)
+      const urlParams = new URLSearchParams(window.location.search);
+      const tokenFromUrl = urlParams.get('token');
+      const errorFromUrl = urlParams.get('error');
+
+      if (tokenFromUrl) {
+        // Clean URL
+        window.history.replaceState({}, document.title, window.location.pathname);
+        await handleUserLogin(tokenFromUrl);
+
+        // Broadcast to other tabs
+        try {
+          new BroadcastChannel(SYNC_CHANNEL).postMessage({ type: 'LOGIN' });
+        } catch (e) { /* BroadcastChannel not supported */ }
+
+        setIsLoading(false);
+        return;
+      }
+
+      if (errorFromUrl) {
+        setAuthError(errorFromUrl);
+        window.history.replaceState({}, document.title, window.location.pathname);
+      }
+
+      // Check cookie
+      const cookieToken = getCookie(COOKIE_NAME);
+      if (cookieToken && !isTokenExpired(cookieToken)) {
+        await handleUserLogin(cookieToken);
+        setIsLoading(false);
+        return;
+      }
+
+      // Check localStorage (fallback)
+      const storedToken = localStorage.getItem(TOKEN_KEY);
+      if (storedToken && !isTokenExpired(storedToken)) {
+        await handleUserLogin(storedToken);
+        setIsLoading(false);
+        return;
+      }
+
+      // No valid token
+      setIsLoading(false);
+    };
+
+    initAuth();
+  }, [handleUserLogin]);
+
+  // Tab sync via BroadcastChannel
+  useEffect(() => {
+    if (typeof BroadcastChannel === 'undefined') return;
+
+    const channel = new BroadcastChannel(SYNC_CHANNEL);
+
+    channel.onmessage = (event) => {
+      if (event.data.type === 'LOGIN' || event.data.type === 'LOGOUT') {
+        window.location.reload();
+      }
+    };
+
+    return () => channel.close();
+  }, []);
+
+  // Reverb WebSocket sync
+  useEffect(() => {
+    if (!user?.id || !REVERB_KEY) return;
+
+    // Pusher loaded from CDN in index.html
+    const Pusher = (window as any).Pusher;
+    if (!Pusher) {
+      console.warn('[Reverb] Pusher not loaded from CDN');
+      return;
+    }
+
+    let pusher: any = null;
+    let channel: any = null;
+
     try {
-      // Logout from local server
-      await fetch('/api/auth/logout', {
-        method: 'POST',
-        headers: token ? { 'Authorization': `Bearer ${token}` } : {},
+      pusher = new Pusher(REVERB_KEY, {
+        wsHost: REVERB_HOST,
+        wsPort: parseInt(REVERB_PORT),
+        wssPort: parseInt(REVERB_PORT),
+        forceTLS: true,
+        disableStats: true,
+        enabledTransports: ['ws', 'wss'],
       });
 
-      // Also logout from Games Admin
-      if (token) {
-        await fetch(`${ADMIN_API_URL}/api/games/${GAME_CODE}/auth/logout`, {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}` },
-        }).catch(() => {});
-      }
-    } catch (error) {
-      console.error('Erro ao fazer logout:', error);
-    } finally {
-      localStorage.removeItem(TOKEN_KEY);
-      // Clear SSO cookie
-      clearCookie(SSO_COOKIE_NAME, '.mysys.shop');
-      setUser(null);
-    }
-  };
+      channel = pusher.subscribe('auth.user.' + user.id);
+      channel.bind('auth.sync', (data: { type: string }) => {
+        console.log('[Reverb] Auth sync event:', data);
+        if (data.type === 'LOGIN' || data.type === 'LOGOUT') {
+          // Broadcast to other tabs
+          try {
+            new BroadcastChannel(SYNC_CHANNEL).postMessage({ type: data.type });
+          } catch (e) { /* ignore */ }
+          window.location.reload();
+        }
+      });
 
-  const clearAuthError = () => setAuthError(null);
+      console.log('[Reverb] Connected to channel: auth.user.' + user.id);
+    } catch (error) {
+      console.error('[Reverb] Connection error:', error);
+    }
+
+    return () => {
+      if (channel) {
+        try { channel.unbind_all(); } catch (e) { /* ignore */ }
+      }
+      if (pusher) {
+        try { pusher.disconnect(); } catch (e) { /* ignore */ }
+      }
+    };
+  }, [user?.id]);
+
+  // Redirect to MySys login page
+  const login = useCallback(() => {
+    const returnUrl = encodeURIComponent(window.location.href);
+    window.location.href = `${AUTH_URL}/login?source=${GAME_CODE}&return_url=${returnUrl}`;
+  }, []);
+
+  // Logout
+  const logout = useCallback(async () => {
+    const currentToken = token || localStorage.getItem(TOKEN_KEY);
+
+    // Logout from local server
+    if (currentToken) {
+      try {
+        await fetch('/api/auth/logout', {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${currentToken}` },
+        });
+      } catch (error) {
+        console.error('[Auth] Local logout error:', error);
+      }
+    }
+
+    // Clear state
+    localStorage.removeItem(TOKEN_KEY);
+    deleteCookie(COOKIE_NAME);
+    setUser(null);
+    setToken(null);
+
+    // Broadcast to other tabs
+    try {
+      new BroadcastChannel(SYNC_CHANNEL).postMessage({ type: 'LOGOUT' });
+    } catch (e) { /* BroadcastChannel not supported */ }
+  }, [token]);
+
+  const clearAuthError = useCallback(() => setAuthError(null), []);
 
   const value: AuthContextType = {
     user,
-    token: getToken(),
+    token,
     isAuthenticated: !!user,
     isAdmin: user?.is_admin ?? false,
     isLoading,

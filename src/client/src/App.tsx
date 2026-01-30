@@ -13,7 +13,6 @@ import TermsOfService from './pages/TermsOfService/TermsOfService';
 import CookiePolicy from './pages/CookiePolicy/CookiePolicy';
 import ChangelogPage from './pages/ChangelogPage/ChangelogPage';
 import AudioTest from './pages/AudioTest/AudioTest';
-import Callback from './pages/Auth/Callback';
 import { useSocket } from './context/SocketContext';
 import { SessionInvalidatedModal } from './components/common/SessionInvalidatedModal';
 
@@ -24,7 +23,7 @@ function App() {
 
   return (
     <div className="app">
-      {/* Modal de sessão invalidada (limite de 1 aba) */}
+      {/* Modal de sessao invalidada (limite de 1 aba) */}
       <SessionInvalidatedModal
         isVisible={isSessionInvalidated}
         reason={sessionInvalidatedReason}
@@ -32,7 +31,6 @@ function App() {
 
       <Routes>
         <Route path="/" element={<Home />} />
-        <Route path="/auth/callback" element={<Callback />} />
         <Route path="/lobby" element={<Lobby />} />
         <Route path="/singleplayer" element={<SinglePlayer />} />
         {/* /multiplayer redireciona para /lobby */}

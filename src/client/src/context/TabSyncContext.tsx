@@ -4,7 +4,7 @@
 // Funciona como um Provider - basta envolver o App
 // ==========================================
 
-import { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { createContext, useContext, useState, useEffect, useCallback, useRef, ReactNode } from 'react';
 import { soundManager } from '../audio/SoundManager';
 
 // ==========================================
@@ -138,7 +138,7 @@ export function TabSyncProvider({
 }: TabSyncProviderProps) {
   const [isFocused, setIsFocused] = useState(!document.hidden);
   const [isSyncing, setIsSyncing] = useState(false);
-  const [blurTimestamp, setBlurTimestamp] = useState<number | null>(null);
+  const blurTimestampRef = useRef<number | null>(null);
 
   const handleVisibilityChange = useCallback(() => {
     if (!enabled) return;
@@ -147,7 +147,7 @@ export function TabSyncProvider({
       // Tab lost focus
       console.log('[TabSync] Tab lost focus');
       setIsFocused(false);
-      setBlurTimestamp(Date.now());
+      blurTimestampRef.current = Date.now();
 
       // Stop music if configured
       if (stopMusicOnBlur) {
@@ -158,8 +158,8 @@ export function TabSyncProvider({
       console.log('[TabSync] Tab gained focus');
 
       // Check if should reload
-      if (blurTimestamp && reloadOnFocus) {
-        const timeAway = Date.now() - blurTimestamp;
+      if (blurTimestampRef.current && reloadOnFocus) {
+        const timeAway = Date.now() - blurTimestampRef.current;
 
         if (timeAway >= minBlurTime) {
           console.log(`[TabSync] Was away for ${timeAway}ms, reloading...`);
@@ -174,9 +174,9 @@ export function TabSyncProvider({
       }
 
       setIsFocused(true);
-      setBlurTimestamp(null);
+      blurTimestampRef.current = null;
     }
-  }, [enabled, blurTimestamp, minBlurTime, reloadOnFocus, stopMusicOnBlur]);
+  }, [enabled, minBlurTime, reloadOnFocus, stopMusicOnBlur]);
 
   useEffect(() => {
     if (!enabled) return;
