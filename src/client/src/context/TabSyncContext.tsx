@@ -139,6 +139,20 @@ export function TabSyncProvider({
   const [isFocused, setIsFocused] = useState(!document.hidden);
   const [isSyncing, setIsSyncing] = useState(false);
   const blurTimestampRef = useRef<number | null>(null);
+  const reloadTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const safetyTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup timeouts
+  const clearTimeouts = useCallback(() => {
+    if (reloadTimeoutRef.current) {
+      clearTimeout(reloadTimeoutRef.current);
+      reloadTimeoutRef.current = null;
+    }
+    if (safetyTimeoutRef.current) {
+      clearTimeout(safetyTimeoutRef.current);
+      safetyTimeoutRef.current = null;
+    }
+  }, []);
 
   const handleVisibilityChange = useCallback(() => {
     if (!enabled) return;
@@ -157,6 +171,9 @@ export function TabSyncProvider({
       // Tab gained focus
       console.log('[TabSync] Tab gained focus');
 
+      // Always mark as focused first
+      setIsFocused(true);
+
       // Check if should reload
       if (blurTimestampRef.current && reloadOnFocus) {
         const timeAway = Date.now() - blurTimestampRef.current;
@@ -165,18 +182,28 @@ export function TabSyncProvider({
           console.log(`[TabSync] Was away for ${timeAway}ms, reloading...`);
           setIsSyncing(true);
 
+          // Clear any existing timeouts
+          clearTimeouts();
+
           // Small delay to show loading before reload
-          setTimeout(() => {
+          reloadTimeoutRef.current = setTimeout(() => {
             window.location.reload();
           }, 500);
+
+          // Safety timeout: reset state if reload doesn't happen (e.g., navigation happened)
+          safetyTimeoutRef.current = setTimeout(() => {
+            console.log('[TabSync] Safety timeout - resetting sync state');
+            setIsSyncing(false);
+          }, 3000);
+
+          blurTimestampRef.current = null;
           return;
         }
       }
 
-      setIsFocused(true);
       blurTimestampRef.current = null;
     }
-  }, [enabled, minBlurTime, reloadOnFocus, stopMusicOnBlur]);
+  }, [enabled, minBlurTime, reloadOnFocus, stopMusicOnBlur, clearTimeouts]);
 
   useEffect(() => {
     if (!enabled) return;
@@ -185,8 +212,9 @@ export function TabSyncProvider({
 
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearTimeouts();
     };
-  }, [enabled, handleVisibilityChange]);
+  }, [enabled, handleVisibilityChange, clearTimeouts]);
 
   const showOverlay = enabled && (!isFocused || isSyncing);
   const overlayMessage = isSyncing ? 'Sincronizando...' : 'Jogo pausado';

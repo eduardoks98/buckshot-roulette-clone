@@ -248,7 +248,12 @@ export function AuthProvider({ children }: AuthProviderProps) {
     const channel = new BroadcastChannel(SYNC_CHANNEL);
 
     channel.onmessage = (event) => {
-      if (event.data.type === 'LOGIN' || event.data.type === 'LOGOUT') {
+      if (event.data.type === 'LOGOUT') {
+        console.log('[BroadcastChannel] Logout event - clearing auth state');
+        localStorage.removeItem(TOKEN_KEY);
+        deleteCookie(COOKIE_NAME);
+        window.location.reload();
+      } else if (event.data.type === 'LOGIN') {
         window.location.reload();
       }
     };
@@ -284,10 +289,22 @@ export function AuthProvider({ children }: AuthProviderProps) {
       channel = pusher.subscribe('auth.user.' + user.id);
       channel.bind('auth.sync', (data: { type: string }) => {
         console.log('[Reverb] Auth sync event:', data);
-        if (data.type === 'LOGIN' || data.type === 'LOGOUT') {
+        if (data.type === 'LOGOUT') {
+          // Clear auth state BEFORE reloading to prevent re-authentication
+          console.log('[Reverb] Logout event - clearing auth state');
+          localStorage.removeItem(TOKEN_KEY);
+          deleteCookie(COOKIE_NAME);
+
           // Broadcast to other tabs
           try {
-            new BroadcastChannel(SYNC_CHANNEL).postMessage({ type: data.type });
+            new BroadcastChannel(SYNC_CHANNEL).postMessage({ type: 'LOGOUT' });
+          } catch (e) { /* ignore */ }
+
+          window.location.reload();
+        } else if (data.type === 'LOGIN') {
+          // Broadcast to other tabs and reload
+          try {
+            new BroadcastChannel(SYNC_CHANNEL).postMessage({ type: 'LOGIN' });
           } catch (e) { /* ignore */ }
           window.location.reload();
         }
