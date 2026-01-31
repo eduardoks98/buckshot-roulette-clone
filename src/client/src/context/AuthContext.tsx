@@ -20,6 +20,7 @@ interface GameUser {
 }
 
 interface User extends GameUser {
+  game_user_id?: string;
   games_played: number;
   games_won: number;
   rounds_played: number;
@@ -161,7 +162,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
       return;
     }
 
-    // Store token
+    // Store token temporarily while we validate
     localStorage.setItem(TOKEN_KEY, authToken);
     setToken(authToken);
 
@@ -171,23 +172,14 @@ export function AuthProvider({ children }: AuthProviderProps) {
     if (fullUser) {
       setUser(fullUser);
     } else {
-      // Use JWT data as fallback with defaults
-      const userId = jwtUser.sub || jwtUser.id;
-      setUser({
-        ...jwtUser,
-        id: userId,
-        games_played: 0,
-        games_won: 0,
-        rounds_played: 0,
-        rounds_won: 0,
-        total_kills: 0,
-        total_deaths: 0,
-        total_xp: 0,
-        active_title_id: null,
-        tier: 'BRONZE',
-        division: 4,
-        lp: 0,
-      });
+      // Backend rejected the token - user is no longer logged in
+      // Do NOT use JWT as fallback - if backend says invalid, respect that
+      console.log('[Auth] Backend rejected token, clearing auth state');
+      localStorage.removeItem(TOKEN_KEY);
+      deleteCookie(COOKIE_NAME);
+      setUser(null);
+      setToken(null);
+      return;
     }
   }, [fetchFullUserData]);
 
@@ -286,7 +278,9 @@ export function AuthProvider({ children }: AuthProviderProps) {
         enabledTransports: ['ws', 'wss'],
       });
 
-      channel = pusher.subscribe('auth.user.' + user.id);
+      // Use game_user_id for the channel (MySys broadcasts to game_user_id, not local id)
+      const channelId = user.game_user_id || user.id;
+      channel = pusher.subscribe('auth.user.' + channelId);
       channel.bind('auth.sync', (data: { type: string }) => {
         console.log('[Reverb] Auth sync event:', data);
         if (data.type === 'LOGOUT') {
@@ -310,7 +304,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         }
       });
 
-      console.log('[Reverb] Connected to channel: auth.user.' + user.id);
+      console.log('[Reverb] Connected to channel: auth.user.' + channelId);
     } catch (error) {
       console.error('[Reverb] Connection error:', error);
     }
@@ -323,7 +317,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
         try { pusher.disconnect(); } catch (e) { /* ignore */ }
       }
     };
-  }, [user?.id]);
+  }, [user?.id, user?.game_user_id]);
 
   // Redirect to MySys login page
   const login = useCallback(() => {

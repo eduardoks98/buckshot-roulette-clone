@@ -42,6 +42,7 @@ interface GamesAdminValidateResponse {
 
 interface UserProfile {
   id: string;
+  game_user_id: string | null;
   email: string;
   username: string;
   display_name: string;
@@ -131,6 +132,7 @@ export class AuthService {
 
   /**
    * Validate a Games Admin JWT token and sync/create user locally
+   * Now also validates with MySys API to check if user has logged out
    */
   async validateGamesAdminToken(token: string): Promise<User | null> {
     try {
@@ -155,6 +157,14 @@ export class AuthService {
       // The 'sub' is the game_user_id from Games Admin
       const gameUserId = decoded.sub;
 
+      // CRITICAL: Always validate with MySys API to check if user has logged out
+      // This catches the case where JWT is valid but user has since logged out
+      const isValidWithMySys = await this.validateTokenWithMySys(token);
+      if (!isValidWithMySys) {
+        console.log('[Auth] Token rejected by MySys API (user may have logged out)');
+        return null;
+      }
+
       // Try to find user by game_user_id first
       let user = await prisma.user.findFirst({
         where: { game_user_id: gameUserId },
@@ -170,6 +180,39 @@ export class AuthService {
       // Token is not a valid Games Admin token
       console.error('[Auth] validateGamesAdminToken error:', error instanceof Error ? error.message : error);
       return null;
+    }
+  }
+
+  /**
+   * Validate token with MySys API to check if user is still logged in
+   * Returns false if user has logged out (even if JWT signature is valid)
+   */
+  private async validateTokenWithMySys(token: string): Promise<boolean> {
+    try {
+      const response = await fetch(
+        `${env.GAMES_ADMIN_API_URL}/api/games/${env.GAME_CODE}/auth/validate`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ token }),
+        }
+      );
+
+      if (!response.ok) {
+        console.log('[Auth] MySys API returned error status:', response.status);
+        return false;
+      }
+
+      const data = await response.json() as { valid: boolean };
+      console.log('[Auth] MySys API validation result:', data.valid);
+      return data.valid === true;
+    } catch (error) {
+      console.error('[Auth] Error validating token with MySys:', error);
+      // If we can't reach MySys, fail closed (reject the token)
+      // This is safer than allowing potentially logged-out users
+      return false;
     }
   }
 
@@ -273,6 +316,7 @@ export class AuthService {
 
     return {
       id: user.id,
+      game_user_id: user.game_user_id,
       email: user.email,
       username: user.username,
       display_name: user.display_name,
