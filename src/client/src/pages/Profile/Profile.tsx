@@ -11,7 +11,7 @@ import { PageLayout, InlineAd } from '../../components/layout/PageLayout';
 import XpBar from '../../components/common/XpBar/XpBar';
 import LevelBadge from '../../components/common/LevelBadge/LevelBadge';
 import { LoadingState } from '../../components/common/LoadingState';
-import { LogoutIcon, CheckIcon, XIcon, FireIcon, DamageIcon, Medal1Icon, SkullIcon, TrophyIcon } from '../../components/icons';
+import { LogoutIcon, FireIcon, DamageIcon, SkullIcon, TrophyIcon } from '../../components/icons';
 import { getRankColor, calculateWinRate, calculateKD, formatDate } from '../../utils/helpers';
 import './Profile.css';
 
@@ -321,19 +321,19 @@ export default function Profile() {
               <div className="profile-form__icons">
                 {recentStats.recentForm.slice(0, 10).map((result, i) => (
                   <span key={i} className={`profile-form__icon ${result === 'W' ? 'win' : 'loss'}`} title={result === 'W' ? 'Vitória' : 'Derrota'}>
-                    {result === 'W' ? <CheckIcon size="xs" color="#4ade80" /> : <XIcon size="xs" color="#f87171" />}
+                    {result}
                   </span>
                 ))}
               </div>
             </div>
             <div className="profile-form__streaks">
               <div className="profile-form__streak">
-                <span className="profile-form__streak-value">{recentStats.currentStreak}</span>
                 <span className="profile-form__streak-label"><FireIcon size="xs" color="#f97316" /> Sequência</span>
+                <span className="profile-form__streak-value">{recentStats.currentStreak}</span>
               </div>
               <div className="profile-form__streak">
-                <span className="profile-form__streak-value">{recentStats.bestStreak}</span>
                 <span className="profile-form__streak-label"><TrophyIcon size="xs" color="#fbbf24" /> Recorde</span>
+                <span className="profile-form__streak-value">{recentStats.bestStreak}</span>
               </div>
             </div>
           </div>
@@ -370,7 +370,7 @@ export default function Profile() {
                       style={{ cursor: 'pointer' }}
                     >
                       <div className={`profile-game__position ${isWin ? 'winner' : ''}`}>
-                        {game.position === 1 ? <Medal1Icon size="sm" /> : `#${game.position}`}
+                        {game.position === 1 ? <TrophyIcon size="sm" color="#fbbf24" /> : `#${game.position}`}
                       </div>
                       <div className="profile-game__info">
                         <span className="profile-game__date">{formatDate(game.createdAt)}</span>
@@ -511,7 +511,7 @@ export default function Profile() {
                             className={`participant-row ${p.position === 1 ? 'winner' : ''} ${p.userId === user?.id ? 'is-me' : ''}`}
                           >
                             <span className="p-col p-pos">
-                              {p.position === 1 ? <Medal1Icon size="xs" /> : p.position ? `#${p.position}` : '-'}
+                              {p.position === 1 ? <TrophyIcon size="xs" color="#fbbf24" /> : p.position ? `#${p.position}` : '-'}
                             </span>
                             <span className="p-col p-name">{p.displayName}</span>
                             <span className="p-col p-stat">{p.kills}</span>
