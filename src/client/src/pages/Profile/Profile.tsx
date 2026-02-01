@@ -321,7 +321,7 @@ export default function Profile() {
               <div className="profile-form__icons">
                 {recentStats.recentForm.slice(0, 10).map((result, i) => (
                   <span key={i} className={`profile-form__icon ${result === 'W' ? 'win' : 'loss'}`} title={result === 'W' ? 'Vitória' : 'Derrota'}>
-                    {result}
+                    {result === 'W' ? 'V' : 'D'}
                   </span>
                 ))}
               </div>
