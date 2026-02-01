@@ -4,7 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getRankColor, getRankFromElo } from '../../../utils/helpers';
+import { getRankColor } from '../../../utils/helpers';
 import './MiniLeaderboard.css';
 
 interface LeaderboardEntry {
@@ -12,7 +12,10 @@ interface LeaderboardEntry {
   user_id: string;
   display_name: string;
   avatar_url?: string;
-  elo_rating: number;
+  tier: string;
+  division: number | null;
+  lp: number;
+  displayRank: string;
   games_won: number;
 }
 
@@ -84,9 +87,9 @@ export function MiniLeaderboard() {
                 <span className="leaderboard-entry__name">{player.display_name || 'Jogador'}</span>
                 <span
                   className="leaderboard-entry__elo"
-                  style={{ color: getRankColor(getRankFromElo(player.elo_rating)) }}
+                  style={{ color: getRankColor(player.tier) }}
                 >
-                  {player.elo_rating}
+                  {player.displayRank}
                 </span>
               </div>
             ))}
