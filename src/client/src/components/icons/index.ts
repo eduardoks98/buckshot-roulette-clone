@@ -21,6 +21,9 @@ export * from './ui';
 // Award icons
 export * from './awards';
 
+// Rank icons
+export * from './ranks';
+
 // ==========================================
 // ITEM ICON MAP - For dynamic rendering
 // ==========================================
