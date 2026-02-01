@@ -11,7 +11,7 @@ import PrivacyPolicy from './pages/PrivacyPolicy/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService/TermsOfService';
 import CookiePolicy from './pages/CookiePolicy/CookiePolicy';
 import ChangelogPage from './pages/ChangelogPage/ChangelogPage';
-import AudioTest from './pages/AudioTest/AudioTest';
+import Debug from './pages/Debug/Debug';
 import Preview from './pages/Preview/Preview';
 import { useSocket } from './context/SocketContext';
 import { SessionInvalidatedModal } from './components/common/SessionInvalidatedModal';
@@ -46,10 +46,8 @@ function App() {
         <Route path="/terms" element={<TermsOfService />} />
         <Route path="/cookies" element={<CookiePolicy />} />
         <Route path="/changelog" element={<ChangelogPage />} />
-        {/* AudioTest só disponível em desenvolvimento */}
-        {import.meta.env.DEV && (
-          <Route path="/audio-test" element={<AudioTest />} />
-        )}
+        {/* Debug page - protected by isAdmin check inside component */}
+        <Route path="/debug" element={<Debug />} />
       </Routes>
     </div>
   );

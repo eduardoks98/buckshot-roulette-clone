@@ -15,6 +15,7 @@ export const getRankColor = (rank: string): string => {
     Diamond: '#b9f2ff',
     Master: '#ff6b6b',
     Grandmaster: '#ff4757',
+    Challenger: '#f1c40f',
   };
   return colors[rank] || '#c0c0c0';
 };

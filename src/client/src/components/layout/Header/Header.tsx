@@ -77,10 +77,15 @@ export function Header({ variant = 'full' }: HeaderProps) {
             <span>Ranking</span>
           </button>
           {user?.is_admin && (
-            <button className="app-nav-item app-nav-item--admin" onClick={() => navigate('/admin')}>
+            <a
+              href="https://admin.mysys.shop/admin"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="app-nav-item app-nav-item--admin"
+            >
               <SettingsIcon size={20} />
               <span>Admin</span>
-            </button>
+            </a>
           )}
         </nav>
 
