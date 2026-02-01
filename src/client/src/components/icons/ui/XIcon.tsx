@@ -1,0 +1,28 @@
+import { IconProps, getIconSize, DEFAULT_ICON_COLOR } from '../Icon';
+
+export function XIcon({ size, color = DEFAULT_ICON_COLOR, className, style, title }: IconProps) {
+  const s = getIconSize(size);
+  return (
+    <svg
+      width={s}
+      height={s}
+      viewBox="0 0 24 24"
+      fill="none"
+      className={className}
+      style={style}
+      aria-hidden={!title}
+      role={title ? 'img' : undefined}
+    >
+      {title && <title>{title}</title>}
+      <circle cx="12" cy="12" r="10" fill={color} opacity="0.15" />
+      <circle cx="12" cy="12" r="10" fill="none" stroke={color} strokeWidth="2" />
+      <path
+        d="M8 8l8 8M16 8l-8 8"
+        stroke={color}
+        strokeWidth="2.5"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}

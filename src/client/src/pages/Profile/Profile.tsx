@@ -11,7 +11,7 @@ import { PageLayout, InlineAd } from '../../components/layout/PageLayout';
 import XpBar from '../../components/common/XpBar/XpBar';
 import LevelBadge from '../../components/common/LevelBadge/LevelBadge';
 import { LoadingState } from '../../components/common/LoadingState';
-import { LogoutIcon } from '../../components/icons';
+import { LogoutIcon, CheckIcon, XIcon, FireIcon, DamageIcon, Medal1Icon, SkullIcon, TrophyIcon } from '../../components/icons';
 import { getRankColor, calculateWinRate, calculateKD, formatDate } from '../../utils/helpers';
 import './Profile.css';
 
@@ -317,11 +317,11 @@ export default function Profile() {
         {recentStats && recentStats.recentForm.length > 0 && (
           <div className="profile-form">
             <div className="profile-form__recent">
-              <span className="profile-form__label">Forma Recente</span>
+              <span className="profile-form__label">Últimas Partidas</span>
               <div className="profile-form__icons">
                 {recentStats.recentForm.slice(0, 10).map((result, i) => (
-                  <span key={i} className={`profile-form__icon ${result === 'W' ? 'win' : 'loss'}`}>
-                    {result}
+                  <span key={i} className={`profile-form__icon ${result === 'W' ? 'win' : 'loss'}`} title={result === 'W' ? 'Vitória' : 'Derrota'}>
+                    {result === 'W' ? <CheckIcon size="xs" color="#4ade80" /> : <XIcon size="xs" color="#f87171" />}
                   </span>
                 ))}
               </div>
@@ -329,11 +329,11 @@ export default function Profile() {
             <div className="profile-form__streaks">
               <div className="profile-form__streak">
                 <span className="profile-form__streak-value">{recentStats.currentStreak}</span>
-                <span className="profile-form__streak-label">Atual</span>
+                <span className="profile-form__streak-label"><FireIcon size="xs" color="#f97316" /> Sequência</span>
               </div>
               <div className="profile-form__streak">
                 <span className="profile-form__streak-value">{recentStats.bestStreak}</span>
-                <span className="profile-form__streak-label">Melhor</span>
+                <span className="profile-form__streak-label"><TrophyIcon size="xs" color="#fbbf24" /> Recorde</span>
               </div>
             </div>
           </div>
@@ -361,7 +361,6 @@ export default function Profile() {
               <div className="profile-history__list">
                 {recentGames.map(game => {
                   const isWin = game.position === 1;
-                  const totalPlayers = (game.opponents?.length || 0) + 1;
 
                   return (
                     <div
@@ -371,7 +370,7 @@ export default function Profile() {
                       style={{ cursor: 'pointer' }}
                     >
                       <div className={`profile-game__position ${isWin ? 'winner' : ''}`}>
-                        {game.position === 1 ? '🥇' : game.position === totalPlayers ? `#${game.position}` : `#${game.position}`}
+                        {game.position === 1 ? <Medal1Icon size="sm" /> : `#${game.position}`}
                       </div>
                       <div className="profile-game__info">
                         <span className="profile-game__date">{formatDate(game.createdAt)}</span>
@@ -381,8 +380,8 @@ export default function Profile() {
                         </span>
                       </div>
                       <div className="profile-game__stats">
-                        <span className="profile-game__stat">💀{game.kills}</span>
-                        <span className="profile-game__stat">💥{game.damageDealt}</span>
+                        <span className="profile-game__stat"><SkullIcon size="xs" color="#a1a1aa" /> {game.kills}</span>
+                        <span className="profile-game__stat"><DamageIcon size="xs" color="#a1a1aa" /> {game.damageDealt}</span>
                       </div>
                       {game.lpChange !== null && (
                         <div className={`profile-game__elo ${game.lpChange >= 0 ? 'positive' : 'negative'}`}>
@@ -488,7 +487,7 @@ export default function Profile() {
 
                   {selectedGame.winner && (
                     <div className="game-details-winner">
-                      🏆 Vencedor: <strong>{selectedGame.winner.displayName}</strong>
+                      <TrophyIcon size="sm" color="#fbbf24" /> Vencedor: <strong>{selectedGame.winner.displayName}</strong>
                     </div>
                   )}
 
@@ -512,7 +511,7 @@ export default function Profile() {
                             className={`participant-row ${p.position === 1 ? 'winner' : ''} ${p.userId === user?.id ? 'is-me' : ''}`}
                           >
                             <span className="p-col p-pos">
-                              {p.position === 1 ? '🥇' : p.position ? `#${p.position}` : '-'}
+                              {p.position === 1 ? <Medal1Icon size="xs" /> : p.position ? `#${p.position}` : '-'}
                             </span>
                             <span className="p-col p-name">{p.displayName}</span>
                             <span className="p-col p-stat">{p.kills}</span>
