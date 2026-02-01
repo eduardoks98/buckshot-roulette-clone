@@ -25,7 +25,7 @@ import { BugReportModal, GameStateForReport } from '../../../components/common/B
 import { AchievementToast } from '../../../components/common';
 import { GameBoard, GameBoardRef, GamePlayer, GameItem, ShotResult, RoundAnnouncement, StealModalData, ItemActionModal, TurnDirection } from '../../../components/game';
 import { InterstitialAd, VideoRewardedAd } from '../../../components/ads';
-import { AWARD_ICONS } from '../../../components/icons';
+import { AWARD_ICONS, RankIcon } from '../../../components/icons';
 import { useSounds } from '../../../audio';
 import './MultiplayerGame.css';
 
@@ -1248,12 +1248,12 @@ export default function MultiplayerGame() {
                           {/* Promoção/Rebaixamento */}
                           {myXpResult.promoted && (
                             <div className="rank-event promotion">
-                              🎉 Promovido para {myXpResult.displayRank}!
+                              <RankIcon tier={myXpResult.newTier || 'Bronze'} size="sm" /> Promovido para {myXpResult.displayRank}!
                             </div>
                           )}
                           {myXpResult.demoted && (
                             <div className="rank-event demotion">
-                              📉 Rebaixado para {myXpResult.displayRank}
+                              <RankIcon tier={myXpResult.newTier || 'Bronze'} size="sm" /> Rebaixado para {myXpResult.displayRank}
                             </div>
                           )}
 
@@ -1264,7 +1264,7 @@ export default function MultiplayerGame() {
 
                           {/* ELO Progress Bar */}
                           <div className="elo-progress-container">
-                            <span className="rank-badge">{myXpResult.displayRank}</span>
+                            <span className="rank-badge"><RankIcon tier={myXpResult.newTier || 'Bronze'} size="xs" /> {myXpResult.displayRank}</span>
                             <div className="elo-bar">
                               <div
                                 className="elo-fill"

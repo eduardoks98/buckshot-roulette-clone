@@ -17,6 +17,7 @@ import {
   LeaderboardIcon,
   SettingsIcon,
   BugIcon,
+  RankIcon,
 } from '../../icons';
 import './Header.css';
 
@@ -124,6 +125,7 @@ export function Header({ variant = 'full' }: HeaderProps) {
             <div className="app-header__user-info">
               <span className="app-header__username">{user?.display_name}</span>
               <span className="app-header__rank" style={{ color: getRankColor(user?.tier || '') }}>
+                <RankIcon tier={user?.tier || 'Bronze'} size="xs" />
                 {user?.tier}{user?.division ? ` ${['', 'I', 'II', 'III', 'IV'][user.division]}` : ''}
               </span>
             </div>

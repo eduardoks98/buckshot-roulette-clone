@@ -11,7 +11,7 @@ import { PageLayout, InlineAd } from '../../components/layout/PageLayout';
 import XpBar from '../../components/common/XpBar/XpBar';
 import LevelBadge from '../../components/common/LevelBadge/LevelBadge';
 import { LoadingState } from '../../components/common/LoadingState';
-import { LogoutIcon, FireIcon, DamageIcon, SkullIcon, TrophyIcon } from '../../components/icons';
+import { LogoutIcon, FireIcon, DamageIcon, SkullIcon, TrophyIcon, RankIcon } from '../../components/icons';
 import { getRankColor, calculateWinRate, calculateKD, formatDate } from '../../utils/helpers';
 import './Profile.css';
 
@@ -264,8 +264,9 @@ export default function Profile() {
             </div>
           </div>
           <div className="profile-header__right">
-            <div className="profile-rank" style={{ borderColor: getRankColor(user.tier || user.rank) }}>
-              <span className="profile-rank__value" style={{ color: getRankColor(user.tier || user.rank) }}>
+            <div className="profile-rank" style={{ borderColor: getRankColor(user.tier || 'Bronze') }}>
+              <RankIcon tier={user.tier || 'Bronze'} size="lg" />
+              <span className="profile-rank__value" style={{ color: getRankColor(user.tier || 'Bronze') }}>
                 {displayRank}
               </span>
               <span className="profile-rank__lp">{user.lp || 0} Pontos</span>

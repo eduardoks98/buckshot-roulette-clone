@@ -5,6 +5,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getRankColor } from '../../../utils/helpers';
+import { RankIcon } from '../../icons';
 import './MiniLeaderboard.css';
 
 interface LeaderboardEntry {
@@ -89,7 +90,7 @@ export function MiniLeaderboard() {
                   className="leaderboard-entry__elo"
                   style={{ color: getRankColor(player.tier) }}
                 >
-                  {player.displayRank}
+                  <RankIcon tier={player.tier} size="xs" /> {player.displayRank}
                 </span>
               </div>
             ))}
