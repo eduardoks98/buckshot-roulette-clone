@@ -31,6 +31,14 @@ export function createServer(): { app: Express; httpServer: http.Server } {
     credentials: true,
   }));
 
+  // Allow embedding in iframes from MySys domains
+  app.use((req: Request, res: Response, next: NextFunction) => {
+    // Allow embedding from mysys.shop and its subdomains
+    // Note: X-Frame-Options ALLOW-FROM is deprecated, using CSP frame-ancestors instead
+    res.setHeader('Content-Security-Policy', "frame-ancestors 'self' https://mysys.shop https://*.mysys.shop");
+    next();
+  });
+
   // JSON parser
   app.use(express.json());
 

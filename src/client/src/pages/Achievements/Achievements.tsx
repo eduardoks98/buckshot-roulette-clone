@@ -68,7 +68,7 @@ export default function Achievements() {
   // Redirect if not authenticated
   useEffect(() => {
     if (!authLoading && !isAuthenticated) {
-      navigate('/');
+      navigate('/lobby');
     }
   }, [authLoading, isAuthenticated, navigate]);
 
@@ -127,7 +127,7 @@ export default function Achievements() {
   if (!user) {
     return (
       <div className="achievements-container--login">
-        <button className="back-btn" onClick={() => navigate('/')}>
+        <button className="back-btn" onClick={() => navigate('/lobby')}>
           Voltar
         </button>
         <h1 className="page-title">CONQUISTAS</h1>

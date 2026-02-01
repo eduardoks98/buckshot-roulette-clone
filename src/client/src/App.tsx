@@ -6,13 +6,13 @@ import WaitingRoom from './pages/Multiplayer/WaitingRoom/WaitingRoom';
 import MultiplayerGame from './pages/Multiplayer/Game/MultiplayerGame';
 import Leaderboard from './pages/Leaderboard/Leaderboard';
 import Profile from './pages/Profile/Profile';
-import History from './pages/History/History';
 import Achievements from './pages/Achievements/Achievements';
 import PrivacyPolicy from './pages/PrivacyPolicy/PrivacyPolicy';
 import TermsOfService from './pages/TermsOfService/TermsOfService';
 import CookiePolicy from './pages/CookiePolicy/CookiePolicy';
 import ChangelogPage from './pages/ChangelogPage/ChangelogPage';
 import AudioTest from './pages/AudioTest/AudioTest';
+import Preview from './pages/Preview/Preview';
 import { useSocket } from './context/SocketContext';
 import { SessionInvalidatedModal } from './components/common/SessionInvalidatedModal';
 
@@ -30,6 +30,8 @@ function App() {
       />
 
       <Routes>
+        {/* Preview route for iframe embedding - no UI, just visuals */}
+        <Route path="/preview" element={<Preview />} />
         <Route path="/" element={<Home />} />
         <Route path="/lobby" element={<Lobby />} />
         <Route path="/singleplayer" element={<SinglePlayer />} />
@@ -39,7 +41,6 @@ function App() {
         <Route path="/multiplayer/game" element={<MultiplayerGame />} />
         <Route path="/leaderboard" element={<Leaderboard />} />
         <Route path="/profile" element={<Profile />} />
-        <Route path="/history" element={<History />} />
         <Route path="/achievements" element={<Achievements />} />
         <Route path="/privacy" element={<PrivacyPolicy />} />
         <Route path="/terms" element={<TermsOfService />} />

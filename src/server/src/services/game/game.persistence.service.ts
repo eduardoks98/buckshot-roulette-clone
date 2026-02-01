@@ -81,6 +81,13 @@ interface SaveRoundParams {
 export class GamePersistenceService {
   // Create a new game in database
   async createGame(params: CreateGameParams): Promise<string> {
+    console.log(`[DB] Criando jogo: ${params.roomCode}`, {
+      hostUserId: params.hostUserId,
+      hostGuestName: params.hostGuestName,
+      hostSocketId: params.hostSocketId,
+      hasPassword: params.hasPassword,
+    });
+
     try {
       const game = await prisma.game.create({
         data: {
@@ -98,10 +105,10 @@ export class GamePersistenceService {
         },
       });
 
-      console.log(`[DB] Jogo criado: ${game.id} (${params.roomCode})`);
+      console.log(`[DB] Jogo criado com sucesso: ${game.id} (${params.roomCode})`);
       return game.id;
     } catch (error) {
-      console.error('[DB] Erro ao criar jogo:', error);
+      console.error(`[DB] FALHA ao criar jogo ${params.roomCode}:`, error);
       throw error;
     }
   }
@@ -187,7 +194,27 @@ export class GamePersistenceService {
     const { roomCode, winnerUserId, playerStats } = params;
     const xpResults: PlayerXpResult[] = [];
 
+    console.log(`[DB] Finalizando jogo: ${roomCode}`, {
+      winnerUserId,
+      playerStatsCount: playerStats.length,
+    });
+
     try {
+      // Verificar se jogo existe ANTES de tentar atualizar
+      const existingGame = await prisma.game.findUnique({
+        where: { room_code: roomCode },
+        select: { id: true, status: true },
+      });
+
+      if (!existingGame) {
+        console.error(`[DB] ERRO CRÍTICO: Jogo ${roomCode} não encontrado no banco!`);
+        console.error('[DB] O jogo pode não ter sido criado ou foi deletado prematuramente');
+        console.error('[DB] playerStats:', playerStats.map(s => ({ odId: s.odId, odUserId: s.odUserId })));
+        return null;
+      }
+
+      console.log(`[DB] Jogo encontrado: ${existingGame.id} (status: ${existingGame.status})`);
+
       // Update game status
       const game = await prisma.game.update({
         where: { room_code: roomCode },
@@ -223,7 +250,7 @@ export class GamePersistenceService {
 
       // Coletar MMRs para novo sistema de ranking
       const playersMmrs: number[] = game.game_participants.map(p =>
-        p.user?.mmr_hidden || 800
+        p.user?.mmr_hidden || 0
       );
 
       const totalPlayers = game.game_participants.length;
@@ -291,7 +318,7 @@ export class GamePersistenceService {
             currentTier: participant.user?.tier || 'Bronze',
             currentDivision: participant.user?.division ?? 4,
             currentLp: participant.user?.lp || 0,
-            currentMmr: participant.user?.mmr_hidden || 800,
+            currentMmr: participant.user?.mmr_hidden || 0,
             gamesSincePromo: participant.user?.games_since_promo || 0,
             position: stats.position,
             totalPlayers,
@@ -377,7 +404,7 @@ export class GamePersistenceService {
               division: rankingResult.newDivision,
               lp: rankingResult.newLp,
               mmr_hidden: rankingResult.newMmr,
-              peak_mmr: Math.max(participant.user?.mmr_hidden || 800, rankingResult.newMmr),
+              peak_mmr: Math.max(participant.user?.mmr_hidden || 0, rankingResult.newMmr),
               games_since_promo: newGamesSincePromo,
             },
           });

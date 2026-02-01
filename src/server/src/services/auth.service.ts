@@ -33,6 +33,7 @@ interface GamesAdminValidateResponse {
     email: string;
     username: string;
     display_name: string;
+    nickname?: string;
     avatar_url?: string;
     elo_rating?: number;
     rank?: string;
@@ -165,15 +166,9 @@ export class AuthService {
         return null;
       }
 
-      // Try to find user by game_user_id first
-      let user = await prisma.user.findFirst({
-        where: { game_user_id: gameUserId },
-      });
-
-      if (!user) {
-        // Fetch user data from Games Admin and create locally
-        user = await this.syncUserFromGamesAdmin(token, gameUserId);
-      }
+      // Always sync user data from MySys to ensure display_name and avatar_url are up to date
+      // This ensures nickname changes in MySys are reflected in BangShot
+      const user = await this.syncUserFromGamesAdmin(token, gameUserId);
 
       return user;
     } catch (error) {
@@ -254,7 +249,7 @@ export class AuthService {
           where: { id: user.id },
           data: {
             game_user_id: gameUserId,
-            display_name: adminUser.display_name,
+            display_name: adminUser.nickname || adminUser.display_name,
             avatar_url: adminUser.avatar_url,
             last_login_at: new Date(),
           },
@@ -266,7 +261,7 @@ export class AuthService {
             game_user_id: gameUserId,
             email: adminUser.email,
             username: adminUser.username,
-            display_name: adminUser.display_name,
+            display_name: adminUser.nickname || adminUser.display_name,
             avatar_url: adminUser.avatar_url,
             elo_rating: adminUser.elo_rating || 0,
             rank: adminUser.rank || 'Bronze',

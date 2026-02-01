@@ -496,6 +496,19 @@
   transform: scale(0.95);
 }
 
+/* Jogador morto com itens pode ser alvo de Adrenalina */
+.opponent-card.dead.has-items {
+  cursor: pointer;
+  opacity: 0.6;
+  filter: grayscale(50%);
+}
+
+.opponent-card.dead.has-items:hover {
+  opacity: 0.75;
+  border-color: var(--gold-accent, #d4a418);
+  filter: grayscale(30%);
+}
+
 .opponent-card.damage {
   animation: damage-shake 0.5s ease;
 }
@@ -1844,6 +1857,15 @@
 .item-action-player {
   font-size: 1.1rem;
   color: rgba(255, 255, 255, 0.7);
+}
+
+.item-action-message {
+  margin-top: 0.75rem;
+  font-size: 1rem;
+  color: var(--gold-accent);
+  font-weight: 600;
+  text-align: center;
+  line-height: 1.4;
 }
 
 .item-action-extra {

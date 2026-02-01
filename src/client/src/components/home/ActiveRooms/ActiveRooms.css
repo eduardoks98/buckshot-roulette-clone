@@ -436,6 +436,77 @@
   cursor: not-allowed;
 }
 
+/* ==========================================
+   CREATE ROOM MODAL - Toggle de senha
+   ========================================== */
+
+.create-room__option {
+  margin-bottom: 1rem;
+}
+
+.create-room__toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  cursor: pointer;
+  padding: 0.75rem;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  transition: all 0.2s;
+}
+
+.create-room__toggle:hover {
+  border-color: rgba(212, 164, 24, 0.3);
+}
+
+.create-room__toggle input[type="checkbox"] {
+  display: none;
+}
+
+.create-room__toggle-slider {
+  width: 44px;
+  height: 24px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  position: relative;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+
+.create-room__toggle-slider::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  background: rgba(255, 255, 255, 0.6);
+  border-radius: 50%;
+  transition: all 0.2s;
+}
+
+.create-room__toggle input:checked + .create-room__toggle-slider {
+  background: rgba(212, 164, 24, 0.4);
+}
+
+.create-room__toggle input:checked + .create-room__toggle-slider::after {
+  left: 22px;
+  background: var(--gold-accent, #d4a418);
+}
+
+.create-room__toggle-label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: rgba(255, 255, 255, 0.8);
+  font-size: 0.9rem;
+}
+
+.create-room__toggle input:checked ~ .create-room__toggle-label {
+  color: var(--gold-accent, #d4a418);
+}
+
 /* Disabled button state */
 .btn-primary:disabled,
 .btn-secondary:disabled,

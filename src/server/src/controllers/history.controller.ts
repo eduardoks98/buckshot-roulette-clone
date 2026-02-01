@@ -59,6 +59,7 @@ export const getUserHistory = async (req: Request, res: Response) => {
       shotsFired: game.shots_fired,
       itemsUsed: game.items_used,
       eloChange: game.elo_change,
+      lpChange: game.lp_change,
       xpEarned: game.xp_earned,
       opponents: game.opponents.map(opp => ({
         displayName: opp.display_name,
@@ -143,6 +144,7 @@ export const getGameDetails = async (req: Request, res: Response) => {
       shotsFired: details.shots_fired,
       itemsUsed: details.items_used,
       eloChange: details.elo_change,
+      lpChange: details.lp_change,
       xpEarned: details.xp_earned,
       winner: details.winner ? {
         id: details.winner.id,
@@ -161,6 +163,7 @@ export const getGameDetails = async (req: Request, res: Response) => {
         shotsFired: p.shots_fired,
         itemsUsed: p.items_used,
         eloChange: p.elo_change,
+        lpChange: p.lp_change,
         xpEarned: p.xp_earned,
         eloRating: p.elo_rating,
       })),

@@ -279,7 +279,7 @@ export default function AudioTest() {
   }, []);
 
   return (
-    <PageLayout title="Teste de Audio" onBack={() => navigate('/')}>
+    <PageLayout title="Teste de Audio" onBack={() => navigate('/lobby')}>
       <div className="audio-test">
         {/* Controle de Volume Global */}
         <section className="audio-test__section">

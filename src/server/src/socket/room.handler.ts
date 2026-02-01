@@ -248,14 +248,35 @@ export function setupRoomCallbacks(
     console.log(`[Room] ${playerName} desconectou da WaitingRoom ${roomCode} - vaga reservada por 10s`);
   };
 
-  // Callback quando jogador reconecta na WaitingRoom
-  roomService.onPlayerReconnected = (roomCode: string, oldSocketId: string, newSocketId: string, playerName: string) => {
+  // Callback quando jogador reconecta na WaitingRoom ou durante o jogo
+  roomService.onPlayerReconnected = (roomCode: string, oldSocketId: string, newSocketId: string, playerName: string, players: PlayerPublicState[]) => {
     io.to(roomCode).emit('playerReconnected', {
       playerId: oldSocketId,
       newSocketId,
       playerName,
+      players, // Lista atualizada de players com novos socket IDs
     });
-    console.log(`[Room] ${playerName} reconectou na WaitingRoom ${roomCode}`);
+    console.log(`[Room] ${playerName} reconectou na sala ${roomCode} (${oldSocketId} -> ${newSocketId})`);
+  };
+
+  // Callback quando jogo é pausado para reconexão
+  roomService.onGamePaused = (roomCode: string, playerId: string, playerName: string, remainingTime: number) => {
+    io.to(roomCode).emit('gamePaused', {
+      reason: 'disconnect',
+      playerId,
+      playerName,
+      remainingTime,
+    });
+    console.log(`[Room] Jogo ${roomCode} PAUSADO - ${playerName} desconectou`);
+  };
+
+  // Callback quando jogo é retomado após reconexão ou eliminação
+  roomService.onGameResumed = (roomCode: string, reason: 'reconnected' | 'eliminated', playerId: string) => {
+    io.to(roomCode).emit('gameResumed', {
+      reason,
+      playerId,
+    });
+    console.log(`[Room] Jogo ${roomCode} RETOMADO - ${reason}`);
   };
 
   // Callback quando jogador sai definitivamente (após grace period expirar)
@@ -317,13 +338,17 @@ export function registerRoomHandlers(
           socket.join(result.room.code);
 
           // Persistir no banco de dados
-          gamePersistenceService.createGame({
-            roomCode: result.room.code,
-            hostUserId: userData.odUserId,
-            hostGuestName: undefined,
-            hostSocketId: socket.id,
-            hasPassword: !!password,
-          }).catch(err => console.error('[DB] Erro ao criar jogo:', err));
+          try {
+            await gamePersistenceService.createGame({
+              roomCode: result.room.code,
+              hostUserId: userData.odUserId,
+              hostGuestName: undefined,
+              hostSocketId: socket.id,
+              hasPassword: !!password,
+            });
+          } catch (err) {
+            console.error('[DB] Erro ao criar jogo - JOGO NÃO SERÁ SALVO:', err);
+          }
 
           socket.emit('roomCreated', {
             code: result.room.code,
@@ -365,13 +390,17 @@ export function registerRoomHandlers(
       socket.join(result.room.code);
 
       // Persistir no banco de dados
-      gamePersistenceService.createGame({
-        roomCode: result.room.code,
-        hostUserId: undefined,
-        hostGuestName: playerName,
-        hostSocketId: socket.id,
-        hasPassword: !!password,
-      }).catch(err => console.error('[DB] Erro ao criar jogo:', err));
+      try {
+        await gamePersistenceService.createGame({
+          roomCode: result.room.code,
+          hostUserId: undefined,
+          hostGuestName: playerName,
+          hostSocketId: socket.id,
+          hasPassword: !!password,
+        });
+      } catch (err) {
+        console.error('[DB] Erro ao criar jogo (guest) - JOGO NÃO SERÁ SALVO:', err);
+      }
 
       socket.emit('roomCreated', {
         code: result.room.code,
@@ -588,8 +617,12 @@ export function registerRoomHandlers(
       const roundData = gameService.startRound(result.room);
 
       // Persistir no banco de dados
-      gamePersistenceService.startGame(result.room.code)
-        .catch(err => console.error('[DB] Erro ao iniciar jogo:', err));
+      try {
+        await gamePersistenceService.startGame(result.room.code);
+        console.log(`[DB] Jogo iniciado no banco: ${result.room.code}`);
+      } catch (err) {
+        console.error('[DB] Erro ao iniciar jogo no banco:', err);
+      }
 
       // Iniciar sessão de match no games-admin (tracking de tempo)
       const playerSocketIds = result.room.players.map(p => p.id);
@@ -735,10 +768,7 @@ export function registerRoomHandlers(
         });
       }
 
-      io.to(roomCode).emit('playerReconnected', {
-        playerId: socket.id,
-        playerName: playerName,
-      });
+      // playerReconnected já foi emitido pelo callback onPlayerReconnected
 
       // CRÍTICO: Sincronizar TODOS os clientes com o estado atualizado
       // Isso garante que todos vejam o novo socket.id do jogador reconectado
@@ -753,6 +783,7 @@ export function registerRoomHandlers(
         roomCode,
         socketId: socket.id,
         playerName,
+        oldSocketId: result.oldSocketId,
         method: 'attemptReconnect',
       });
     } catch (error) {
@@ -801,11 +832,7 @@ export function registerRoomHandlers(
           });
         }
 
-        // Notificar outros jogadores
-        io.to(roomCode).emit('playerReconnected', {
-          playerId: socket.id,
-          playerName: result.playerName,
-        });
+        // playerReconnected já foi emitido pelo callback onPlayerReconnected
 
         // Sincronizar todos os clientes
         io.to(roomCode).emit('turnChanged', {
@@ -815,7 +842,7 @@ export function registerRoomHandlers(
           turnElapsed: room?.turnStartTime ? Date.now() - room.turnStartTime : 0,
         });
 
-        console.log(`[Room] ${result.playerName} reconectou ao jogo ${roomCode} via rejoinGame`);
+        console.log(`[Room] ${result.playerName} reconectou ao jogo ${roomCode} via rejoinGame (${result.oldSocketId} -> ${socket.id})`);
       } else {
         // WaitingRoom - enviar dados da sala
         const room = roomService.getRoom(roomCode);
@@ -826,11 +853,7 @@ export function registerRoomHandlers(
             isHost: room.host === socket.id,
           });
 
-          // Notificar outros jogadores
-          io.to(roomCode).emit('playerReconnected', {
-            playerId: socket.id,
-            playerName: result.playerName,
-          });
+          // playerReconnected já foi emitido pelo callback onPlayerReconnected
 
           console.log(`[Room] ${result.playerName} reconectou à WaitingRoom ${roomCode} via rejoinGame`);
         }

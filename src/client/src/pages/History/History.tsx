@@ -156,9 +156,9 @@ export default function History() {
     );
   }
 
-  // Not logged in - redirect to home
+  // Not logged in - redirect to lobby
   if (!user) {
-    navigate('/');
+    navigate('/lobby');
     return null;
   }
 

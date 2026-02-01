@@ -96,6 +96,11 @@ interface Room {
   turnTimeout: NodeJS.Timeout | null;
   turnStartTime: number | null;
   firstToDie: number | null;
+  // Pause state for reconnection
+  pausedForReconnect: boolean;
+  pausedPlayerId: string | null;
+  pausedPlayerName: string | null;
+  pauseStartTime: number | null;
 }
 
 interface RoundStartResult {
@@ -152,6 +157,8 @@ interface ItemResult {
   newShells?: ShellInfo;
   itemsDistributed?: { playerId: string; items: Item[] }[]; // Itens distribuídos no reload
   usedImmediately?: boolean; // Adrenalina - item roubado foi usado imediatamente
+  requiresTarget?: boolean; // Adrenalina - item roubado precisa de alvo adicional (handcuffs)
+  validTargets?: { id: string; name: string }[]; // Alvos válidos para item roubado
   players: PlayerPublicState[];
   shellsRemaining: ShellInfo;
 }
@@ -621,8 +628,10 @@ export class GameService {
           return { error: 'Nao pode roubar outra Adrenalina!' };
         }
 
-        // Validar se Handcuffs tem alvos válidos antes de permitir roubo
-        if (itemToSteal.id === 'handcuffs') {
+        // Verificar se item precisa de alvo (handcuffs)
+        const needsTarget = itemToSteal.id === 'handcuffs';
+
+        if (needsTarget && itemToSteal.id === 'handcuffs') {
           // Encontrar alvos válidos para Handcuffs (vivo, não é você, não está algemado, não é imune)
           const validHandcuffTargets = room.players.filter(p =>
             p.id !== userId &&           // Não pode algemar a si mesmo
@@ -634,8 +643,28 @@ export class GameService {
           if (validHandcuffTargets.length === 0) {
             return { error: 'Nao ha alvos validos para as Algemas!' };
           }
+
+          // Roubar o item do alvo
+          const stolenItem = target.items.splice(itemIndex, 1)[0];
+
+          // NÃO adicionar ao inventário - forçar uso imediato
+          // Guardar referência do item roubado para processamento posterior
+          baseResult.targetId = targetId;
+          baseResult.targetName = target.name;
+          baseResult.stolenItem = stolenItem;
+          baseResult.message = `Roubou ${stolenItem.emoji} ${stolenItem.name} de ${target.name}!`;
+          baseResult.usedImmediately = false; // Precisa de ação adicional
+
+          // Retornar que precisa de alvo com lista de alvos válidos
+          (baseResult as ItemResult & { requiresTarget: boolean; validTargets: { id: string; name: string }[] }).requiresTarget = true;
+          (baseResult as ItemResult & { requiresTarget: boolean; validTargets: { id: string; name: string }[] }).validTargets = validHandcuffTargets.map(p => ({ id: p.id, name: p.name }));
+
+          user.stats.adrenalineUses++;
+          user.stats.adrenalineUsesInGame++;
+          break;
         }
 
+        // Item não precisa de alvo - fluxo normal
         // Roubar o item do alvo
         const stolenItem = target.items.splice(itemIndex, 1)[0];
 

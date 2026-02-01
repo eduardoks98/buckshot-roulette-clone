@@ -47,6 +47,9 @@ export function ActiveRooms() {
   const [pendingRoomCode, setPendingRoomCode] = useState('');
   const [activeGame, setActiveGame] = useState<{ roomCode: string; gameStarted: boolean } | null>(null);
   const [isReconnecting, setIsReconnecting] = useState(false);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createPassword, setCreatePassword] = useState('');
+  const [usePassword, setUsePassword] = useState(false);
 
   // Handlers para eventos do lobby
   const handleRoomList = useCallback((data: RoomInfo[]) => {
@@ -183,8 +186,8 @@ export function ActiveRooms() {
     setTimeout(() => setRefreshing(false), 500);
   }, [isConnected, listRooms]);
 
-  // Criar sala diretamente
-  const handleCreateRoom = useCallback(() => {
+  // Abrir modal de criação de sala
+  const handleOpenCreateModal = useCallback(() => {
     if (!isConnected || !user) {
       setJoinError('Voce precisa estar conectado');
       return;
@@ -194,11 +197,31 @@ export function ActiveRooms() {
       setJoinError(`Voce ja esta na sala ${activeGame.roomCode}`);
       return;
     }
+    setShowCreateModal(true);
+    setCreatePassword('');
+    setUsePassword(false);
+    setJoinError('');
+  }, [isConnected, user, activeGame]);
+
+  // Criar sala (com ou sem senha)
+  const handleCreateRoom = useCallback(() => {
+    if (!isConnected || !user) {
+      setJoinError('Voce precisa estar conectado');
+      return;
+    }
     clearSession();
     setCreating(true);
+    setShowCreateModal(false);
     setJoinError('');
-    createRoom(user.display_name);
-  }, [isConnected, user, activeGame, clearSession, createRoom]);
+    createRoom(user.display_name, usePassword ? createPassword : undefined);
+  }, [isConnected, user, clearSession, createRoom, usePassword, createPassword]);
+
+  // Fechar modal de criação
+  const closeCreateModal = useCallback(() => {
+    setShowCreateModal(false);
+    setCreatePassword('');
+    setUsePassword(false);
+  }, []);
 
   // Entrar em sala da lista
   const handleJoinRoom = useCallback((code: string, hasPassword: boolean) => {
@@ -381,7 +404,7 @@ export function ActiveRooms() {
       <div className="active-rooms__actions">
         <button
           className="btn-primary btn-create-room"
-          onClick={handleCreateRoom}
+          onClick={handleOpenCreateModal}
           disabled={creating || joining || !isConnected || !user || !!activeGame}
         >
           <PlusIcon size={16} />
@@ -396,7 +419,7 @@ export function ActiveRooms() {
         </button>
       </div>
 
-      {/* Modal de senha */}
+      {/* Modal de senha para entrar */}
       {showPasswordModal && (
         <div className="password-modal-overlay" onClick={closePasswordModal}>
           <div className="password-modal" onClick={(e) => e.stopPropagation()}>
@@ -423,6 +446,58 @@ export function ActiveRooms() {
                 disabled={joining || !joinPassword}
               >
                 {joining ? 'Entrando...' : 'Entrar'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de criação de sala */}
+      {showCreateModal && (
+        <div className="password-modal-overlay" onClick={closeCreateModal}>
+          <div className="password-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Criar Sala</h3>
+            <p>Configure sua nova sala</p>
+
+            <div className="create-room__option">
+              <label className="create-room__toggle">
+                <input
+                  type="checkbox"
+                  checked={usePassword}
+                  onChange={(e) => setUsePassword(e.target.checked)}
+                />
+                <span className="create-room__toggle-slider"></span>
+                <span className="create-room__toggle-label">
+                  <LockIcon size={14} />
+                  Proteger com senha
+                </span>
+              </label>
+            </div>
+
+            {usePassword && (
+              <input
+                type="password"
+                className="password-modal__input"
+                placeholder="Digite a senha da sala"
+                value={createPassword}
+                onChange={(e) => setCreatePassword(e.target.value)}
+                autoFocus
+              />
+            )}
+
+            <div className="password-modal__actions">
+              <button
+                className="password-modal__cancel"
+                onClick={closeCreateModal}
+              >
+                Cancelar
+              </button>
+              <button
+                className="password-modal__confirm"
+                onClick={handleCreateRoom}
+                disabled={creating || (usePassword && !createPassword)}
+              >
+                {creating ? 'Criando...' : 'Criar Sala'}
               </button>
             </div>
           </div>

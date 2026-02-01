@@ -856,7 +856,7 @@ export default function SinglePlayer() {
           <h1 className="start-title">BANGSHOT</h1>
           <p className="start-subtitle">Single Player vs Dealer</p>
           <button className="start-btn" onClick={startGame}>INICIAR JOGO</button>
-          <button className="back-to-menu-btn" onClick={() => navigate('/')}>← Voltar ao Menu</button>
+          <button className="back-to-menu-btn" onClick={() => navigate('/lobby')}>← Voltar ao Menu</button>
         </div>
       </div>
     );
@@ -926,7 +926,7 @@ export default function SinglePlayer() {
               <button
                 className="back-to-menu-btn"
                 style={{ marginTop: '1rem' }}
-                onClick={() => navigate('/')}
+                onClick={() => navigate('/lobby')}
               >
                 Voltar ao Menu
               </button>
@@ -959,7 +959,7 @@ export default function SinglePlayer() {
         onUseItem={handlePlayerUseItem}
         onStealItem={handleStealItem}
         onCancelSteal={cancelSteal}
-        onBack={() => navigate('/')}
+        onBack={() => navigate('/lobby')}
         onRoundAnnouncementComplete={() => {
           setRoundAnnouncement(null);
           // Spin dramático quando o anúncio do round termina

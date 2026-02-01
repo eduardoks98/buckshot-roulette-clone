@@ -12,7 +12,7 @@ interface PageHeaderProps {
   onBack?: () => void;
 }
 
-export function PageHeader({ title, backTo = '/', onBack }: PageHeaderProps) {
+export function PageHeader({ title, backTo = '/lobby', onBack }: PageHeaderProps) {
   const navigate = useNavigate();
 
   const handleBack = () => {

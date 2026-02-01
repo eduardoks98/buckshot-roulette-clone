@@ -24,17 +24,17 @@ type LeaderboardPeriod = 'daily' | 'weekly' | 'monthly' | 'all_time';
 
 interface LeaderboardEntry {
   rank: number;
-  userId: string;
+  user_id: string;
   username: string;
-  displayName: string;
-  avatarUrl?: string;
-  gamesPlayed: number;
-  gamesWon: number;
-  winRate: number;
-  eloRating: number;
-  eloGain?: number;
-  totalXp?: number;
-  activeTitleId?: string | null;
+  display_name: string;
+  avatar_url?: string;
+  games_played: number;
+  games_won: number;
+  win_rate: number;
+  elo_rating: number;
+  elo_gain?: number;
+  total_xp?: number;
+  active_title_id?: string | null;
   // Novo sistema de ranking
   tier?: string;
   division?: number | null;
@@ -78,39 +78,39 @@ export default function Leaderboard() {
       setEntries([
         {
           rank: 1,
-          userId: '1',
+          user_id: '1',
           username: 'player1',
-          displayName: 'Jogador Pro',
-          gamesPlayed: 150,
-          gamesWon: 120,
-          winRate: 80,
-          eloRating: 1850,
-          eloGain: 150,
-          totalXp: 0,
+          display_name: 'Jogador Pro',
+          games_played: 150,
+          games_won: 120,
+          win_rate: 80,
+          elo_rating: 1850,
+          elo_gain: 150,
+          total_xp: 0,
         },
         {
           rank: 2,
-          userId: '2',
+          user_id: '2',
           username: 'player2',
-          displayName: 'Mestre do Tiro',
-          gamesPlayed: 200,
-          gamesWon: 140,
-          winRate: 70,
-          eloRating: 1720,
-          eloGain: 80,
-          totalXp: 0,
+          display_name: 'Mestre do Tiro',
+          games_played: 200,
+          games_won: 140,
+          win_rate: 70,
+          elo_rating: 1720,
+          elo_gain: 80,
+          total_xp: 0,
         },
         {
           rank: 3,
-          userId: '3',
+          user_id: '3',
           username: 'player3',
-          displayName: 'Lucky Shot',
-          gamesPlayed: 100,
-          gamesWon: 65,
-          winRate: 65,
-          eloRating: 1650,
-          eloGain: 50,
-          totalXp: 0,
+          display_name: 'Lucky Shot',
+          games_played: 100,
+          games_won: 65,
+          win_rate: 65,
+          elo_rating: 1650,
+          elo_gain: 50,
+          total_xp: 0,
         },
       ]);
     } finally {
@@ -179,34 +179,34 @@ export default function Leaderboard() {
           <div className="leaderboard-list">
             {entries.map(entry => (
               <div
-                key={entry.userId}
-                className={`leaderboard-entry ${getRankClass(entry.rank)} ${entry.userId === user?.id ? 'is-me' : ''}`}
+                key={entry.user_id}
+                className={`leaderboard-entry ${getRankClass(entry.rank)} ${entry.user_id === user?.id ? 'is-me' : ''}`}
               >
                 <div className="entry-rank">{getRankIcon(entry.rank)}</div>
 
                 <div className="entry-avatar">
-                  {entry.avatarUrl ? (
-                    <img src={entry.avatarUrl} alt={entry.displayName} />
+                  {entry.avatar_url ? (
+                    <img src={entry.avatar_url} alt={entry.display_name} />
                   ) : (
-                    entry.displayName.charAt(0).toUpperCase()
+                    entry.display_name.charAt(0).toUpperCase()
                   )}
                 </div>
 
                 <div className="entry-info">
                   <span className="entry-name">
-                    {entry.displayName}
-                    {entry.totalXp !== undefined && (
-                      <span className="entry-level">Nv.{getLevelInfo(entry.totalXp).displayLevel}</span>
+                    {entry.display_name}
+                    {entry.total_xp !== undefined && (
+                      <span className="entry-level">Nv.{getLevelInfo(entry.total_xp).displayLevel}</span>
                     )}
-                    {entry.activeTitleId && (() => {
-                      const titleDef = getTitleById(entry.activeTitleId!);
+                    {entry.active_title_id && (() => {
+                      const titleDef = getTitleById(entry.active_title_id!);
                       return titleDef ? (
                         <span className="entry-title">{titleDef.icon} {titleDef.name}</span>
                       ) : null;
                     })()}
                   </span>
                   <span className="entry-stats">
-                    {entry.gamesWon}V / {entry.gamesPlayed - entry.gamesWon}D ({entry.winRate.toFixed(0)}%)
+                    {entry.games_won}V / {entry.games_played - entry.games_won}D ({entry.win_rate.toFixed(0)}%)
                   </span>
                 </div>
 
@@ -220,9 +220,9 @@ export default function Leaderboard() {
                     </>
                   ) : (
                     <>
-                      <span className="elo-value">{entry.eloRating}</span>
-                      {entry.eloGain !== undefined && entry.eloGain > 0 && (
-                        <span className="elo-gain">+{entry.eloGain}</span>
+                      <span className="elo-value">{entry.elo_rating}</span>
+                      {entry.elo_gain !== undefined && entry.elo_gain > 0 && (
+                        <span className="elo-gain">+{entry.elo_gain}</span>
                       )}
                     </>
                   )}

@@ -95,6 +95,7 @@ export default function MultiplayerGame() {
     playerId: string;
     playerName: string;
     items: { id: string; emoji: string; name: string }[];
+    mandatory?: boolean;
   } | null>(null);
   const [gameOverData, setGameOverData] = useState<GameOverPayload | null>(null);
   const [unlockedAchievements, setUnlockedAchievements] = useState<AchievementUnlocked[]>([]);
@@ -109,6 +110,11 @@ export default function MultiplayerGame() {
     playerName: string;
     remainingTime: number;
   }[]>([]);
+
+  // Game pause state for reconnection
+  const [isPausedForReconnect, setIsPausedForReconnect] = useState(false);
+  const [pausedPlayerName, setPausedPlayerName] = useState<string | null>(null);
+  const [pauseCountdown, setPauseCountdown] = useState(0);
 
   // Rematch state
   const [isRequestingRematch, setIsRequestingRematch] = useState(false);
@@ -145,8 +151,9 @@ export default function MultiplayerGame() {
            lastShotResult !== null ||
            gameOverData !== null ||
            stealingFromPlayer !== null ||
-           itemActionModal !== null;
-  }, [roundAnnouncement, lastShotResult, gameOverData, stealingFromPlayer, itemActionModal]);
+           itemActionModal !== null ||
+           isPausedForReconnect;
+  }, [roundAnnouncement, lastShotResult, gameOverData, stealingFromPlayer, itemActionModal, isPausedForReconnect]);
 
   // Ref to access current overlay state in socket handlers
   const hasActiveOverlayRef = useRef(hasActiveOverlay);
@@ -552,24 +559,54 @@ export default function MultiplayerGame() {
       // Segundo regras do Buckshot Roulette: item roubado DEVE ser usado imediatamente
       if (data.itemId === 'adrenaline' && data.stolenItem && isMe) {
         const stolenItemId = data.stolenItem.id;
-        const needsTarget = stolenItemId === 'handcuffs' || stolenItemId === 'adrenaline';
 
-        if (needsTarget) {
-          // Encontrar o item no inventário atualizado
-          const updatedItems = data.players?.find(p => p.id === myId)?.items || [];
-          const stolenIndex = updatedItems.findIndex(item => item.id === stolenItemId);
+        // Novo fluxo: servidor retorna requiresTarget=true para handcuffs
+        // O item NÃO foi adicionado ao inventário, precisamos mostrar modal obrigatório
+        if ((data as ItemUsedPayload & { requiresTarget?: boolean; validTargets?: { id: string; name: string }[] }).requiresTarget) {
+          const validTargets = (data as ItemUsedPayload & { requiresTarget?: boolean; validTargets?: { id: string; name: string }[] }).validTargets || [];
 
-          if (stolenIndex !== -1) {
-            // Agendar para mostrar seleção de alvo APÓS o overlay de item fechar
-            setTimeout(() => {
-              setPendingStolenItem({
-                itemId: stolenItemId,
-                itemIndex: stolenIndex,
-                itemName: data.stolenItem!.name,
-                itemEmoji: data.stolenItem!.emoji,
-              });
-              setMessage(`Use ${data.stolenItem!.emoji} ${data.stolenItem!.name} - Selecione um alvo!`);
-            }, 2600); // Overlay de item dura 2500ms + buffer
+          // Agendar para mostrar modal obrigatório APÓS o overlay de item fechar
+          setTimeout(() => {
+            setPendingStolenItem({
+              itemId: stolenItemId,
+              itemIndex: -1, // Item não está no inventário
+              itemName: data.stolenItem!.name,
+              itemEmoji: data.stolenItem!.emoji,
+            });
+            // Mostrar modal com alvos válidos
+            setStealingFromPlayer({
+              playerId: '__STOLEN_ITEM__', // Marcador especial para saber que é item roubado
+              playerName: `Usar ${data.stolenItem!.emoji} ${data.stolenItem!.name}`,
+              items: validTargets.map(t => ({
+                id: t.id,
+                emoji: '🎯',
+                name: t.name,
+              })),
+              mandatory: true, // Não permite cancelar
+            });
+            setMessage(`OBRIGATÓRIO: Use ${data.stolenItem!.emoji} ${data.stolenItem!.name} - Selecione um alvo!`);
+          }, 2600); // Overlay de item dura 2500ms + buffer
+        } else {
+          // Fluxo antigo para itens que não precisam de alvo adicional
+          const needsTarget = stolenItemId === 'handcuffs' || stolenItemId === 'adrenaline';
+
+          if (needsTarget && !data.usedImmediately) {
+            // Encontrar o item no inventário atualizado
+            const updatedItems = data.players?.find(p => p.id === myId)?.items || [];
+            const stolenIndex = updatedItems.findIndex(item => item.id === stolenItemId);
+
+            if (stolenIndex !== -1) {
+              // Agendar para mostrar seleção de alvo APÓS o overlay de item fechar
+              setTimeout(() => {
+                setPendingStolenItem({
+                  itemId: stolenItemId,
+                  itemIndex: stolenIndex,
+                  itemName: data.stolenItem!.name,
+                  itemEmoji: data.stolenItem!.emoji,
+                });
+                setMessage(`Use ${data.stolenItem!.emoji} ${data.stolenItem!.name} - Selecione um alvo!`);
+              }, 2600); // Overlay de item dura 2500ms + buffer
+            }
           }
         }
       }
@@ -757,9 +794,39 @@ export default function MultiplayerGame() {
     });
 
     // Player reconnected
-    socket.on('playerReconnected', ({ playerName }) => {
+    socket.on('playerReconnected', ({ playerName, players: updatedPlayers }) => {
       setDisconnectedPlayers(prev => prev.filter(p => p.playerName !== playerName));
       setMessage(`${playerName} reconectou!`);
+
+      // CRÍTICO: Atualizar lista de players com novos socket IDs
+      if (updatedPlayers) {
+        setPlayers(updatedPlayers);
+        const myData = updatedPlayers.find((p: PlayerPublicState) => p.id === myId);
+        if (myData) {
+          setMyItems(myData.items);
+        }
+      }
+    });
+
+    // Game paused for reconnection
+    socket.on('gamePaused', ({ reason, playerId, playerName, remainingTime }) => {
+      console.log('[Game] Jogo PAUSADO:', { reason, playerId, playerName, remainingTime });
+      setIsPausedForReconnect(true);
+      setPausedPlayerName(playerName);
+      setPauseCountdown(Math.floor(remainingTime / 1000));
+    });
+
+    // Game resumed after reconnection or elimination
+    socket.on('gameResumed', ({ reason, playerId }) => {
+      console.log('[Game] Jogo RETOMADO:', { reason, playerId });
+      setIsPausedForReconnect(false);
+      setPausedPlayerName(null);
+      setPauseCountdown(0);
+      if (reason === 'reconnected') {
+        setMessage('Jogador reconectou! Jogo retomado.');
+      } else if (reason === 'eliminated') {
+        setMessage('Jogador eliminado por timeout. Jogo retomado.');
+      }
     });
 
     // Player items (para Adrenalina)
@@ -792,6 +859,8 @@ export default function MultiplayerGame() {
       socket.off('gameOver');
       socket.off('playerDisconnected');
       socket.off('playerReconnected');
+      socket.off('gamePaused');
+      socket.off('gameResumed');
       socket.off('actionError');
       socket.off('reconnected');
       socket.off('reconnectError');
@@ -836,6 +905,17 @@ export default function MultiplayerGame() {
 
     return () => clearInterval(interval);
   }, [disconnectedPlayers.length]);
+
+  // Countdown timer for pause state
+  useEffect(() => {
+    if (!isPausedForReconnect || pauseCountdown <= 0) return;
+
+    const interval = setInterval(() => {
+      setPauseCountdown(prev => Math.max(0, prev - 1));
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [isPausedForReconnect, pauseCountdown]);
 
   // Actions
   const handleShoot = useCallback((targetId: string) => {
@@ -910,6 +990,26 @@ export default function MultiplayerGame() {
 
   const handleStealItem = useCallback((itemIndex: number) => {
     if (!socket || !stealingFromPlayer) return;
+
+    // Caso especial: item roubado que precisa de alvo (Handcuffs via Adrenaline)
+    if (stealingFromPlayer.playerId === '__STOLEN_ITEM__' && pendingStolenItem) {
+      // O itemIndex aqui é o índice do alvo na lista de validTargets
+      const targetId = stealingFromPlayer.items[itemIndex]?.id;
+      if (targetId) {
+        socket.emit('completeStealItem', {
+          stolenItemId: pendingStolenItem.itemId,
+          targetId,
+        });
+      }
+      setStealingFromPlayer(null);
+      setPendingStolenItem(null);
+      setSelectedItem(null);
+      setSelectedTarget(null);
+      setMessage('');
+      return;
+    }
+
+    // Fluxo normal: roubar item de outro jogador
     socket.emit('useItem', {
       itemId: 'adrenaline',
       targetId: stealingFromPlayer.playerId,
@@ -918,13 +1018,18 @@ export default function MultiplayerGame() {
     setStealingFromPlayer(null);
     setSelectedItem(null);
     setSelectedTarget(null);
-  }, [socket, stealingFromPlayer]);
+  }, [socket, stealingFromPlayer, pendingStolenItem]);
 
   const handleCancelSteal = useCallback(() => {
+    // Não permitir cancelar se é item roubado obrigatório (Handcuffs via Adrenaline)
+    if (stealingFromPlayer?.playerId === '__STOLEN_ITEM__') {
+      setMessage('Você DEVE usar o item roubado!');
+      return;
+    }
     setStealingFromPlayer(null);
     setSelectedItem(null);
     setSelectedTarget(null);
-  }, []);
+  }, [stealingFromPlayer]);
 
   // Handle rematch request
   const handleRematch = useCallback(() => {
@@ -1009,6 +1114,7 @@ export default function MultiplayerGame() {
     playerId: stealingFromPlayer.playerId,
     playerName: stealingFromPlayer.playerName,
     items: stealingFromPlayer.items as GameItem[],
+    mandatory: stealingFromPlayer.playerId === '__STOLEN_ITEM__', // Obrigatório para item roubado
   } : null;
 
   return (
@@ -1050,6 +1156,7 @@ export default function MultiplayerGame() {
                   <thead>
                     <tr>
                       <th>Jogador</th>
+                      <th title="Pontuação total calculada">SCORE</th>
                       <th title="Rounds vencidos">ROUNDS</th>
                       <th title="Dano causado em outros jogadores">DANO</th>
                       <th title="Dano recebido de outros jogadores">SOFRIDO</th>
@@ -1059,9 +1166,12 @@ export default function MultiplayerGame() {
                     </tr>
                   </thead>
                   <tbody>
-                    {gameOverData.stats.map((stat: PlayerGameStats) => (
+                    {[...gameOverData.stats]
+                      .sort((a, b) => calculateScore(b) - calculateScore(a))
+                      .map((stat: PlayerGameStats) => (
                       <tr key={stat.odId} className={stat.odId === gameOverData.winner?.id ? 'winner-row' : ''}>
                         <td className="player-name-cell">{stat.guestName}</td>
+                        <td className="score-cell">{calculateScore(stat)}</td>
                         <td>{stat.roundsWon}</td>
                         <td>{stat.damageDealt}</td>
                         <td>{stat.damageTaken}</td>
@@ -1132,9 +1242,9 @@ export default function MultiplayerGame() {
                           <div className="xp-fill" style={{ width: `${Math.round(levelInfo.xpProgress * 100)}%` }} />
                         </div>
                       </div>
-                      {/* LP Ranking */}
+                      {/* ELO Ranking */}
                       {myXpResult.lpChange !== undefined && (
-                        <div className="lp-section">
+                        <div className="elo-section">
                           {/* Promoção/Rebaixamento */}
                           {myXpResult.promoted && (
                             <div className="rank-event promotion">
@@ -1147,21 +1257,21 @@ export default function MultiplayerGame() {
                             </div>
                           )}
 
-                          {/* LP Change */}
-                          <div className={`lp-change ${myXpResult.lpChange >= 0 ? 'positive' : 'negative'}`}>
-                            {myXpResult.lpChange >= 0 ? '+' : ''}{myXpResult.lpChange} LP
+                          {/* ELO Change */}
+                          <div className={`elo-change ${myXpResult.lpChange >= 0 ? 'positive' : 'negative'}`}>
+                            {myXpResult.lpChange >= 0 ? '+' : ''}{myXpResult.lpChange} ELO
                           </div>
 
-                          {/* LP Progress Bar */}
-                          <div className="lp-progress-container">
+                          {/* ELO Progress Bar */}
+                          <div className="elo-progress-container">
                             <span className="rank-badge">{myXpResult.displayRank}</span>
-                            <div className="lp-bar">
+                            <div className="elo-bar">
                               <div
-                                className="lp-fill"
+                                className="elo-fill"
                                 style={{ width: `${myXpResult.newLp}%` }}
                               />
                             </div>
-                            <span className="lp-text">{myXpResult.newLp}/100 LP</span>
+                            <span className="elo-text">{myXpResult.newLp}/100 Pontos</span>
                           </div>
                         </div>
                       )}
@@ -1233,8 +1343,30 @@ export default function MultiplayerGame() {
           gameBoardRef.current?.triggerReloadSpin();
         }}
       >
+        {/* Game Paused Overlay */}
+        {isPausedForReconnect && (
+          <div className="game-paused-overlay">
+            <div className="game-paused-modal">
+              <div className="pause-icon">⏸️</div>
+              <h2>JOGO PAUSADO</h2>
+              <p className="pause-reason">
+                <span className="disconnected-name">{pausedPlayerName}</span> desconectou
+              </p>
+              <div className="pause-countdown">
+                <span className={`countdown-number ${pauseCountdown <= 10 ? 'critical' : ''}`}>
+                  {pauseCountdown}
+                </span>
+                <span className="countdown-label">segundos para reconectar</span>
+              </div>
+              <p className="pause-info">
+                O jogo será retomado quando o jogador reconectar ou o tempo acabar.
+              </p>
+            </div>
+          </div>
+        )}
+
         {/* Disconnected Players Alert */}
-        {disconnectedPlayers.length > 0 && (
+        {!isPausedForReconnect && disconnectedPlayers.length > 0 && (
           <div className="disconnected-players-container">
             {disconnectedPlayers.map(dp => (
               <div key={dp.playerId} className="disconnected-player-alert">
@@ -1275,6 +1407,18 @@ export default function MultiplayerGame() {
       </GameBoard>
     </div>
   );
+}
+
+// Helper function to calculate player score
+function calculateScore(stat: PlayerGameStats): number {
+  let score = 0;
+  score += stat.roundsWon * 100;      // Rounds vencidos (peso maior)
+  score += stat.kills * 50;            // Kills
+  score += stat.damageDealt * 5;       // Dano causado
+  score -= stat.selfDamage * 10;       // Penalidade por auto-dano
+  score -= stat.damageTaken * 2;       // Penalidade por dano recebido
+  score += stat.itemsUsed * 3;         // Itens usados
+  return Math.max(0, score);
 }
 
 // Helper functions for awards

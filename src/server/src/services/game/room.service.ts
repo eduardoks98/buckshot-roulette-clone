@@ -33,6 +33,11 @@ export interface Room {
   firstToDie: number | null;
   // Grace period timer for empty waiting rooms (60s before deletion)
   emptyRoomTimeout: NodeJS.Timeout | null;
+  // Pause state for reconnection
+  pausedForReconnect: boolean;
+  pausedPlayerId: string | null;
+  pausedPlayerName: string | null;
+  pauseStartTime: number | null;
 }
 
 interface PlayerStats {
@@ -109,7 +114,9 @@ export class RoomService {
   onPlayerLeft?: (roomCode: string, players: PlayerPublicState[]) => void; // Called when player leaves/timeout in WaitingRoom
   onHostChanged?: (roomCode: string, newHostName: string) => void; // Called when host changes
   onPlayerDisconnected?: (roomCode: string, playerId: string, playerName: string) => void; // Called when player temporarily disconnects
-  onPlayerReconnected?: (roomCode: string, playerId: string, newSocketId: string, playerName: string) => void; // Called when player reconnects
+  onPlayerReconnected?: (roomCode: string, playerId: string, newSocketId: string, playerName: string, players: PlayerPublicState[]) => void; // Called when player reconnects
+  onGamePaused?: (roomCode: string, playerId: string, playerName: string, remainingTime: number) => void; // Called when game is paused for reconnect
+  onGameResumed?: (roomCode: string, reason: 'reconnected' | 'eliminated', playerId: string) => void; // Called when game resumes
 
   // ==========================================
   // HELPERS
@@ -254,6 +261,10 @@ export class RoomService {
       turnStartTime: null,
       firstToDie: null,
       emptyRoomTimeout: null,
+      pausedForReconnect: false,
+      pausedPlayerId: null,
+      pausedPlayerName: null,
+      pauseStartTime: null,
     };
 
     this.rooms.set(code, room);
@@ -297,12 +308,13 @@ export class RoomService {
 
       console.log(`[Room] ${playerName} reconectou à sala ${code}`);
 
-      // Emitir evento de reconexão
-      this.onPlayerReconnected?.(code, oldSocketId, socketId, playerName);
+      // Emitir evento de reconexão com lista atualizada de players
+      const playersPublic = room.players.map(p => this.toPublicPlayer(p));
+      this.onPlayerReconnected?.(code, oldSocketId, socketId, playerName, playersPublic);
 
       return {
         room,
-        players: room.players.map(p => this.toPublicPlayer(p)),
+        players: playersPublic,
         isReconnect: true,
       };
     }
@@ -326,11 +338,12 @@ export class RoomService {
         }
 
         console.log(`[Room] Jogador ${playerName} reconectou (odUserId match) - socket ${oldSocketId} -> ${socketId}`);
-        this.onPlayerReconnected?.(code, oldSocketId, socketId, playerName);
+        const playersPublicUserId = room.players.map(p => this.toPublicPlayer(p));
+        this.onPlayerReconnected?.(code, oldSocketId, socketId, playerName, playersPublicUserId);
 
         return {
           room,
-          players: room.players.map(p => this.toPublicPlayer(p)),
+          players: playersPublicUserId,
           isReconnect: true,
         };
       }
@@ -582,6 +595,15 @@ export class RoomService {
     // Token já foi gerado em startGame() - NÃO regenerar para manter consistência com cliente
     player.originalSocketId = socketId;
 
+    // PAUSAR O JOGO para todos os jogadores
+    room.pausedForReconnect = true;
+    room.pausedPlayerId = socketId;
+    room.pausedPlayerName = playerName;
+    room.pauseStartTime = Date.now();
+
+    // Emitir evento de pausa
+    this.onGamePaused?.(code, socketId, playerName, GAME_RULES.TIMERS.RECONNECT_GRACE_MS);
+
     // Agendar eliminação após grace period
     setTimeout(() => {
       this.checkReconnectTimeout(code, player.originalSocketId!);
@@ -609,6 +631,17 @@ export class RoomService {
     player.disconnected = false;
 
     console.log(`[Room] Jogador ${player.name} eliminado por timeout de reconexão`);
+
+    // DESPAUSAR O JOGO
+    const wasPaused = room.pausedForReconnect;
+    room.pausedForReconnect = false;
+    room.pausedPlayerId = null;
+    room.pausedPlayerName = null;
+    room.pauseStartTime = null;
+
+    if (wasPaused) {
+      this.onGameResumed?.(roomCode, 'eliminated', originalSocketId);
+    }
 
     // Verificar se TODOS jogadores estão mortos ou desconectados
     const allDeadOrDisconnected = room.players.every(p => !p.alive || p.disconnected);
@@ -685,7 +718,7 @@ export class RoomService {
     newSocketId: string,
     playerName: string,
     reconnectToken: string
-  ): { gameState: ReconnectedPayload } | { error: string } {
+  ): { gameState: ReconnectedPayload; oldSocketId: string } | { error: string } {
     const room = this.rooms.get(roomCode);
     if (!room) return { error: 'Sala não encontrada' };
 
@@ -695,6 +728,9 @@ export class RoomService {
 
     if (!player) return { error: 'Sessão expirada ou inválida' };
 
+    // Guardar socket ID antigo antes de atualizar
+    const oldSocketId = player.id;
+
     // Restaurar jogador
     player.id = newSocketId;
     player.disconnected = false;
@@ -702,9 +738,23 @@ export class RoomService {
     // Gerar novo token para possível reconexão futura
     player.reconnectToken = this.generateReconnectToken();
 
+    // DESPAUSAR O JOGO se estava pausado por este jogador
+    const wasPaused = room.pausedForReconnect;
+    if (wasPaused) {
+      room.pausedForReconnect = false;
+      room.pausedPlayerId = null;
+      room.pausedPlayerName = null;
+      room.pauseStartTime = null;
+      this.onGameResumed?.(roomCode, 'reconnected', oldSocketId);
+    }
+
+    // Emitir evento de reconexão com lista atualizada de players
+    this.onPlayerReconnected?.(roomCode, oldSocketId, newSocketId, playerName, room.players.map(p => this.toPublicPlayer(p)));
+
     const shellsRemaining = room.shells.length - room.currentShellIndex;
 
     return {
+      oldSocketId,
       gameState: {
         roomCode: room.code,
         players: room.players.map(p => this.toPublicPlayer(p)),
@@ -730,7 +780,7 @@ export class RoomService {
     roomCode: string,
     newSocketId: string,
     odUserId: string
-  ): { gameState?: ReconnectedPayload; gameStarted: boolean; playerName: string } | { error: string } {
+  ): { gameState?: ReconnectedPayload; gameStarted: boolean; playerName: string; oldSocketId: string } | { error: string } {
     const room = this.rooms.get(roomCode);
     if (!room) return { error: 'Sala não encontrada' };
 
@@ -752,6 +802,19 @@ export class RoomService {
       console.log(`[Room] Host ${player.name} reconectou - atualizando room.host para ${newSocketId}`);
     }
 
+    // DESPAUSAR O JOGO se estava pausado por este jogador
+    const wasPaused = room.pausedForReconnect;
+    if (wasPaused) {
+      room.pausedForReconnect = false;
+      room.pausedPlayerId = null;
+      room.pausedPlayerName = null;
+      room.pauseStartTime = null;
+      this.onGameResumed?.(roomCode, 'reconnected', oldSocketId);
+    }
+
+    // Emitir evento de reconexão com lista atualizada de players
+    this.onPlayerReconnected?.(roomCode, oldSocketId, newSocketId, player.name, room.players.map(p => this.toPublicPlayer(p)));
+
     if (room.started) {
       // Jogo em andamento - retornar estado completo
       const shellsRemaining = room.shells.length - room.currentShellIndex;
@@ -759,6 +822,7 @@ export class RoomService {
       return {
         gameStarted: true,
         playerName: player.name,
+        oldSocketId,
         gameState: {
           roomCode: room.code,
           players: room.players.map(p => this.toPublicPlayer(p)),
@@ -780,6 +844,7 @@ export class RoomService {
       return {
         gameStarted: false,
         playerName: player.name,
+        oldSocketId,
       };
     }
   }
@@ -866,6 +931,25 @@ export class RoomService {
 
   getRoom(code: string): Room | undefined {
     return this.rooms.get(code);
+  }
+
+  isGamePaused(code: string): boolean {
+    const room = this.rooms.get(code);
+    return room?.pausedForReconnect ?? false;
+  }
+
+  getPauseInfo(code: string): { paused: boolean; playerName: string | null; remainingTime: number } {
+    const room = this.rooms.get(code);
+    if (!room || !room.pausedForReconnect) {
+      return { paused: false, playerName: null, remainingTime: 0 };
+    }
+    const elapsed = room.pauseStartTime ? Date.now() - room.pauseStartTime : 0;
+    const remaining = Math.max(0, GAME_RULES.TIMERS.RECONNECT_GRACE_MS - elapsed);
+    return {
+      paused: true,
+      playerName: room.pausedPlayerName,
+      remainingTime: remaining,
+    };
   }
 
   getRoomByPlayer(playerId: string): { code: string; room: Room } | null {

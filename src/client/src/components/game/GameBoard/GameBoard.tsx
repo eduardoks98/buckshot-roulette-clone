@@ -67,6 +67,7 @@ export interface StealModalData {
   playerId: string;
   playerName: string;
   items: GameItem[];
+  mandatory?: boolean; // Se true, não permite cancelar (ex: handcuffs roubadas)
 }
 
 export interface ItemActionModal {
@@ -276,8 +277,8 @@ const GameBoard = forwardRef<GameBoardRef, GameBoardProps>(({
         {opponents.map(player => (
           <div
             key={player.id}
-            className={`opponent-card ${player.id === currentPlayerId ? 'active' : ''} ${player.id === selectedTarget ? 'selected' : ''} ${!player.alive ? 'dead' : ''} ${player.id === damagedPlayerId ? 'damage' : ''} ${player.id === healedPlayerId ? 'heal' : ''}`}
-            onClick={() => (player.alive || selectedItemId === 'adrenaline') && onSelectTarget(player.id)}
+            className={`opponent-card ${player.id === currentPlayerId ? 'active' : ''} ${player.id === selectedTarget ? 'selected' : ''} ${!player.alive ? 'dead' : ''} ${!player.alive && player.items.length > 0 ? 'has-items' : ''} ${player.id === damagedPlayerId ? 'damage' : ''} ${player.id === healedPlayerId ? 'heal' : ''}`}
+            onClick={() => (player.alive || (selectedItemId === 'adrenaline' && player.items.length > 0)) && onSelectTarget(player.id)}
           >
             {/* Turn indicator badge - shows on the active player's card */}
             {player.id === currentPlayerId && !hasActiveOverlay && (
@@ -473,9 +474,21 @@ const GameBoard = forwardRef<GameBoardRef, GameBoardProps>(({
       {/* ========== STEAL MODAL (Adrenaline) ========== */}
       {stealModalData && !gameOverData && onStealItem && onCancelSteal && (
         <div className="steal-modal-overlay">
-          <div className="steal-modal">
-            <h3><AdrenalineIcon size={24} color="var(--gold-accent)" /> Roubar item de {stealModalData.playerName}</h3>
-            <p className="steal-instruction">Selecione um item para roubar e USAR IMEDIATAMENTE:</p>
+          <div className={`steal-modal ${stealModalData.mandatory ? 'mandatory' : ''}`}>
+            <h3>
+              <AdrenalineIcon size={24} color="var(--gold-accent)" />
+              {stealModalData.mandatory ? (
+                <> {stealModalData.playerName}</>
+              ) : (
+                <> Roubar item de {stealModalData.playerName}</>
+              )}
+            </h3>
+            <p className="steal-instruction">
+              {stealModalData.mandatory
+                ? 'OBRIGATÓRIO - Selecione o alvo:'
+                : 'Selecione um item para roubar e USAR IMEDIATAMENTE:'
+              }
+            </p>
             <div className="steal-items">
               {stealModalData.items.filter(item => item.id !== 'adrenaline').length > 0 ? (
                 stealModalData.items
@@ -486,10 +499,10 @@ const GameBoard = forwardRef<GameBoardRef, GameBoardProps>(({
                       key={originalIndex}
                       className="steal-item-btn"
                       onClick={() => onStealItem(originalIndex)}
-                      title={`${item.name} (sera usado imediatamente)`}
+                      title={stealModalData.mandatory ? `Algemar ${item.name}` : `${item.name} (sera usado imediatamente)`}
                     >
                       <span className="steal-item-emoji">
-                        <ItemIcon item={item} size={32} />
+                        {stealModalData.mandatory ? '🎯' : <ItemIcon item={item} size={32} />}
                       </span>
                       <span className="steal-item-name">{item.name}</span>
                     </button>
@@ -498,9 +511,11 @@ const GameBoard = forwardRef<GameBoardRef, GameBoardProps>(({
                 <p className="no-items-to-steal">Sem itens roubaveis!</p>
               )}
             </div>
-            <button className="steal-cancel-btn" onClick={onCancelSteal}>
-              Cancelar
-            </button>
+            {!stealModalData.mandatory && (
+              <button className="steal-cancel-btn" onClick={onCancelSteal}>
+                Cancelar
+              </button>
+            )}
           </div>
         </div>
       )}
@@ -522,6 +537,10 @@ const GameBoard = forwardRef<GameBoardRef, GameBoardProps>(({
             </div>
             <div className="item-action-name">{itemActionModal.name}</div>
             <div className="item-action-player">{itemActionModal.playerName}</div>
+            {/* Mensagem especial para Adrenalina - mostra item roubado e de quem */}
+            {itemActionModal.message && (
+              <div className="item-action-message">{itemActionModal.message}</div>
+            )}
             {itemActionModal.extraInfo && (
               <div className={`item-action-extra ${itemActionModal.extraInfo.includes('LIVE') || itemActionModal.extraInfo.includes('VIVA') ? 'live' : 'blank'}`}>
                 {itemActionModal.extraInfo}

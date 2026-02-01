@@ -23,6 +23,7 @@ export interface ClientToServerEvents {
   shoot: (data: ShootPayload) => void;
   useItem: (data: UseItemPayload) => void;
   getPlayerItems: (data: GetPlayerItemsPayload) => void;
+  completeStealItem: (data: CompleteStealItemPayload) => void;
 
   // Reconnection
   reconnectToGame: (data: ReconnectPayload) => void;
@@ -94,6 +95,11 @@ export interface RequestRematchPayload {
   playerName: string;
 }
 
+export interface CompleteStealItemPayload {
+  stolenItemId: string;
+  targetId: string;
+}
+
 // ==========================================
 // SERVER -> CLIENT EVENTS
 // ==========================================
@@ -137,6 +143,10 @@ export interface ServerToClientEvents {
   reconnectError: (data: ReconnectErrorPayload) => void;
   reconnectCredentials: (data: ReconnectCredentialsPayload) => void;
   gameAbandoned: () => void;
+
+  // Game pause events (for reconnection)
+  gamePaused: (data: GamePausedPayload) => void;
+  gameResumed: (data: GameResumedPayload) => void;
 
   // Achievement events
   achievementsUnlocked: (data: AchievementUnlocked[]) => void;
@@ -325,6 +335,19 @@ export interface PlayerReconnectedPayload {
   playerId: string;
   playerName: string;
   newSocketId?: string; // Novo socket ID após reconexão (usado na WaitingRoom)
+  players?: PlayerPublicState[]; // Lista atualizada de players com novos socket IDs
+}
+
+export interface GamePausedPayload {
+  reason: 'disconnect';
+  playerId: string;
+  playerName: string;
+  remainingTime: number; // ms restantes para reconexão
+}
+
+export interface GameResumedPayload {
+  reason: 'reconnected' | 'eliminated';
+  playerId: string;
 }
 
 export interface PlayerEliminatedPayload {

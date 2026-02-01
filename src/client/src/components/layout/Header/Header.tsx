@@ -13,7 +13,6 @@ import { getRankColor } from '../../../utils/helpers';
 import {
   BackArrowIcon,
   ProfileIcon,
-  HistoryIcon,
   AchievementIcon,
   LeaderboardIcon,
   SettingsIcon,
@@ -67,10 +66,6 @@ export function Header({ variant = 'full' }: HeaderProps) {
           <button className="app-nav-item" onClick={() => navigate('/profile')}>
             <ProfileIcon size={20} />
             <span>Perfil</span>
-          </button>
-          <button className="app-nav-item" onClick={() => navigate('/history')}>
-            <HistoryIcon size={20} />
-            <span>Historico</span>
           </button>
           <button className="app-nav-item" onClick={() => navigate('/achievements')}>
             <AchievementIcon size={20} />
@@ -128,8 +123,8 @@ export function Header({ variant = 'full' }: HeaderProps) {
             </div>
             <div className="app-header__user-info">
               <span className="app-header__username">{user?.display_name}</span>
-              <span className="app-header__rank" style={{ color: getRankColor(user?.rank || '') }}>
-                {user?.rank}
+              <span className="app-header__rank" style={{ color: getRankColor(user?.tier || '') }}>
+                {user?.tier}{user?.division ? ` ${['', 'I', 'II', 'III', 'IV'][user.division]}` : ''}
               </span>
             </div>
           </div>

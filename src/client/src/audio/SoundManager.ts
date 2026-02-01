@@ -46,6 +46,7 @@ class SoundManager {
   private musicEnabled: boolean = true;
   private volume: number = 0.7;
   private musicVolume: number = 0.3;
+  private isInIframe: boolean = false;
 
   // Web Audio API para sons com trim
   private audioContext: AudioContext | null = null;
@@ -53,6 +54,15 @@ class SoundManager {
   private trimmedBuffers: Map<string, AudioBuffer> = new Map();
 
   private constructor() {
+    // Detect if running inside an iframe - disable all audio if so
+    this.isInIframe = window.self !== window.top;
+    if (this.isInIframe) {
+      this.enabled = false;
+      this.musicEnabled = false;
+      console.debug('[SoundManager] Running in iframe - audio disabled');
+      return; // Skip preloading audio when in iframe
+    }
+
     this.loadSettings();
     this.preloadSounds();
     this.preloadMusic();
@@ -250,7 +260,7 @@ class SoundManager {
   }
 
   play(name: SoundName, config?: SoundConfig): void {
-    if (!this.enabled) return;
+    if (!this.enabled || this.isInIframe) return;
 
     // Verificar se tem versão trimada
     const trimmedBuffer = this.trimmedBuffers.get(name);
@@ -394,7 +404,7 @@ class SoundManager {
   // ==========================================
 
   playMusic(name: MusicName): void {
-    if (!this.musicEnabled) return;
+    if (!this.musicEnabled || this.isInIframe) return;
 
     if (this.currentMusicName === name && this.currentMusic && !this.currentMusic.paused) {
       return;

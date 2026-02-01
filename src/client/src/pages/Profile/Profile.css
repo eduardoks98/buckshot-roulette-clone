@@ -414,6 +414,44 @@
   color: #f44336;
 }
 
+/* History Pagination */
+.profile-history__pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 0.75rem 1rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.profile-history__page-btn {
+  padding: 0.5rem 1rem;
+  background: rgba(255, 255, 255, 0.05);
+  color: var(--text-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 0.8rem;
+  transition: all 0.2s;
+}
+
+.profile-history__page-btn:hover:not(:disabled) {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: var(--gold-accent);
+}
+
+.profile-history__page-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.profile-history__page-info {
+  font-size: 0.85rem;
+  color: var(--text-dim);
+  min-width: 60px;
+  text-align: center;
+}
+
 /* ==========================================
    LOGOUT BUTTON
    ========================================== */

@@ -101,7 +101,7 @@ export const exchangeCode = async (req: Request, res: Response) => {
           where: { id: user.id },
           data: {
             game_user_id: data.user.id,
-            display_name: data.user.display_name || data.user.nickname || data.user.username,
+            display_name: data.user.nickname || data.user.display_name || data.user.username,
             avatar_url: data.user.avatar_url,
             is_admin: data.user.is_admin,
             last_login_at: new Date(),
@@ -114,7 +114,7 @@ export const exchangeCode = async (req: Request, res: Response) => {
             game_user_id: data.user.id,
             email: data.user.email,
             username: data.user.username,
-            display_name: data.user.display_name || data.user.nickname || data.user.username,
+            display_name: data.user.nickname || data.user.display_name || data.user.username,
             avatar_url: data.user.avatar_url,
             is_admin: data.user.is_admin,
             last_login_at: new Date(),

@@ -32,6 +32,12 @@ export function registerGameHandlers(
 
       const { code, room } = roomData;
 
+      // Verificar se jogo está pausado
+      if (room.pausedForReconnect) {
+        socket.emit('actionError', 'Jogo pausado - aguardando jogador reconectar');
+        return;
+      }
+
       // Process shot
       const result = gameService.processShot(room, socket.id, targetId);
 
@@ -133,6 +139,12 @@ export function registerGameHandlers(
       }
 
       const { code, room } = roomData;
+
+      // Verificar se jogo está pausado
+      if (room.pausedForReconnect) {
+        socket.emit('actionError', 'Jogo pausado - aguardando jogador reconectar');
+        return;
+      }
 
       // Process item
       const result = gameService.processItem(room, socket.id, itemId as ItemId, targetId, itemIndex);
@@ -316,6 +328,82 @@ export function registerGameHandlers(
         error: String(error),
       });
       socket.emit('actionError', 'Erro ao usar item');
+    }
+  });
+
+  // ==========================================
+  // COMPLETE STEAL ITEM (para Adrenalina + Handcuffs)
+  // ==========================================
+  socket.on('completeStealItem', ({ stolenItemId, targetId }) => {
+    try {
+      const roomData = roomService.getRoomByPlayer(socket.id);
+      if (!roomData) {
+        socket.emit('actionError', 'Voce nao esta em uma sala');
+        return;
+      }
+
+      const { code, room } = roomData;
+
+      // Verificar se jogo está pausado
+      if (room.pausedForReconnect) {
+        socket.emit('actionError', 'Jogo pausado - aguardando jogador reconectar');
+        return;
+      }
+
+      // Verificar se é o turno do jogador
+      const currentPlayer = room.players[room.currentPlayerIndex];
+      if (currentPlayer.id !== socket.id) {
+        socket.emit('actionError', 'Nao e seu turno');
+        return;
+      }
+
+      // Validar alvo para handcuffs
+      if (stolenItemId === 'handcuffs') {
+        const target = room.players.find(p => p.id === targetId);
+        if (!target || !target.alive || target.id === socket.id) {
+          socket.emit('actionError', 'Alvo invalido');
+          return;
+        }
+        if (target.handcuffed) {
+          socket.emit('actionError', 'Alvo ja esta algemado!');
+          return;
+        }
+        if (target.handcuffImmune) {
+          socket.emit('actionError', 'Alvo imune a algemas');
+          return;
+        }
+
+        // Aplicar handcuffs
+        target.handcuffed = true;
+        target.handcuffImmune = true;
+
+        const user = room.players.find(p => p.id === socket.id);
+        if (user) {
+          user.stats.handcuffUses++;
+        }
+
+        // Emitir resultado
+        io.to(code).emit('itemUsed', {
+          success: true,
+          itemId: 'handcuffs',
+          playerId: socket.id,
+          playerName: user?.name || 'Jogador',
+          targetId,
+          targetName: target.name,
+          message: `Usou ${target.name} foi algemado! (item roubado)`,
+          players: room.players.map(p => gameService.toPublicPlayer(p)),
+          shellsRemaining: {
+            total: room.shells.length - room.currentShellIndex,
+            live: room.shells.slice(room.currentShellIndex).filter(s => s === 'live').length,
+            blank: room.shells.slice(room.currentShellIndex).filter(s => s === 'blank').length,
+          },
+        });
+
+        console.log(`[Game] ${user?.name || socket.id} completou uso de handcuffs roubadas em ${target.name}`);
+      }
+    } catch (error) {
+      console.error('[Game] Erro ao completar uso de item roubado:', error);
+      socket.emit('actionError', 'Erro ao completar uso de item');
     }
   });
 

@@ -28,7 +28,7 @@ export const LP_CONFIG = {
 
 // Configurações de MMR
 export const MMR_CONFIG = {
-  DEFAULT_MMR: 800,
+  DEFAULT_MMR: 0,
   K_FACTOR: 32, // Fator de ajuste do MMR
   MIN_MMR: 0,
   MAX_MMR: 3000,

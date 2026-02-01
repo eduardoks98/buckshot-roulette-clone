@@ -36,6 +36,7 @@ interface RecentGame {
   damageDealt: number;
   roundsWon: number;
   eloChange: number | null;
+  lpChange: number | null;
   xpEarned: number | null;
   opponents: { displayName: string }[];
 }
@@ -53,6 +54,7 @@ interface GameParticipant {
   shotsFired: number;
   itemsUsed: number;
   eloChange: number | null;
+  lpChange: number | null;
   xpEarned: number | null;
   eloRating: number | null;
 }
@@ -86,6 +88,10 @@ export default function Profile() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [selectedGame, setSelectedGame] = useState<GameDetails | null>(null);
   const [gameDetailsLoading, setGameDetailsLoading] = useState(false);
+  const [historyPage, setHistoryPage] = useState(1);
+  const [historyTotalPages, setHistoryTotalPages] = useState(1);
+  const [showFullHistory, setShowFullHistory] = useState(false);
+  const [totalGamesFromHistory, setTotalGamesFromHistory] = useState<number | null>(null);
 
   // Fetch titles
   const fetchTitles = useCallback(async () => {
@@ -104,12 +110,12 @@ export default function Profile() {
   }, [token]);
 
   // Fetch recent games
-  const fetchRecentGames = useCallback(async () => {
+  const fetchRecentGames = useCallback(async (page: number = 1, limit: number = 5) => {
     if (!token) return;
     setHistoryLoading(true);
     try {
       const [historyRes, statsRes] = await Promise.all([
-        fetch('/api/history?page=1&limit=5', {
+        fetch(`/api/history?page=${page}&limit=${limit}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
         fetch('/api/history/stats', {
@@ -120,6 +126,8 @@ export default function Profile() {
       if (historyRes.ok) {
         const data = await historyRes.json();
         setRecentGames(data.data || []);
+        setHistoryTotalPages(data.pages || 1);
+        setTotalGamesFromHistory(data.total);
       }
 
       if (statsRes.ok) {
@@ -132,6 +140,20 @@ export default function Profile() {
       setHistoryLoading(false);
     }
   }, [token]);
+
+  // Handle pagination
+  const handlePageChange = useCallback((newPage: number) => {
+    setHistoryPage(newPage);
+    fetchRecentGames(newPage, showFullHistory ? 10 : 5);
+  }, [fetchRecentGames, showFullHistory]);
+
+  // Toggle full history view
+  const handleToggleFullHistory = useCallback(() => {
+    const newShowFull = !showFullHistory;
+    setShowFullHistory(newShowFull);
+    setHistoryPage(1);
+    fetchRecentGames(1, newShowFull ? 10 : 5);
+  }, [showFullHistory, fetchRecentGames]);
 
   useEffect(() => {
     if (user) {
@@ -196,9 +218,9 @@ export default function Profile() {
     );
   }
 
-  // Not logged in - redirect to home
+  // Not logged in - redirect to lobby
   if (!user) {
-    navigate('/');
+    navigate('/lobby');
     return null;
   }
 
@@ -246,7 +268,7 @@ export default function Profile() {
               <span className="profile-rank__value" style={{ color: getRankColor(user.tier || user.rank) }}>
                 {displayRank}
               </span>
-              <span className="profile-rank__lp">{user.lp || 0} LP</span>
+              <span className="profile-rank__lp">{user.lp || 0} Pontos</span>
             </div>
           </div>
         </div>
@@ -263,7 +285,7 @@ export default function Profile() {
         {/* Stats Grid - 6 columns on larger screens */}
         <div className="profile-stats">
           <div className="profile-stat">
-            <span className="profile-stat__value">{user.games_played}</span>
+            <span className="profile-stat__value">{totalGamesFromHistory ?? user.games_played}</span>
             <span className="profile-stat__label">Partidas</span>
           </div>
           <div className="profile-stat">
@@ -317,12 +339,14 @@ export default function Profile() {
           </div>
         )}
 
-        {/* Recent Games */}
+        {/* Recent Games / Full History */}
         <div className="profile-history">
           <div className="profile-history__header">
-            <h3 className="profile-history__title">Partidas Recentes</h3>
-            <button className="profile-history__see-all" onClick={() => navigate('/history')}>
-              Ver todas
+            <h3 className="profile-history__title">
+              {showFullHistory ? 'Historico Completo' : 'Partidas Recentes'}
+            </h3>
+            <button className="profile-history__see-all" onClick={handleToggleFullHistory}>
+              {showFullHistory ? 'Ver menos' : 'Ver todas'}
             </button>
           </div>
 
@@ -333,41 +357,66 @@ export default function Profile() {
               Nenhuma partida ainda. Jogue sua primeira!
             </div>
           ) : (
-            <div className="profile-history__list">
-              {recentGames.map(game => {
-                const isWin = game.position === 1;
-                const totalPlayers = (game.opponents?.length || 0) + 1;
+            <>
+              <div className="profile-history__list">
+                {recentGames.map(game => {
+                  const isWin = game.position === 1;
+                  const totalPlayers = (game.opponents?.length || 0) + 1;
 
-                return (
-                  <div
-                    key={game.id}
-                    className={`profile-game ${isWin ? 'win' : 'loss'}`}
-                    onClick={() => fetchGameDetails(game.id)}
-                    style={{ cursor: 'pointer' }}
-                  >
-                    <div className={`profile-game__position ${isWin ? 'winner' : ''}`}>
-                      {game.position === 1 ? '🥇' : game.position === totalPlayers ? `#${game.position}` : `#${game.position}`}
-                    </div>
-                    <div className="profile-game__info">
-                      <span className="profile-game__date">{formatDate(game.createdAt)}</span>
-                      <span className="profile-game__opponents">
-                        vs {game.opponents?.slice(0, 2).map(o => o.displayName).join(', ')}
-                        {(game.opponents?.length || 0) > 2 && ` +${(game.opponents?.length || 0) - 2}`}
-                      </span>
-                    </div>
-                    <div className="profile-game__stats">
-                      <span className="profile-game__stat">💀{game.kills}</span>
-                      <span className="profile-game__stat">💥{game.damageDealt}</span>
-                    </div>
-                    {game.eloChange !== null && (
-                      <div className={`profile-game__elo ${game.eloChange >= 0 ? 'positive' : 'negative'}`}>
-                        {game.eloChange >= 0 ? '+' : ''}{game.eloChange}
+                  return (
+                    <div
+                      key={game.id}
+                      className={`profile-game ${isWin ? 'win' : 'loss'}`}
+                      onClick={() => fetchGameDetails(game.id)}
+                      style={{ cursor: 'pointer' }}
+                    >
+                      <div className={`profile-game__position ${isWin ? 'winner' : ''}`}>
+                        {game.position === 1 ? '🥇' : game.position === totalPlayers ? `#${game.position}` : `#${game.position}`}
                       </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
+                      <div className="profile-game__info">
+                        <span className="profile-game__date">{formatDate(game.createdAt)}</span>
+                        <span className="profile-game__opponents">
+                          vs {game.opponents?.slice(0, 2).map(o => o.displayName).join(', ')}
+                          {(game.opponents?.length || 0) > 2 && ` +${(game.opponents?.length || 0) - 2}`}
+                        </span>
+                      </div>
+                      <div className="profile-game__stats">
+                        <span className="profile-game__stat">💀{game.kills}</span>
+                        <span className="profile-game__stat">💥{game.damageDealt}</span>
+                      </div>
+                      {game.lpChange !== null && (
+                        <div className={`profile-game__elo ${game.lpChange >= 0 ? 'positive' : 'negative'}`}>
+                          {game.lpChange >= 0 ? '+' : ''}{game.lpChange}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Pagination - Only show when in full history mode and there are multiple pages */}
+              {showFullHistory && historyTotalPages > 1 && (
+                <div className="profile-history__pagination">
+                  <button
+                    className="profile-history__page-btn"
+                    onClick={() => handlePageChange(historyPage - 1)}
+                    disabled={historyPage === 1 || historyLoading}
+                  >
+                    Anterior
+                  </button>
+                  <span className="profile-history__page-info">
+                    {historyPage} / {historyTotalPages}
+                  </span>
+                  <button
+                    className="profile-history__page-btn"
+                    onClick={() => handlePageChange(historyPage + 1)}
+                    disabled={historyPage === historyTotalPages || historyLoading}
+                  >
+                    Proxima
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
 
@@ -471,9 +520,9 @@ export default function Profile() {
                             <span className="p-col p-stat">{p.damageDealt}</span>
                             <span className="p-col p-stat">{p.shotsFired}</span>
                             <span className="p-col p-elo">
-                              {p.eloChange !== null && (
-                                <span className={p.eloChange >= 0 ? 'positive' : 'negative'}>
-                                  {p.eloChange >= 0 ? '+' : ''}{p.eloChange}
+                              {p.lpChange !== null && (
+                                <span className={p.lpChange >= 0 ? 'positive' : 'negative'}>
+                                  {p.lpChange >= 0 ? '+' : ''}{p.lpChange}
                                 </span>
                               )}
                             </span>

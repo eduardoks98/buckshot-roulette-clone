@@ -50,8 +50,8 @@ model User {
   tier              String @default("Bronze")
   division          Int?   @default(4)
   lp                Int    @default(0)
-  mmr_hidden        Int    @default(800)
-  peak_mmr          Int    @default(800)
+  mmr_hidden        Int    @default(0)
+  peak_mmr          Int    @default(0)
   games_since_promo Int    @default(0)
 
   // Progression

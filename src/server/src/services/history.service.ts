@@ -29,6 +29,7 @@ export interface GameHistoryEntry {
   shots_fired: number;
   items_used: number;
   elo_change: number | null;
+  lp_change: number | null;
   xp_earned: number | null;
 
   // Oponentes
@@ -70,6 +71,7 @@ export interface GameDetailedHistory extends GameHistoryEntry {
     shots_fired: number;
     items_used: number;
     elo_change: number | null;
+    lp_change: number | null;
     xp_earned: number | null;
     elo_rating: number | null;
   }[];
@@ -200,6 +202,7 @@ class HistoryService {
           shots_fired: participation.shots_fired,
           items_used: participation.items_used,
           elo_change: participation.elo_change,
+          lp_change: participation.lp_change,
           xp_earned: participation.xp_earned,
           opponents,
           winner,
@@ -308,6 +311,7 @@ class HistoryService {
         shots_fired: p.shots_fired,
         items_used: p.items_used,
         elo_change: p.elo_change,
+        lp_change: p.lp_change,
         xp_earned: p.xp_earned,
         elo_rating: p.user?.elo_rating || null,
       }));
@@ -340,6 +344,7 @@ class HistoryService {
         shots_fired: userParticipation.shots_fired,
         items_used: userParticipation.items_used,
         elo_change: userParticipation.elo_change,
+        lp_change: userParticipation.lp_change,
         xp_earned: userParticipation.xp_earned,
         opponents,
         winner,
