@@ -4,7 +4,7 @@
 
 import { PlayerPublicState } from './player.types';
 import { Item, ItemId, ItemUseResult } from './item.types';
-import { ShellInfo, ShellType, TurnDirection } from './game.types';
+import { ShellInfo, ShellType, TurnDirection, GameMode } from './game.types';
 import { PlayerXpResult, AchievementUnlocked, MatchBadgeAwarded } from './achievement.types';
 
 // ==========================================
@@ -54,6 +54,10 @@ export interface RemoveBotPayload {
 export interface CreateRoomPayload {
   playerName: string;
   password?: string;
+  /** Game mode controls progression (stats, XP, rank) */
+  gameMode?: GameMode;
+  /** Debug only: enable rank changes for testing */
+  debugRankEnabled?: boolean;
 }
 
 export interface JoinRoomPayload {

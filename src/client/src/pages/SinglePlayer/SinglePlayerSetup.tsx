@@ -172,7 +172,7 @@ export default function SinglePlayerSetup({ onStartGame }: SinglePlayerSetupProp
               <span>Voce</span>
             </div>
             <span className="sp-setup__preview-vs">vs</span>
-            {bots.map((bot, index) => (
+            {bots.map((bot) => (
               <div key={bot.id} className="sp-setup__preview-player">
                 <span className="sp-setup__preview-icon">🤖</span>
                 <span>{bot.name}</span>
