@@ -145,6 +145,16 @@
   background: rgba(255, 255, 255, 0.05);
 }
 
+.app-nav-item--active {
+  color: var(--gold-accent);
+  background: rgba(212, 164, 24, 0.1);
+}
+
+.app-nav-item--active:hover {
+  color: var(--gold-accent);
+  background: rgba(212, 164, 24, 0.15);
+}
+
 .app-nav-item--admin {
   color: var(--red-live, #e63946);
 }

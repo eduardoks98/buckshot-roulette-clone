@@ -3,7 +3,7 @@
 // ==========================================
 
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../../context/AuthContext';
 import { useOnlineCount } from '../../../hooks';
 import LevelBadge from '../../common/LevelBadge/LevelBadge';
@@ -28,9 +28,13 @@ interface HeaderProps {
 
 export function Header({ variant = 'full' }: HeaderProps) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, isAuthenticated } = useAuth();
   const onlineCount = useOnlineCount();
   const [showBugReport, setShowBugReport] = useState(false);
+
+  // Helper para verificar se a rota está ativa
+  const isActive = (path: string) => location.pathname === path || location.pathname.startsWith(path + '/');
 
   // Header simples para páginas legais (não logado)
   if (variant === 'simple') {
@@ -65,19 +69,19 @@ export function Header({ variant = 'full' }: HeaderProps) {
         </div>
 
         <nav className="app-header__nav">
-          <button className="app-nav-item" onClick={() => navigate('/lobby')}>
+          <button className={`app-nav-item ${isActive('/lobby') ? 'app-nav-item--active' : ''}`} onClick={() => navigate('/lobby')}>
             <GamepadIcon size={20} />
             <span>Lobby</span>
           </button>
-          <button className="app-nav-item" onClick={() => navigate('/profile')}>
+          <button className={`app-nav-item ${isActive('/profile') ? 'app-nav-item--active' : ''}`} onClick={() => navigate('/profile')}>
             <ProfileIcon size={20} />
             <span>Perfil</span>
           </button>
-          <button className="app-nav-item" onClick={() => navigate('/achievements')}>
+          <button className={`app-nav-item ${isActive('/achievements') ? 'app-nav-item--active' : ''}`} onClick={() => navigate('/achievements')}>
             <AchievementIcon size={20} />
             <span>Conquistas</span>
           </button>
-          <button className="app-nav-item" onClick={() => navigate('/leaderboard')}>
+          <button className={`app-nav-item ${isActive('/leaderboard') ? 'app-nav-item--active' : ''}`} onClick={() => navigate('/leaderboard')}>
             <LeaderboardIcon size={20} />
             <span>Ranking</span>
           </button>

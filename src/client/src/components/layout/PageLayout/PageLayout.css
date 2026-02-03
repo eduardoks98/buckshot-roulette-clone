@@ -27,6 +27,30 @@
   flex-direction: column;
 }
 
+/* ===== SIDE ADS ===== */
+.page-layout__side-ad {
+  width: 160px;
+  min-height: 600px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 80px; /* Abaixo do header */
+  align-self: flex-start;
+}
+
+.page-layout__side-ad--left {
+  margin-right: 0.5rem;
+}
+
+.page-layout__side-ad--right {
+  margin-left: 0.5rem;
+}
+
+@media (max-width: 1400px) {
+  .page-layout__side-ad {
+    display: none;
+  }
+}
+
 /* ===== AD PLACEHOLDER (Debug) ===== */
 .ad-placeholder {
   background: rgba(255, 193, 7, 0.08);
