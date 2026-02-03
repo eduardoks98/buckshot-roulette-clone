@@ -14,10 +14,11 @@ import {
 } from '../../../hooks';
 import type { RoomInfo, RoomCreatedPayload, RoomJoinedPayload } from '../../../hooks';
 import { PlayersIcon, RefreshIcon, UserIcon, PlusIcon, TargetCircleIcon, GamepadIcon, LockIcon } from '../../icons';
+import { Modal } from '../../common/Modal';
 import './ActiveRooms.css';
 
 export function ActiveRooms() {
-  const { isConnected } = useSocket();
+  const { isConnected, activeGame, clearActiveGame } = useSocket();
   const { user } = useAuth();
   const navigate = useNavigate();
 
@@ -29,12 +30,10 @@ export function ActiveRooms() {
     listRooms,
     createRoom,
     joinRoom: emitJoinRoom,
-    rejoinGame,
-    abandonGame,
     checkActiveGame,
   } = useLobbyActions();
 
-  // Estado local
+  // Estado local (apenas para UI do lobby, nao para jogo ativo - agora e global)
   const [rooms, setRooms] = useState<RoomInfo[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -45,8 +44,6 @@ export function ActiveRooms() {
   const [joining, setJoining] = useState(false);
   const [showPasswordModal, setShowPasswordModal] = useState(false);
   const [pendingRoomCode, setPendingRoomCode] = useState('');
-  const [activeGame, setActiveGame] = useState<{ roomCode: string; gameStarted: boolean } | null>(null);
-  const [isReconnecting, setIsReconnecting] = useState(false);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createPassword, setCreatePassword] = useState('');
   const [usePassword, setUsePassword] = useState(false);
@@ -92,14 +89,13 @@ export function ActiveRooms() {
   const handleJoinError = useCallback((message: string) => {
     setJoining(false);
     setCreating(false);
-    setIsReconnecting(false);
     setJoinError(message);
 
     // Se erro indica que a sala não existe mais ou usuário não está nela, limpar activeGame e sessão
     if (message.includes('não encontrada') || message.includes('not found') ||
         message.includes('não existe') || message.includes('não está nesta sala')) {
       console.log('[ActiveRooms] Sala não existe ou usuário removido, limpando activeGame');
-      setActiveGame(null);
+      clearActiveGame();
       clearSession();
     }
     // Se erro é "Já está na sala", limpar sessão antiga corrompida
@@ -108,11 +104,10 @@ export function ActiveRooms() {
     }
 
     setTimeout(() => setJoinError(''), 3000);
-  }, [clearSession]);
+  }, [clearSession, clearActiveGame]);
 
-  const handleRoomDeleted = useCallback((data: { code: string }) => {
-    // Limpar activeGame state se for a mesma sala
-    setActiveGame(prev => prev?.roomCode === data.code ? null : prev);
+  const handleRoomDeleted = useCallback(() => {
+    // Nota: activeGame agora e limpo globalmente no SocketContext
     // Limpar qualquer dado de sessão legado
     clearSession();
     listRooms();
@@ -122,31 +117,15 @@ export function ActiveRooms() {
     clearSession();
   }, [clearSession]);
 
-  const handleAlreadyInGame = useCallback((data: { roomCode: string; gameStarted: boolean }) => {
-    console.log('[ActiveRooms] alreadyInGame:', data);
+  // Nota: alreadyInGame, reconnected e gameAbandoned agora sao tratados globalmente no SocketContext
+  const handleAlreadyInGame = useCallback(() => {
+    // Apenas limpar estados de loading
     setCreating(false);
     setJoining(false);
-    setActiveGame({
-      roomCode: data.roomCode,
-      gameStarted: data.gameStarted,
-    });
-  }, []);
-
-  const handleReconnected = useCallback((data: { roomCode: string }) => {
-    console.log('[ActiveRooms] reconnected:', data.roomCode);
-    setIsReconnecting(false);
-    setActiveGame(null);
-    navigate('/multiplayer/game', {
-      state: { roomCode: data.roomCode, reconnected: true, gameState: data },
-    });
-  }, [navigate]);
-
-  const handleGameAbandoned = useCallback(() => {
-    console.log('[ActiveRooms] gameAbandoned');
-    setActiveGame(null);
   }, []);
 
   // Registrar event listeners via hook
+  // Nota: alreadyInGame, reconnected e gameAbandoned sao tratados globalmente no SocketContext
   useLobbyEvents({
     onRoomList: handleRoomList,
     onRoomListUpdated: handleRoomListUpdated,
@@ -156,8 +135,6 @@ export function ActiveRooms() {
     onRoomDeleted: handleRoomDeleted,
     onLeftRoom: handleLeftRoom,
     onAlreadyInGame: handleAlreadyInGame,
-    onReconnected: handleReconnected,
-    onGameAbandoned: handleGameAbandoned,
   });
 
   // Efeito inicial: solicitar lista e verificar jogo ativo
@@ -277,50 +254,10 @@ export function ActiveRooms() {
     setJoinPassword('');
   };
 
-  // Reconectar ao jogo ativo
-  const handleReconnect = useCallback(() => {
-    if (!activeGame) return;
-    setIsReconnecting(true);
-    rejoinGame(activeGame.roomCode);
-  }, [activeGame, rejoinGame]);
-
-  // Abandonar jogo ativo
-  const handleAbandonGame = useCallback(() => {
-    if (!activeGame) return;
-    abandonGame(activeGame.roomCode);
-  }, [activeGame, abandonGame]);
+  // Nota: Reconexao e abandono agora sao tratados pelo ActiveGameModal global
 
   return (
     <div className="active-rooms">
-      {/* Banner de jogo ativo */}
-      {activeGame && (
-        <div className="active-game-banner">
-          <div className="active-game-banner__info">
-            <span className="active-game-banner__icon">⚠️</span>
-            <div className="active-game-banner__text">
-              <strong>{activeGame.gameStarted ? 'Partida em andamento!' : 'Você está em uma sala!'}</strong>
-              <span>Sala: {activeGame.roomCode}</span>
-            </div>
-          </div>
-          <div className="active-game-banner__actions">
-            <button
-              className="active-game-banner__btn active-game-banner__btn--primary"
-              onClick={handleReconnect}
-              disabled={isReconnecting || !isConnected}
-            >
-              {isReconnecting ? 'Reconectando...' : 'RECONECTAR'}
-            </button>
-            <button
-              className="active-game-banner__btn active-game-banner__btn--secondary"
-              onClick={handleAbandonGame}
-              disabled={isReconnecting}
-            >
-              ABANDONAR
-            </button>
-          </div>
-        </div>
-      )}
-
       {/* Header with title and refresh button */}
       <div className="active-rooms__header">
         <h2 className="active-rooms__title">
@@ -420,89 +357,93 @@ export function ActiveRooms() {
       </div>
 
       {/* Modal de senha para entrar */}
-      {showPasswordModal && (
-        <div className="password-modal-overlay" onClick={closePasswordModal}>
-          <div className="password-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Sala com senha</h3>
-            <p>A sala #{pendingRoomCode} requer senha</p>
+      <Modal
+        isOpen={showPasswordModal}
+        onClose={closePasswordModal}
+        title="Sala com senha"
+        size="sm"
+      >
+        <div className="password-modal-content">
+          <p>A sala #{pendingRoomCode} requer senha</p>
+          <input
+            type="password"
+            className="password-modal__input"
+            placeholder="Digite a senha"
+            value={joinPassword}
+            onChange={(e) => setJoinPassword(e.target.value)}
+            autoFocus
+          />
+          <div className="password-modal__actions">
+            <button
+              className="password-modal__cancel"
+              onClick={closePasswordModal}
+            >
+              Cancelar
+            </button>
+            <button
+              className="password-modal__confirm"
+              onClick={handleJoinWithPassword}
+              disabled={joining || !joinPassword}
+            >
+              {joining ? 'Entrando...' : 'Entrar'}
+            </button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* Modal de criação de sala */}
+      <Modal
+        isOpen={showCreateModal}
+        onClose={closeCreateModal}
+        title="Criar Sala"
+        size="sm"
+      >
+        <div className="create-room-modal-content">
+          <p>Configure sua nova sala</p>
+
+          <div className="create-room__option">
+            <label className="create-room__toggle">
+              <input
+                type="checkbox"
+                checked={usePassword}
+                onChange={(e) => setUsePassword(e.target.checked)}
+              />
+              <span className="create-room__toggle-slider"></span>
+              <span className="create-room__toggle-label">
+                <LockIcon size={14} />
+                Proteger com senha
+              </span>
+            </label>
+          </div>
+
+          {usePassword && (
             <input
               type="password"
               className="password-modal__input"
-              placeholder="Digite a senha"
-              value={joinPassword}
-              onChange={(e) => setJoinPassword(e.target.value)}
+              placeholder="Digite a senha da sala"
+              value={createPassword}
+              onChange={(e) => setCreatePassword(e.target.value)}
               autoFocus
             />
-            <div className="password-modal__actions">
-              <button
-                className="password-modal__cancel"
-                onClick={closePasswordModal}
-              >
-                Cancelar
-              </button>
-              <button
-                className="password-modal__confirm"
-                onClick={handleJoinWithPassword}
-                disabled={joining || !joinPassword}
-              >
-                {joining ? 'Entrando...' : 'Entrar'}
-              </button>
-            </div>
+          )}
+
+          <div className="password-modal__actions">
+            <button
+              className="password-modal__cancel"
+              onClick={closeCreateModal}
+            >
+              Cancelar
+            </button>
+            <button
+              className="password-modal__confirm"
+              onClick={handleCreateRoom}
+              disabled={creating || (usePassword && !createPassword)}
+            >
+              {creating ? 'Criando...' : 'Criar Sala'}
+            </button>
           </div>
         </div>
-      )}
-
-      {/* Modal de criação de sala */}
-      {showCreateModal && (
-        <div className="password-modal-overlay" onClick={closeCreateModal}>
-          <div className="password-modal" onClick={(e) => e.stopPropagation()}>
-            <h3>Criar Sala</h3>
-            <p>Configure sua nova sala</p>
-
-            <div className="create-room__option">
-              <label className="create-room__toggle">
-                <input
-                  type="checkbox"
-                  checked={usePassword}
-                  onChange={(e) => setUsePassword(e.target.checked)}
-                />
-                <span className="create-room__toggle-slider"></span>
-                <span className="create-room__toggle-label">
-                  <LockIcon size={14} />
-                  Proteger com senha
-                </span>
-              </label>
-            </div>
-
-            {usePassword && (
-              <input
-                type="password"
-                className="password-modal__input"
-                placeholder="Digite a senha da sala"
-                value={createPassword}
-                onChange={(e) => setCreatePassword(e.target.value)}
-                autoFocus
-              />
-            )}
-
-            <div className="password-modal__actions">
-              <button
-                className="password-modal__cancel"
-                onClick={closeCreateModal}
-              >
-                Cancelar
-              </button>
-              <button
-                className="password-modal__confirm"
-                onClick={handleCreateRoom}
-                disabled={creating || (usePassword && !createPassword)}
-              >
-                {creating ? 'Criando...' : 'Criar Sala'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      </Modal>
     </div>
   );
 }
