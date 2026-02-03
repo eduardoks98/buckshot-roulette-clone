@@ -8,6 +8,18 @@ export type GameStatus = 'WAITING' | 'IN_PROGRESS' | 'COMPLETED' | 'ABANDONED';
 
 export type TurnDirection = 1 | -1; // 1 = horário, -1 = anti-horário
 
+/**
+ * Game mode controls progression (stats, XP, rank):
+ * - NORMAL: Full progression (multiplayer) - stats, XP, and rank
+ * - SINGLEPLAYER: Stats + XP, NO rank changes (playing against bots)
+ * - DEBUG: Stats + XP, rank toggleable (dev only for testing)
+ */
+export enum GameMode {
+  NORMAL = 'normal',
+  SINGLEPLAYER = 'singleplayer',
+  DEBUG = 'debug',
+}
+
 export interface ShellInfo {
   total: number;
   live: number;

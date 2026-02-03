@@ -7,6 +7,7 @@ import {
   RoomInfo,
   ReconnectedPayload,
   Item,
+  GameMode,
 } from '../../../../shared/types';
 import { GAME_RULES } from '../../../../shared/constants';
 
@@ -14,11 +15,8 @@ import { GAME_RULES } from '../../../../shared/constants';
 // TYPES
 // ==========================================
 
-// Game modes control progression (stats, XP, rank)
-// - 'normal': Full progression (multiplayer)
-// - 'singleplayer': Stats + XP, NO rank changes
-// - 'debug': Stats + XP, rank is toggleable (dev only)
-export type GameMode = 'normal' | 'singleplayer' | 'debug';
+// Re-export GameMode for convenience
+export { GameMode };
 
 export interface Room {
   code: string;
@@ -247,7 +245,7 @@ export class RoomService {
     hostName: string,
     password?: string,
     odUserId?: string,
-    gameMode: GameMode = 'normal',
+    gameMode: GameMode = GameMode.NORMAL,
     debugRankEnabled: boolean = false
   ): { room: Room; players: PlayerPublicState[] } {
     let code = this.generateRoomCode();
@@ -278,7 +276,7 @@ export class RoomService {
       pausedPlayerName: null,
       pauseStartTime: null,
       gameMode,
-      debugRankEnabled: gameMode === 'debug' ? debugRankEnabled : false,
+      debugRankEnabled: gameMode === GameMode.DEBUG ? debugRankEnabled : false,
     };
 
     this.rooms.set(code, room);

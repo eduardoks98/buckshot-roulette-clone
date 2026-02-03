@@ -19,9 +19,12 @@ import {
   calculatePerformanceScore,
   getDisplayRank,
   RankingInput,
+  RankingResult,
   Tier,
+  Division,
 } from '../../../../shared/utils/rankingCalculator';
 import { PlayerXpResult } from '../../../../shared/types/achievement.types';
+import { GameMode } from '../../../../shared/types';
 
 // ==========================================
 // TYPES
@@ -34,6 +37,9 @@ interface CreateGameParams {
   hostSocketId?: string;  // Socket ID do host para correlação
   hasPassword: boolean;
   maxPlayers?: number;
+  // Game mode controls progression (see GameMode enum)
+  gameMode?: GameMode;
+  debugRankEnabled?: boolean;
 }
 
 interface AddParticipantParams {
@@ -81,11 +87,20 @@ interface SaveRoundParams {
 export class GamePersistenceService {
   // Create a new game in database
   async createGame(params: CreateGameParams): Promise<string> {
+    // Determine if game should be ranked based on gameMode
+    // - NORMAL: ranked (multiplayer)
+    // - SINGLEPLAYER: NOT ranked (no LP/MMR changes)
+    // - DEBUG: depends on debugRankEnabled toggle
+    const gameMode = params.gameMode || GameMode.NORMAL;
+    const isRanked = gameMode === GameMode.NORMAL || (gameMode === GameMode.DEBUG && params.debugRankEnabled);
+
     console.log(`[DB] Criando jogo: ${params.roomCode}`, {
       hostUserId: params.hostUserId,
       hostGuestName: params.hostGuestName,
       hostSocketId: params.hostSocketId,
       hasPassword: params.hasPassword,
+      gameMode,
+      isRanked,
     });
 
     try {
@@ -95,6 +110,7 @@ export class GamePersistenceService {
           status: GameStatus.WAITING,
           has_password: params.hasPassword,
           max_players: params.maxPlayers || 4,
+          is_ranked: isRanked,
           game_participants: {
             create: {
               user_id: params.hostUserId || null,
@@ -203,7 +219,7 @@ export class GamePersistenceService {
       // Verificar se jogo existe ANTES de tentar atualizar
       const existingGame = await prisma.game.findUnique({
         where: { room_code: roomCode },
-        select: { id: true, status: true },
+        select: { id: true, status: true, is_ranked: true },
       });
 
       if (!existingGame) {
@@ -213,7 +229,8 @@ export class GamePersistenceService {
         return null;
       }
 
-      console.log(`[DB] Jogo encontrado: ${existingGame.id} (status: ${existingGame.status})`);
+      const isRankedGame = existingGame.is_ranked;
+      console.log(`[DB] Jogo encontrado: ${existingGame.id} (status: ${existingGame.status}, isRanked: ${isRankedGame})`);
 
       // Update game status
       const game = await prisma.game.update({
@@ -294,41 +311,68 @@ export class GamePersistenceService {
             gameContext,
           };
 
-          // Calcular ELO com performance (legacy)
-          const eloResult = calculatePerformanceBasedElo(eloInput);
-          const eloChange = eloResult.totalChange;
-
           // ========================================
-          // NOVO SISTEMA DE RANKING (LP + MMR)
+          // CÁLCULO DE RANK (APENAS SE isRankedGame)
           // ========================================
+          // Para jogos não-ranked (singleplayer, debug sem toggle):
+          // - Stats são salvos normalmente
+          // - XP é ganho normalmente
+          // - ELO/LP/MMR NÃO mudam
 
-          // Calcular performance score para o novo sistema
-          const performanceScore = calculatePerformanceScore({
-            kills: stats.kills,
-            deaths: stats.deaths,
-            roundsWon: stats.roundsWon,
-            totalRounds: game.current_round,
-            damageDealt: stats.damageDealt,
-            damageTaken: stats.damageTaken,
-            itemsUsed: stats.itemsUsed,
-          });
-
-          // Preparar input para novo ranking
-          const rankingInput: RankingInput = {
-            currentTier: participant.user?.tier || 'Bronze',
-            currentDivision: participant.user?.division ?? 4,
-            currentLp: participant.user?.lp || 0,
-            currentMmr: participant.user?.mmr_hidden || 0,
-            gamesSincePromo: participant.user?.games_since_promo || 0,
-            position: stats.position,
-            totalPlayers,
-            allPlayersMmr: playersMmrs,
-            performanceScore,
-            wasQuitter: false, // TODO: detectar quitters
+          let eloChange = 0;
+          const currentTier = (participant.user?.tier || 'Bronze') as Tier;
+          const currentDivision = (participant.user?.division ?? 4) as Division;
+          let rankingResult: RankingResult = {
+            lpChange: 0,
+            mmrChange: 0,
+            newTier: currentTier,
+            newDivision: currentDivision,
+            newLp: participant.user?.lp || 0,
+            newMmr: participant.user?.mmr_hidden || 0,
+            displayRank: getDisplayRank(currentTier, currentDivision),
+            promoted: false,
+            demoted: false,
           };
 
-          // Calcular novo LP/MMR
-          const rankingResult = calculateLpChange(rankingInput);
+          if (isRankedGame) {
+            // Calcular ELO com performance (legacy)
+            const eloResult = calculatePerformanceBasedElo(eloInput);
+            eloChange = eloResult.totalChange;
+
+            // ========================================
+            // NOVO SISTEMA DE RANKING (LP + MMR)
+            // ========================================
+
+            // Calcular performance score para o novo sistema
+            const performanceScore = calculatePerformanceScore({
+              kills: stats.kills,
+              deaths: stats.deaths,
+              roundsWon: stats.roundsWon,
+              totalRounds: game.current_round,
+              damageDealt: stats.damageDealt,
+              damageTaken: stats.damageTaken,
+              itemsUsed: stats.itemsUsed,
+            });
+
+            // Preparar input para novo ranking
+            const rankingInput: RankingInput = {
+              currentTier: participant.user?.tier || 'Bronze',
+              currentDivision: participant.user?.division ?? 4,
+              currentLp: participant.user?.lp || 0,
+              currentMmr: participant.user?.mmr_hidden || 0,
+              gamesSincePromo: participant.user?.games_since_promo || 0,
+              position: stats.position,
+              totalPlayers,
+              allPlayersMmr: playersMmrs,
+              performanceScore,
+              wasQuitter: false, // TODO: detectar quitters
+            };
+
+            // Calcular novo LP/MMR
+            rankingResult = calculateLpChange(rankingInput);
+          } else {
+            console.log(`[DB] Jogo não-ranked: pulando cálculo de ELO/LP para ${participant.user_id}`);
+          }
 
           // Calculate XP
           const currentUser = await prisma.user.findUnique({
@@ -384,37 +428,43 @@ export class GamePersistenceService {
             newGamesSincePromo = 0; // Reset após promoção/rebaixamento
           }
 
-          // Atualizar User com ELO, rank, stats, XP e NOVO SISTEMA DE RANKING
+          // Atualizar User com stats, XP, e rank (se for ranked)
           await prisma.user.update({
             where: { id: participant.user_id },
             data: {
+              // Stats (sempre atualizados)
               games_played: { increment: 1 },
               games_won: isWinner ? { increment: 1 } : undefined,
               rounds_played: { increment: game.current_round },
               rounds_won: { increment: stats.roundsWon },
               total_kills: { increment: stats.kills },
               total_deaths: { increment: stats.deaths },
-              // Legacy ELO
-              elo_rating: newElo,
-              rank: newRank,
-              // XP
+              // XP (sempre atualizado)
               total_xp: { increment: xpResult.totalXp },
-              // Novo sistema de ranking
-              tier: rankingResult.newTier,
-              division: rankingResult.newDivision,
-              lp: rankingResult.newLp,
-              mmr_hidden: rankingResult.newMmr,
-              peak_mmr: Math.max(participant.user?.mmr_hidden || 0, rankingResult.newMmr),
-              games_since_promo: newGamesSincePromo,
+              // Rank (apenas se for ranked game)
+              ...(isRankedGame ? {
+                // Legacy ELO
+                elo_rating: newElo,
+                rank: newRank,
+                // Novo sistema de ranking
+                tier: rankingResult.newTier,
+                division: rankingResult.newDivision,
+                lp: rankingResult.newLp,
+                mmr_hidden: rankingResult.newMmr,
+                peak_mmr: Math.max(participant.user?.mmr_hidden || 0, rankingResult.newMmr),
+                games_since_promo: newGamesSincePromo,
+              } : {}),
             },
           });
 
-          // Atualizar leaderboard com ELO real
-          await leaderboardService.updatePlayerStats(participant.user_id, {
-            games_played: 1,
-            games_won: isWinner ? 1 : 0,
-            elo_change: eloChange,
-          });
+          // Atualizar leaderboard (apenas se for ranked game)
+          if (isRankedGame) {
+            await leaderboardService.updatePlayerStats(participant.user_id, {
+              games_played: 1,
+              games_won: isWinner ? 1 : 0,
+              elo_change: eloChange,
+            });
+          }
 
           // Store XP result for returning to handler
           xpResults.push({

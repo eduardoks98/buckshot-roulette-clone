@@ -3,7 +3,7 @@
 // ==========================================
 
 import { TypedIOServer, TypedSocket, socketUserMap } from '../socket';
-import { RoomService, Player, Room } from '../services/game/room.service';
+import { RoomService, Player, Room, GameMode } from '../services/game/room.service';
 import { GameService } from '../services/game/game.service';
 import { gamePersistenceService } from '../services/game/game.persistence.service';
 import { achievementService, PlayerEndGameStats } from '../services/achievement.service';
@@ -303,14 +303,22 @@ export function registerRoomHandlers(
   // ==========================================
   // CREATE ROOM
   // ==========================================
-  socket.on('createRoom', async ({ playerName, password }) => {
+  socket.on('createRoom', async ({ playerName, password, gameMode, debugRankEnabled }: {
+    playerName: string;
+    password?: string;
+    gameMode?: GameMode;
+    debugRankEnabled?: boolean;
+  }) => {
     try {
       const userData = socketUserMap.get(socket.id);
+      const mode: GameMode = gameMode || GameMode.NORMAL;
+      const rankEnabled = mode === GameMode.DEBUG ? (debugRankEnabled || false) : false;
 
       // DEBUG: Log para identificar problema de múltiplas salas
       console.log(`[CreateRoom] ========== INICIO ==========`);
       console.log(`[CreateRoom] socket.id: ${socket.id}`);
       console.log(`[CreateRoom] playerName: ${playerName}`);
+      console.log(`[CreateRoom] gameMode: ${mode}, debugRankEnabled: ${rankEnabled}`);
       console.log(`[CreateRoom] userData:`, userData ? { odUserId: userData.odUserId, displayName: userData.displayName } : 'undefined');
 
       // Se usuário autenticado, usar lock para prevenir race condition de múltiplas abas
@@ -333,7 +341,7 @@ export function registerRoomHandlers(
           console.log(`[CreateRoom] Verificações passaram (com lock) - criando sala...`);
 
           // Criar sala DENTRO do lock
-          const result = roomService.createRoom(socket.id, playerName, password, userData.odUserId);
+          const result = roomService.createRoom(socket.id, playerName, password, userData.odUserId, mode, rankEnabled);
 
           socket.join(result.room.code);
 
@@ -345,6 +353,8 @@ export function registerRoomHandlers(
               hostGuestName: undefined,
               hostSocketId: socket.id,
               hasPassword: !!password,
+              gameMode: mode,
+              debugRankEnabled: rankEnabled,
             });
           } catch (err) {
             console.error('[DB] Erro ao criar jogo - JOGO NÃO SERÁ SALVO:', err);
@@ -385,7 +395,7 @@ export function registerRoomHandlers(
 
       console.log(`[CreateRoom] Verificações passaram - criando sala...`);
 
-      const result = roomService.createRoom(socket.id, playerName, password);
+      const result = roomService.createRoom(socket.id, playerName, password, undefined, mode, rankEnabled);
 
       socket.join(result.room.code);
 
@@ -397,6 +407,8 @@ export function registerRoomHandlers(
           hostGuestName: playerName,
           hostSocketId: socket.id,
           hasPassword: !!password,
+          gameMode: mode,
+          debugRankEnabled: rankEnabled,
         });
       } catch (err) {
         console.error('[DB] Erro ao criar jogo (guest) - JOGO NÃO SERÁ SALVO:', err);
