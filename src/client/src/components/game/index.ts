@@ -9,6 +9,7 @@ export { default as GameBoard } from './GameBoard/GameBoard';
 export { RevolverCylinder } from './RevolverCylinder';
 export { RoundAnnouncementOverlay } from './RoundAnnouncementOverlay';
 export type { RoundAnnouncementOverlayProps } from './RoundAnnouncementOverlay';
+export { GameMenu } from './GameMenu';
 export type { RevolverCylinderProps, RevealedChamber } from './RevolverCylinder';
 export type {
   GamePlayer,

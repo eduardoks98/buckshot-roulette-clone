@@ -1,0 +1,327 @@
+/* ==========================================
+   GAME MENU STYLES - Portal Design
+   ========================================== */
+
+.game-menu-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9000;
+  animation: gameMenuFadeIn 0.2s ease-out;
+}
+
+@keyframes gameMenuFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.game-menu {
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 12px;
+  width: 90%;
+  max-width: 380px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  animation: gameMenuSlideIn 0.25s ease-out;
+}
+
+@keyframes gameMenuSlideIn {
+  from {
+    transform: scale(0.95) translateY(-10px);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1) translateY(0);
+    opacity: 1;
+  }
+}
+
+/* Header */
+.game-menu__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #2a2a2a;
+}
+
+.game-menu__title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #ffffff;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.game-menu__close {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  color: #a0a0a0;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.game-menu__close:hover {
+  background: #2a2a2a;
+  color: #ffffff;
+}
+
+/* Content */
+.game-menu__content {
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* Section */
+.game-menu__section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.game-menu__section-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.game-menu__section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #ffffff;
+  font-size: 0.9375rem;
+  font-weight: 500;
+}
+
+.game-menu__music-icon {
+  font-size: 1.125rem;
+  color: #a0a0a0;
+}
+
+/* Toggle Button */
+.game-menu__toggle {
+  padding: 0.375rem 0.75rem;
+  background: #141414;
+  border: 1px solid #2a2a2a;
+  border-radius: 4px;
+  color: #666666;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 48px;
+}
+
+.game-menu__toggle:hover {
+  background: #1f1f1f;
+  color: #a0a0a0;
+}
+
+.game-menu__toggle.active {
+  background: rgba(16, 185, 129, 0.15);
+  border-color: #10b981;
+  color: #10b981;
+}
+
+/* Slider Row */
+.game-menu__slider-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.game-menu__slider {
+  flex: 1;
+  height: 6px;
+  border-radius: 3px;
+  background: #141414;
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.game-menu__slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #10b981;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+  border: 2px solid #1a1a1a;
+}
+
+.game-menu__slider::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+}
+
+.game-menu__slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #10b981;
+  cursor: pointer;
+  border: 2px solid #1a1a1a;
+}
+
+.game-menu__slider-value {
+  min-width: 40px;
+  color: #a0a0a0;
+  font-size: 0.8125rem;
+  text-align: right;
+}
+
+/* Divider */
+.game-menu__divider {
+  height: 1px;
+  background: #2a2a2a;
+  margin: 0.5rem 0;
+}
+
+/* Abandon Button */
+.game-menu__abandon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: transparent;
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 8px;
+  color: #ef4444;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.game-menu__abandon-btn:hover {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: #ef4444;
+}
+
+/* Footer */
+.game-menu__footer {
+  padding: 1rem 1.25rem;
+  border-top: 1px solid #2a2a2a;
+}
+
+.game-menu__resume-btn {
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: #10b981;
+  border: none;
+  border-radius: 8px;
+  color: #ffffff;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.game-menu__resume-btn:hover {
+  background: #0ea573;
+  transform: translateY(-1px);
+}
+
+/* Abandon Confirm */
+.game-menu__abandon-confirm {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 1rem 0;
+}
+
+.abandon-confirm__icon {
+  color: #f59e0b;
+  margin-bottom: 1rem;
+}
+
+.game-menu__abandon-confirm h3 {
+  margin: 0 0 0.5rem;
+  color: #ffffff;
+  font-size: 1.125rem;
+  font-weight: 600;
+}
+
+.game-menu__abandon-confirm p {
+  margin: 0 0 1.5rem;
+  color: #a0a0a0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.abandon-confirm__buttons {
+  display: flex;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.abandon-confirm__btn {
+  flex: 1;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.abandon-confirm__btn--cancel {
+  background: #141414;
+  border: 1px solid #2a2a2a;
+  color: #ffffff;
+}
+
+.abandon-confirm__btn--cancel:hover {
+  background: #1f1f1f;
+  border-color: #3a3a3a;
+}
+
+.abandon-confirm__btn--confirm {
+  background: #ef4444;
+  border: none;
+  color: #ffffff;
+}
+
+.abandon-confirm__btn--confirm:hover {
+  background: #dc2626;
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .game-menu {
+    width: 95%;
+    max-width: none;
+    margin: 1rem;
+  }
+
+  .game-menu__header {
+    padding: 0.875rem 1rem;
+  }
+
+  .game-menu__content {
+    padding: 1rem;
+  }
+
+  .game-menu__footer {
+    padding: 0.875rem 1rem;
+  }
+}
