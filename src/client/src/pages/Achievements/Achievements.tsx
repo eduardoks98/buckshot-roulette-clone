@@ -8,6 +8,8 @@ import { useAuth } from '../../context/AuthContext';
 import { MILESTONES } from '@shared/constants/achievements';
 import { PageLayout, InlineAd } from '../../components/layout/PageLayout';
 import { LoadingState } from '../../components/common/LoadingState';
+import { LockIcon } from '../../components/icons';
+import { ACHIEVEMENT_ICONS_BY_ID, ACHIEVEMENT_ICONS } from '../../components/icons/achievements';
 import './Achievements.css';
 
 // ==========================================
@@ -192,6 +194,8 @@ export default function Achievements() {
           <div className="achievement-grid">
             {filteredMilestones.map(milestone => {
               const isUnlocked = unlockedIds.has(milestone.id);
+              // Usar novo sistema de ícones por ID, fallback para sistema antigo
+              const IconComponent = ACHIEVEMENT_ICONS_BY_ID[milestone.id] || ACHIEVEMENT_ICONS[milestone.icon];
 
               return (
                 <div
@@ -199,9 +203,11 @@ export default function Achievements() {
                   className={`achievement-card ${isUnlocked ? 'unlocked' : 'locked'}`}
                 >
                   <div className="achievement-icon-wrapper">
-                    <span className="achievement-icon">{milestone.icon}</span>
+                    <span className="achievement-icon">
+                      {IconComponent ? <IconComponent size={48} /> : milestone.icon}
+                    </span>
                     {!isUnlocked && (
-                      <span className="lock-overlay">&#x1F512;</span>
+                      <span className="lock-overlay"><LockIcon size={16} /></span>
                     )}
                   </div>
                   <div className="achievement-info">

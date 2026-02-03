@@ -24,6 +24,11 @@ export * from './awards';
 // Rank icons
 export * from './ranks';
 
+// Achievement icons - NÃO usar export * para evitar conflitos de nomes
+// Importar diretamente de './achievements' quando necessário
+// export * from './achievements';
+export { ACHIEVEMENT_ICONS, getAchievementIcon } from './achievements';
+
 // ==========================================
 // ITEM ICON MAP - For dynamic rendering
 // ==========================================

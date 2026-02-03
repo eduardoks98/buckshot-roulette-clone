@@ -13,6 +13,8 @@ import { EmptyState } from '../../components/common/EmptyState';
 import { getRankIcon } from '../../utils/helpers';
 import { AdBanner } from '../../components/common/AdBanner';
 import { MultiProviderLogin } from '../../components/auth/MultiProviderLogin';
+import { TrophyIcon } from '../../components/icons';
+import { ACHIEVEMENT_ICONS } from '../../components/icons/achievements';
 import './Leaderboard.css';
 
 // AdSense config
@@ -170,7 +172,7 @@ export default function Leaderboard() {
           <div className="error-message">{error}</div>
         ) : entries.length === 0 ? (
           <EmptyState
-            icon="🏆"
+            icon={<TrophyIcon size={48} color="#d4a418" />}
             title="Nenhum jogador no ranking"
             description="Jogue partidas ranqueadas para aparecer!"
             action={{ label: 'Jogar Agora', onClick: () => navigate('/multiplayer') }}
@@ -200,9 +202,14 @@ export default function Leaderboard() {
                     )}
                     {entry.active_title_id && (() => {
                       const titleDef = getTitleById(entry.active_title_id!);
-                      return titleDef ? (
-                        <span className="entry-title">{titleDef.icon} {titleDef.name}</span>
-                      ) : null;
+                      if (!titleDef) return null;
+                      const TitleIcon = ACHIEVEMENT_ICONS[titleDef.icon];
+                      return (
+                        <span className="entry-title">
+                          {TitleIcon && <TitleIcon size={14} />}
+                          {titleDef.name}
+                        </span>
+                      );
                     })()}
                   </span>
                   <span className="entry-stats">

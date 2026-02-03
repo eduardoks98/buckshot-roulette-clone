@@ -145,11 +145,7 @@
 
 /* Locked State */
 .achievement-card.locked {
-  opacity: 0.4;
-}
-
-.achievement-card.locked .achievement-icon-wrapper {
-  filter: grayscale(1);
+  opacity: 0.6;
 }
 
 /* ==========================================
@@ -158,26 +154,62 @@
 
 .achievement-icon-wrapper {
   position: relative;
-  width: 56px;
-  height: 56px;
+  width: 80px;
+  height: 80px;
   display: flex;
   align-items: center;
   justify-content: center;
-  margin-bottom: 0.75rem;
+  margin-bottom: 1rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: all 0.3s ease;
 }
 
 .achievement-icon {
   font-size: 2.5rem;
   line-height: 1;
+  color: rgba(255, 255, 255, 0.4);
+  transition: all 0.3s ease;
+}
+
+/* Ícone desbloqueado - destaque dourado */
+.achievement-card.unlocked .achievement-icon-wrapper {
+  background: rgba(212, 164, 24, 0.1);
+  border-color: rgba(212, 164, 24, 0.3);
+  box-shadow:
+    0 0 20px rgba(212, 164, 24, 0.15),
+    inset 0 0 20px rgba(212, 164, 24, 0.05);
+}
+
+.achievement-card.unlocked .achievement-icon {
+  color: var(--gold-accent);
+  filter: drop-shadow(0 0 8px rgba(212, 164, 24, 0.4));
+}
+
+/* Ícone bloqueado - discreto */
+.achievement-card.locked .achievement-icon-wrapper {
+  background: rgba(0, 0, 0, 0.2);
+  border-color: rgba(255, 255, 255, 0.05);
+}
+
+.achievement-card.locked .achievement-icon {
+  color: rgba(255, 255, 255, 0.25);
+  filter: grayscale(1);
 }
 
 .lock-overlay {
   position: absolute;
-  bottom: -4px;
-  right: -4px;
-  font-size: 1rem;
+  bottom: -2px;
+  right: -2px;
   line-height: 1;
-  filter: grayscale(1);
+  color: rgba(255, 255, 255, 0.5);
+  background: rgba(0, 0, 0, 0.8);
+  border-radius: 50%;
+  padding: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 /* ==========================================
@@ -228,8 +260,10 @@
     padding: 1rem 0.75rem;
   }
 
-  .achievement-icon {
-    font-size: 2rem;
+  .achievement-icon-wrapper {
+    width: 64px;
+    height: 64px;
+    border-radius: 12px;
   }
 
   .category-tabs {
@@ -260,16 +294,18 @@
     padding: 0.75rem 0.5rem;
   }
 
+  .achievement-icon-wrapper {
+    width: 56px;
+    height: 56px;
+    border-radius: 10px;
+  }
+
   .achievement-name {
     font-size: 0.8rem;
   }
 
   .achievement-description {
     font-size: 0.7rem;
-  }
-
-  .achievement-icon {
-    font-size: 1.75rem;
   }
 
   .category-tab {
