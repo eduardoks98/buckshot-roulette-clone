@@ -4,7 +4,7 @@ import { useSocket } from '../../../context/SocketContext';
 import { useAuth } from '../../../context/AuthContext';
 import { useRequireAuth } from '../../../hooks';
 import { PageLayout } from '../../../components/layout/PageLayout';
-import { BannerAd } from '../../../components/ads';
+import { BannerAd } from '../../../components/advertising';
 import { useSounds } from '../../../audio/useSounds';
 import type { RoomInfo } from '../../../../../shared/types/socket-events.types';
 import './Lobby.css';

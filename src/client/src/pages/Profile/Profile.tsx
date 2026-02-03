@@ -83,6 +83,7 @@ export default function Profile() {
   const [titles, setTitles] = useState<UserTitleEntry[]>([]);
   const [showTitleSelector, setShowTitleSelector] = useState(false);
   const [titleLoading, setTitleLoading] = useState(false);
+  const [logoutLoading, setLogoutLoading] = useState(false);
   const [recentGames, setRecentGames] = useState<RecentGame[]>([]);
   const [recentStats, setRecentStats] = useState<RecentStats | null>(null);
   const [historyLoading, setHistoryLoading] = useState(false);
@@ -421,9 +422,23 @@ export default function Profile() {
         </div>
 
         {/* Logout Button */}
-        <button className="profile-logout" onClick={logout}>
-          <LogoutIcon size={16} />
-          Sair
+        <button
+          className="profile-logout"
+          onClick={async () => {
+            setLogoutLoading(true);
+            await logout();
+            // logout() handles navigation/state clearing
+          }}
+          disabled={logoutLoading}
+        >
+          {logoutLoading ? (
+            <>Saindo...</>
+          ) : (
+            <>
+              <LogoutIcon size={16} />
+              Sair
+            </>
+          )}
         </button>
 
         {/* Title Selector Modal */}

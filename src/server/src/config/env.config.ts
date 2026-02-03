@@ -6,8 +6,12 @@ import dotenv from 'dotenv';
 import path from 'path';
 
 // Carregar variáveis de ambiente
-// O __dirname no dist é: dist/server/src/config, então precisamos subir 4 níveis
-dotenv.config({ path: path.resolve(__dirname, '../../../../.env') });
+// Em dev (ts-node): __dirname = src/server/src/config → subir 2 níveis
+// Em prod (dist): __dirname = dist/server/src/config → subir 4 níveis
+const envPath = __dirname.includes('dist')
+  ? path.resolve(__dirname, '../../../../.env')
+  : path.resolve(__dirname, '../../.env');
+dotenv.config({ path: envPath });
 
 export const ENV = {
   // Server
@@ -20,11 +24,6 @@ export const ENV = {
 
   // Session
   SESSION_SECRET: process.env.SESSION_SECRET || 'buckshot-roulette-secret-key',
-
-  // Google OAuth (legacy - now handled by Games Admin)
-  GOOGLE_CLIENT_ID: process.env.GOOGLE_CLIENT_ID || '',
-  GOOGLE_CLIENT_SECRET: process.env.GOOGLE_CLIENT_SECRET || '',
-  GOOGLE_CALLBACK_URL: process.env.GOOGLE_CALLBACK_URL || '/api/auth/google/callback',
 
   // JWT (local tokens)
   JWT_SECRET: process.env.JWT_SECRET || 'jwt-secret-key',

@@ -6,7 +6,6 @@ import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
 import http from 'http';
 import path from 'path';
-import passport from './config/passport.config';
 import { ENV } from './config/env.config';
 import { getOnlineCount } from './socket';
 import authRoutes from './routes/auth.routes';
@@ -45,8 +44,6 @@ export function createServer(): { app: Express; httpServer: http.Server } {
   // URL encoded parser
   app.use(express.urlencoded({ extended: true }));
 
-  // Passport
-  app.use(passport.initialize());
 
   // ==========================================
   // STATIC FILES (em produção)

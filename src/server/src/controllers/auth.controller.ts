@@ -2,69 +2,41 @@
 // AUTH CONTROLLER
 // ==========================================
 
-import { Request, Response, NextFunction } from 'express';
-import passport from 'passport';
-import { User } from '@prisma/client';
+import { Request, Response } from 'express';
 import { authService } from '../services/auth.service';
-import { env } from '../config/env.config';
-
-// ==========================================
-// GOOGLE AUTH (Legacy - kept for backwards compatibility)
-// Now authentication is primarily handled by Games Admin
-// ==========================================
-
-export const googleAuth = passport.authenticate('google', {
-  scope: ['profile', 'email'],
-});
-
-export const googleCallback = (req: Request, res: Response, next: NextFunction) => {
-  console.log('[Auth] CLIENT_URL configurado:', env.CLIENT_URL);
-
-  passport.authenticate('google', { session: false }, async (err: Error, user: User) => {
-    if (err) {
-      console.error('[Auth] Erro no callback Google:', err);
-      return res.redirect(`${env.CLIENT_URL}/?error=auth_failed`);
-    }
-
-    if (!user) {
-      return res.redirect(`${env.CLIENT_URL}/?error=no_user`);
-    }
-
-    try {
-      // Create session and token
-      const { token } = await authService.createSession(user.id);
-
-      // Redirect to home with token (menu principal)
-      res.redirect(`${env.CLIENT_URL}/?token=${token}`);
-    } catch (error) {
-      console.error('[Auth] Erro ao criar sessao:', error);
-      res.redirect(`${env.CLIENT_URL}/?error=session_failed`);
-    }
-  })(req, res, next);
-};
 
 // ==========================================
 // SESSION
 // ==========================================
 
 export const getMe = async (req: Request, res: Response) => {
+  console.log('[Auth] getMe - Request received');
   try {
     const authHeader = req.headers.authorization;
+    console.log('[Auth] getMe - Auth header present:', !!authHeader);
+
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log('[Auth] getMe - No valid auth header, returning 401');
       return res.status(401).json({ error: 'Token nao fornecido' });
     }
 
     const token = authHeader.split(' ')[1];
+    console.log('[Auth] getMe - Token length:', token.length);
+
     const user = await authService.validateToken(token);
+    console.log('[Auth] getMe - User from validateToken:', user ? user.email : 'null');
 
     if (!user) {
+      console.log('[Auth] getMe - User is null, returning 401');
       return res.status(401).json({ error: 'Token invalido ou expirado' });
     }
 
     const profile = await authService.getUserProfile(user.id);
+    console.log('[Auth] getMe - Profile fetched:', profile ? profile.email : 'null');
+    console.log('[Auth] getMe - Returning success with user');
     res.json({ user: profile });
   } catch (error) {
-    console.error('[Auth] Erro ao obter usuario:', error);
+    console.error('[Auth] getMe - Error:', error);
     res.status(500).json({ error: 'Erro interno' });
   }
 };

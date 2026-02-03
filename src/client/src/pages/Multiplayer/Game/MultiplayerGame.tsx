@@ -6,6 +6,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useSocket } from '../../../context/SocketContext';
 import { useAuth } from '../../../context/AuthContext';
+import { useAnalytics } from '../../../context/AnalyticsContext';
 import { useRequireAuth } from '../../../hooks';
 import {
   PlayerPublicState,
@@ -24,7 +25,7 @@ import { getLevelInfo } from '../../../../../shared/utils/xpCalculator';
 import { BugReportModal, GameStateForReport } from '../../../components/common/BugReportModal';
 import { AchievementToast } from '../../../components/common';
 import { GameBoard, GameBoardRef, GamePlayer, GameItem, ShotResult, RoundAnnouncement, StealModalData, ItemActionModal, TurnDirection } from '../../../components/game';
-import { InterstitialAd, VideoRewardedAd } from '../../../components/ads';
+import { InterstitialAd, VideoRewardedAd } from '../../../components/advertising';
 import { AWARD_ICONS, RankIcon } from '../../../components/icons';
 import { useSounds } from '../../../audio';
 import './MultiplayerGame.css';
@@ -52,6 +53,7 @@ export default function MultiplayerGame() {
   const location = useLocation();
   const { socket, isConnected } = useSocket();
   const { user } = useAuth();
+  const { match: analyticsMatch } = useAnalytics();
   const {
     playDamage, playHeal, playItem,
     playRoundStart, playRoundWin, playGameOver,
@@ -287,6 +289,14 @@ export default function MultiplayerGame() {
       playReload();
       resetTimerWarning(); // Resetar warning do timer para novo round
 
+      // Analytics: Iniciar tracking da partida no primeiro round
+      if (data.round === 1) {
+        analyticsMatch.startMatch({
+          mode: 'multiplayer',
+          players: data.players.length,
+        });
+      }
+
       setPlayers(data.players);
       setCurrentPlayerId(data.currentPlayer);
       setRound(data.round);
@@ -377,6 +387,15 @@ export default function MultiplayerGame() {
       // Trigger shot animation + sound via GameBoard ref
       gameBoardRef.current?.triggerShot(data.shell === 'live');
 
+      // Analytics: Track shot action
+      if (data.shooter === myId) {
+        analyticsMatch.trackAction('shot_fired', {
+          shell_type: data.shell,
+          target_self: data.target === myId,
+          damage: data.damage,
+        });
+      }
+
       // Som de dano se acertou alguém
       if (data.shell === 'live' && data.damage > 0) {
         setTimeout(() => playDamage(), 500); // Delay para sincronizar com animação (spin + tiro)
@@ -428,6 +447,14 @@ export default function MultiplayerGame() {
     socket.on('itemUsed', (data: ItemUsedPayload) => {
       // Tocar som do item
       playItem(data.itemId);
+
+      // Analytics: Track item usage
+      if (data.playerId === myId) {
+        analyticsMatch.trackAction('item_used', {
+          item_id: data.itemId,
+          success: !data.failed,
+        });
+      }
 
       const userName = data.playerId === myId ? 'Você' : data.playerName;
       const item = ITEMS[data.itemId as ItemId];
@@ -680,6 +707,14 @@ export default function MultiplayerGame() {
       const isWinner = data.winner?.id === myId;
       playGameOver(isWinner);
 
+      // Analytics: Finalizar tracking da partida
+      const myStats = data.stats?.find(s => s.odId === myId);
+      analyticsMatch.endMatch({
+        result: isWinner ? 'win' : 'loss',
+        score: myStats ? calculateScore(myStats) : 0,
+        position: data.stats?.findIndex(s => s.odId === myId) ?? 0,
+      });
+
       // Limpar dados de sessão e reconexão (todas as chaves)
       sessionStorage.removeItem('bangshot_reconnect');
       localStorage.removeItem('bangshot_reconnect');
@@ -869,7 +904,7 @@ export default function MultiplayerGame() {
       socket.off('roomCreated');
       socket.off('roomJoined');
     };
-  }, [socket, players, myId, selectedItem, navigate, playDamage, playHeal, playItem, playRoundStart, playRoundWin, playGameOver, playTurnChange, playReload, resetTimerWarning]);
+  }, [socket, players, myId, selectedItem, navigate, playDamage, playHeal, playItem, playRoundStart, playRoundWin, playGameOver, playTurnChange, playReload, resetTimerWarning, analyticsMatch]);
 
   // Turn timer - decrements for all players to stay in sync
   useEffect(() => {

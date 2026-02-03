@@ -23,7 +23,16 @@
       "Bash(tree:*)",
       "Bash(composer update:*)",
       "Bash(php artisan vendor:publish:*)",
-      "Bash(php artisan:*)"
+      "Bash(php artisan:*)",
+      "Bash(mysql:*)",
+      "Bash(npx prisma migrate reset:*)",
+      "WebFetch(domain:support.google.com)",
+      "Bash(find:*)",
+      "Bash(npm install)",
+      "Bash(npm run build:*)",
+      "Bash(composer install:*)",
+      "Bash(git add:*)",
+      "Bash(php -r:*)"
     ]
   }
 }

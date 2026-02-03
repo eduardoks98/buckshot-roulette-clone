@@ -22,5 +22,11 @@ export default defineConfig({
         target: 'http://localhost:3000',
       },
     },
+    headers: {
+      // Disable caching to ensure OAuth redirects work correctly
+      'Cache-Control': 'no-store, no-cache, must-revalidate',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+    },
   },
 });

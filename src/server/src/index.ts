@@ -26,7 +26,7 @@ async function main() {
       console.log(`📡 Socket.IO: Ativo`);
       console.log(`🔧 Ambiente: ${ENV.NODE_ENV}`);
       console.log(`🌐 Client URL: ${ENV.CLIENT_URL}`);
-      console.log(`🔑 Google Callback: ${ENV.GOOGLE_CALLBACK_URL}`);
+      console.log(`🔐 Auth: Laravel OAuth (${ENV.GAMES_ADMIN_API_URL})`);
       console.log('========================================');
     });
 
