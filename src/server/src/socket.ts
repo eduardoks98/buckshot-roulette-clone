@@ -39,7 +39,10 @@ export function getOnlineCount(): { total: number; inQueue: number; userIds: str
   let anonymousCount = 0;
 
   for (const [, userData] of socketUserMap) {
-    if (userData?.odUserId) {
+    // Pular entradas nulas ou inválidas
+    if (!userData) continue;
+
+    if (userData.odUserId) {
       uniqueUserIds.add(userData.odUserId);
     } else {
       // Conexão sem autenticação (guest ou não logado)

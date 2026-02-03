@@ -7,3 +7,4 @@ export { ExplosionIcon } from './ExplosionIcon';
 export { SmokeIcon } from './SmokeIcon';
 export { ChainedIcon } from './ChainedIcon';
 export { DisconnectedIcon } from './DisconnectedIcon';
+export { WarningIcon } from './WarningIcon';

@@ -20,7 +20,7 @@ export default function Modal({
   title,
   children,
   size = 'md',
-  closeOnOverlayClick = true,
+  closeOnOverlayClick = false,
 }: ModalProps) {
   // Close on Escape key
   useEffect(() => {
