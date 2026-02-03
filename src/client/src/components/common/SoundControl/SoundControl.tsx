@@ -2,8 +2,9 @@
 // SOUND CONTROL - Controle de volume e música
 // ==========================================
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { soundManager } from '../../../audio';
+import { VolumeIcon } from '../../icons';
 import './SoundControl.css';
 
 interface SoundControlProps {
@@ -16,6 +17,7 @@ export function SoundControl({ compact = false }: SoundControlProps) {
   const [musicEnabled, setMusicEnabled] = useState(soundManager.isMusicEnabled());
   const [musicVolume, setMusicVolume] = useState(soundManager.getMusicVolume());
   const [showPanel, setShowPanel] = useState(false);
+  const panelRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     soundManager.loadSettings();
@@ -24,6 +26,20 @@ export function SoundControl({ compact = false }: SoundControlProps) {
     setMusicEnabled(soundManager.isMusicEnabled());
     setMusicVolume(soundManager.getMusicVolume());
   }, []);
+
+  // Click outside para fechar o painel
+  useEffect(() => {
+    if (!showPanel) return;
+
+    const handleClickOutside = (e: MouseEvent) => {
+      if (panelRef.current && !panelRef.current.contains(e.target as Node)) {
+        setShowPanel(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showPanel]);
 
   const toggleSound = () => {
     const newEnabled = !enabled;
@@ -49,11 +65,11 @@ export function SoundControl({ compact = false }: SoundControlProps) {
     soundManager.setMusicVolume(newVolume);
   };
 
-  const getVolumeIcon = () => {
-    if (!enabled || volume === 0) return '🔇';
-    if (volume < 0.3) return '🔈';
-    if (volume < 0.7) return '🔉';
-    return '🔊';
+  const getVolumeLevel = (): 'off' | 'muted' | 'low' | 'medium' | 'high' => {
+    if (!enabled || volume === 0) return 'muted';
+    if (volume < 0.3) return 'low';
+    if (volume < 0.7) return 'medium';
+    return 'high';
   };
 
   if (compact) {
@@ -63,23 +79,21 @@ export function SoundControl({ compact = false }: SoundControlProps) {
         onClick={toggleSound}
         title={enabled ? 'Desativar som' : 'Ativar som'}
       >
-        {getVolumeIcon()}
+        <VolumeIcon size={20} level={getVolumeLevel()} />
       </button>
     );
   }
 
+  const togglePanel = () => setShowPanel(!showPanel);
+
   return (
-    <div
-      className="sound-control"
-      onMouseEnter={() => setShowPanel(true)}
-      onMouseLeave={() => setShowPanel(false)}
-    >
+    <div className="sound-control" ref={panelRef}>
       <button
         className="sound-control__btn"
-        onClick={toggleSound}
-        title={enabled ? 'Desativar som' : 'Ativar som'}
+        onClick={togglePanel}
+        title="Configurações de áudio"
       >
-        {getVolumeIcon()}
+        <VolumeIcon size={20} level={getVolumeLevel()} />
       </button>
 
       {showPanel && (

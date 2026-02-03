@@ -34,3 +34,5 @@ export { CheckIcon } from './CheckIcon';
 export { XIcon } from './XIcon';
 export { FireIcon } from './FireIcon';
 export { DamageIcon } from './DamageIcon';
+export { VolumeIcon } from './VolumeIcon';
+export { CloseIcon } from './CloseIcon';
