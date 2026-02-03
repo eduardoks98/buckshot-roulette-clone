@@ -1,0 +1,276 @@
+/* ==========================================
+   SINGLEPLAYER SETUP - Portal Design
+   ========================================== */
+
+.sp-setup {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #0a0a0a;
+  padding: 2rem 1rem;
+}
+
+.sp-setup__container {
+  width: 100%;
+  max-width: 500px;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+/* Header */
+.sp-setup__header {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+
+.sp-setup__back {
+  width: 40px;
+  height: 40px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  color: #a0a0a0;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sp-setup__back:hover {
+  background: #2a2a2a;
+  color: #ffffff;
+}
+
+.sp-setup__title {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--gold-accent, #d4a418);
+  letter-spacing: 0.05em;
+}
+
+/* Section */
+.sp-setup__section {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.sp-setup__label {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #a0a0a0;
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+/* Bot Count */
+.sp-setup__bot-count {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.sp-setup__count-btn {
+  flex: 1;
+  padding: 0.875rem 1rem;
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 8px;
+  color: #a0a0a0;
+  font-size: 1.25rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sp-setup__count-btn:hover {
+  background: #1f1f1f;
+  border-color: #3a3a3a;
+  color: #ffffff;
+}
+
+.sp-setup__count-btn.active {
+  background: rgba(212, 164, 24, 0.15);
+  border-color: var(--gold-accent, #d4a418);
+  color: var(--gold-accent, #d4a418);
+}
+
+/* Bot Cards */
+.sp-setup__bots {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.sp-setup__bot-card {
+  background: #1a1a1a;
+  border: 1px solid #2a2a2a;
+  border-radius: 12px;
+  padding: 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.sp-setup__bot-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: #ffffff;
+}
+
+.sp-setup__bot-name {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+/* Difficulty */
+.sp-setup__difficulty {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.sp-setup__difficulty-label {
+  color: #666666;
+  font-size: 0.8125rem;
+}
+
+.sp-setup__difficulty-options {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.sp-setup__diff-btn {
+  flex: 1;
+  padding: 0.5rem 0.75rem;
+  background: #141414;
+  border: 1px solid #2a2a2a;
+  border-radius: 6px;
+  color: #a0a0a0;
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sp-setup__diff-btn:hover {
+  background: #1f1f1f;
+  border-color: #3a3a3a;
+}
+
+.sp-setup__diff-btn.active {
+  background: rgba(var(--diff-color-rgb, 255, 255, 255), 0.1);
+  border-color: var(--diff-color, #ffffff);
+  color: var(--diff-color, #ffffff);
+}
+
+/* Preview */
+.sp-setup__preview {
+  background: #141414;
+  border: 1px solid #2a2a2a;
+  border-radius: 12px;
+  padding: 1rem 1.25rem;
+}
+
+.sp-setup__preview-title {
+  color: #666666;
+  font-size: 0.75rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.75rem;
+}
+
+.sp-setup__preview-players {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.sp-setup__preview-player {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.375rem 0.75rem;
+  background: #1a1a1a;
+  border-radius: 20px;
+  color: #ffffff;
+  font-size: 0.8125rem;
+}
+
+.sp-setup__preview-player--you {
+  background: rgba(212, 164, 24, 0.15);
+  color: var(--gold-accent, #d4a418);
+}
+
+.sp-setup__preview-icon {
+  font-size: 0.875rem;
+}
+
+.sp-setup__preview-vs {
+  color: #666666;
+  font-size: 0.75rem;
+  font-weight: 600;
+}
+
+.sp-setup__preview-diff {
+  font-size: 0.6875rem;
+  opacity: 0.8;
+}
+
+/* Start Button */
+.sp-setup__start-btn {
+  padding: 1rem 2rem;
+  background: linear-gradient(135deg, var(--gold-accent, #d4a418) 0%, #b8860b 100%);
+  border: none;
+  border-radius: 10px;
+  color: #000000;
+  font-size: 1.125rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-top: 0.5rem;
+}
+
+.sp-setup__start-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(212, 164, 24, 0.3);
+}
+
+/* Responsive */
+@media (max-width: 480px) {
+  .sp-setup {
+    padding: 1.5rem 1rem;
+  }
+
+  .sp-setup__title {
+    font-size: 1.25rem;
+  }
+
+  .sp-setup__count-btn {
+    padding: 0.75rem;
+    font-size: 1.125rem;
+  }
+
+  .sp-setup__bot-card {
+    padding: 1rem;
+  }
+
+  .sp-setup__diff-btn {
+    padding: 0.5rem;
+    font-size: 0.75rem;
+  }
+
+  .sp-setup__start-btn {
+    padding: 0.875rem 1.5rem;
+    font-size: 1rem;
+  }
+}

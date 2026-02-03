@@ -6,10 +6,11 @@ import {
   ITEMS as SHARED_ITEMS,
   getRandomItem as getRandomItemUtil,
 } from '../../../../shared';
-import { GameBoard, GameBoardRef, GamePlayer, GameItem, ShotResult, RoundAnnouncement, StealModalData } from '../../components/game';
+import { GameBoard, GameBoardRef, GamePlayer, GameItem, ShotResult, RoundAnnouncement, StealModalData, GameMenu } from '../../components/game';
 import { InterstitialAd, VideoRewardedAd } from '../../components/advertising';
 import { useSounds } from '../../audio';
 import { useMatchTracking } from '../../context/AnalyticsContext';
+import SinglePlayerSetup, { SinglePlayerConfig, BotDifficulty } from './SinglePlayerSetup';
 import './SinglePlayer.css';
 
 // ========================================
@@ -110,6 +111,12 @@ export default function SinglePlayer() {
     playRoundStart, playReload, playGameOver
   } = useSounds();
   const { startMatch, endMatch, trackAction } = useMatchTracking();
+
+  // Setup state
+  const [showSetup, setShowSetup] = useState(true);
+  const [botConfig, setBotConfig] = useState<SinglePlayerConfig | null>(null);
+
+  // Game state
   const [gameStarted, setGameStarted] = useState(false);
   const [game, setGame] = useState<GameState>(() => createInitialState(1));
   const [message, setMessage] = useState<string>('');
@@ -124,6 +131,9 @@ export default function SinglePlayer() {
   const [dealerHealFlash, setDealerHealFlash] = useState(false);
   const [playerHealFlash, setPlayerHealFlash] = useState(false);
   const [playerLastShell, setPlayerLastShell] = useState<Record<string, 'live' | 'blank'>>({});
+
+  // Menu state
+  const [showGameMenu, setShowGameMenu] = useState(false);
 
   // Ads state
   const [showInterstitial, setShowInterstitial] = useState(false);
@@ -869,20 +879,48 @@ export default function SinglePlayer() {
   } : null;
 
   // ========================================
+  // SETUP HANDLERS
+  // ========================================
+
+  const handleSetupStart = useCallback((config: SinglePlayerConfig) => {
+    setBotConfig(config);
+    setShowSetup(false);
+    startGame();
+  }, [startGame]);
+
+  const handleAbandonGame = useCallback(() => {
+    setShowGameMenu(false);
+    setGameStarted(false);
+    setShowSetup(true);
+    setBotConfig(null);
+  }, []);
+
+  // Handle M key to open menu
+  useEffect(() => {
+    if (!gameStarted || hasActiveOverlay) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'm' || e.key === 'M' || e.key === 'Escape') {
+        setShowGameMenu(prev => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [gameStarted, hasActiveOverlay]);
+
+  // ========================================
   // RENDER
   // ========================================
 
+  // Show setup screen
+  if (showSetup) {
+    return <SinglePlayerSetup onStartGame={handleSetupStart} />;
+  }
+
+  // Old start screen removed - using SinglePlayerSetup instead
   if (!gameStarted) {
-    return (
-      <div className="singleplayer-page">
-        <div className="start-screen">
-          <h1 className="start-title">BANGSHOT</h1>
-          <p className="start-subtitle">Single Player vs Dealer</p>
-          <button className="start-btn" onClick={startGame}>INICIAR JOGO</button>
-          <button className="back-to-menu-btn" onClick={() => navigate('/lobby')}>← Voltar ao Menu</button>
-        </div>
-      </div>
-    );
+    return <SinglePlayerSetup onStartGame={handleSetupStart} />;
   }
 
   return (
@@ -991,8 +1029,8 @@ export default function SinglePlayer() {
       >
         {/* Phone Modal */}
         {phoneModal && (
-          <div className="steal-modal-overlay" onClick={() => setPhoneModal(null)}>
-            <div className="steal-modal" onClick={e => e.stopPropagation()}>
+          <div className="steal-modal-overlay">
+            <div className="steal-modal">
               <h3>📱 CELULAR</h3>
               <div className="phone-content">
                 <p>Posição {phoneModal.position - game.currentShellIndex + 1}:</p>
@@ -1007,6 +1045,14 @@ export default function SinglePlayer() {
           </div>
         )}
       </GameBoard>
+
+      {/* Game Menu */}
+      <GameMenu
+        isOpen={showGameMenu}
+        onClose={() => setShowGameMenu(false)}
+        onAbandon={handleAbandonGame}
+        isSinglePlayer={true}
+      />
     </div>
   );
 }
