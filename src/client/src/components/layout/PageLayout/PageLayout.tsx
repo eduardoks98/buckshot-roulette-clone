@@ -5,7 +5,7 @@
 import { Header } from '../Header';
 import { Footer } from '../Footer';
 import { PageHeader } from '../PageHeader';
-import { BannerAd } from '../../ads';
+import { BannerAd } from '../../advertising';
 import './PageLayout.css';
 
 // Debug mode para visualizar onde os ads vão ficar quando não há ads reais

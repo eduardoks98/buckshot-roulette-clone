@@ -688,14 +688,13 @@
 .lobby-body {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  padding: 1.5rem 4%;
+  padding: 1.5rem 2rem;
   gap: 2rem;
   width: 100%;
   flex: 1;
-  max-width: 1400px;
+  max-width: 1100px;
   margin: 0 auto;
   min-height: 0;
-  overflow: hidden;
 }
 
 .lobby-body__left {
@@ -711,7 +710,6 @@
   gap: 1rem;
   min-width: 0;
   min-height: 0;
-  overflow-y: auto;
 }
 
 /* ===== FOOTER ===== */

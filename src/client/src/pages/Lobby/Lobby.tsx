@@ -5,8 +5,7 @@
 import { useEffect } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { Header } from '../../components/layout/Header';
-import { Footer } from '../../components/layout/Footer';
+import { PageLayout } from '../../components/layout/PageLayout';
 import { ActiveRooms } from '../../components/home/ActiveRooms';
 import { MiniLeaderboard } from '../../components/home/MiniLeaderboard';
 import { Changelog } from '../../components/home/Changelog';
@@ -47,9 +46,7 @@ export default function Lobby() {
   // LOBBY PAGE (Authenticated) - LoL Style
   // ==========================================
   return (
-    <div className="lobby-container">
-      <Header />
-
+    <PageLayout showSideAds={true}>
       {/* ===== MAIN BODY ===== */}
       <main className="lobby-body">
         {/* Left Column - Active Rooms */}
@@ -75,8 +72,6 @@ export default function Lobby() {
           )}
         </section>
       </main>
-
-      <Footer />
-    </div>
+    </PageLayout>
   );
 }

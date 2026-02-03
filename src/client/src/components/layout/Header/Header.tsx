@@ -18,6 +18,7 @@ import {
   SettingsIcon,
   BugIcon,
   RankIcon,
+  GamepadIcon,
 } from '../../icons';
 import './Header.css';
 
@@ -64,6 +65,10 @@ export function Header({ variant = 'full' }: HeaderProps) {
         </div>
 
         <nav className="app-header__nav">
+          <button className="app-nav-item" onClick={() => navigate('/lobby')}>
+            <GamepadIcon size={20} />
+            <span>Lobby</span>
+          </button>
           <button className="app-nav-item" onClick={() => navigate('/profile')}>
             <ProfileIcon size={20} />
             <span>Perfil</span>
