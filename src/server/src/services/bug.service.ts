@@ -10,9 +10,9 @@ import { BugCategory, BugPriority, DEFAULT_PRIORITY } from '../../../shared/type
 // CONFIG
 // ==========================================
 
-const GAMES_ADMIN_URL = process.env.GAMES_ADMIN_URL || 'http://localhost:8000';
+const GAMES_ADMIN_API_URL = process.env.GAMES_ADMIN_API_URL || 'http://localhost:8000';
 const GAMES_ADMIN_API_KEY = process.env.GAMES_ADMIN_API_KEY || '';
-const GAMES_ADMIN_GAME_CODE = process.env.GAMES_ADMIN_GAME_CODE || 'BANGSHOT';
+const GAME_CODE = process.env.GAME_CODE || 'BANGSHOT';
 
 // ==========================================
 // TYPES
@@ -46,9 +46,9 @@ class BugService {
   private gameCode: string;
 
   constructor() {
-    this.apiUrl = GAMES_ADMIN_URL;
+    this.apiUrl = GAMES_ADMIN_API_URL;
     this.apiKey = GAMES_ADMIN_API_KEY;
-    this.gameCode = GAMES_ADMIN_GAME_CODE;
+    this.gameCode = GAME_CODE;
   }
 
   // Check if Games Admin is configured
@@ -59,7 +59,7 @@ class BugService {
   // Create a new bug report - sends to Games Admin API
   async createReport(params: CreateBugReportParams): Promise<GamesAdminResponse> {
     if (!this.isConfigured()) {
-      console.error('[BugReport] Games Admin nao configurado. Defina GAMES_ADMIN_URL, GAMES_ADMIN_API_KEY e GAMES_ADMIN_GAME_CODE.');
+      console.error('[BugReport] Games Admin nao configurado. Defina GAMES_ADMIN_API_URL, GAMES_ADMIN_API_KEY e GAME_CODE.');
       throw new Error('Games Admin nao configurado');
     }
 

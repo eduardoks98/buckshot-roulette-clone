@@ -1,8 +1,9 @@
 // ==========================================
 // BUG REPORT MODAL COMPONENT
+// Integração com games-admin SDK
 // ==========================================
 
-import { useState, useRef, ReactNode } from 'react';
+import { useState, useRef, useEffect, ReactNode } from 'react';
 import {
   BugIcon,
   GamepadIcon,
@@ -14,6 +15,8 @@ import {
   ChartIcon,
   CheckIcon,
 } from '../../icons';
+import { ADMIN_API_URL, GAME_API_KEY, GAME_CODE } from '../../../config';
+import { useAuth } from '../../../context/AuthContext';
 import './BugReportModal.css';
 
 export interface GameStateForReport {
@@ -32,25 +35,29 @@ interface BugReportModalProps {
   gameState?: GameStateForReport;
 }
 
-type BugCategory = 'GAMEPLAY' | 'UI' | 'CONNECTION' | 'PERFORMANCE' | 'OTHER';
+// Categorias compatíveis com games-admin API
+type BugCategory = 'BUG' | 'UI' | 'GAMEPLAY' | 'NETWORK' | 'PERFORMANCE' | 'OTHER';
 type BugPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
 const CATEGORY_OPTIONS: { value: BugCategory; label: string; icon: ReactNode }[] = [
   { value: 'GAMEPLAY', label: 'Gameplay', icon: <GamepadIcon size={16} /> },
   { value: 'UI', label: 'Interface', icon: <MonitorIcon size={16} /> },
-  { value: 'CONNECTION', label: 'Conexao', icon: <GlobeIcon size={16} /> },
+  { value: 'NETWORK', label: 'Conexao', icon: <GlobeIcon size={16} /> },
   { value: 'PERFORMANCE', label: 'Performance', icon: <PerformanceIcon size={16} /> },
+  { value: 'BUG', label: 'Bug Geral', icon: <BugIcon size={16} /> },
   { value: 'OTHER', label: 'Outro', icon: <PinIcon size={16} /> },
 ];
 
+// Cores do design da landing page (vermelho neon)
 const PRIORITY_OPTIONS: { value: BugPriority; label: string; color: string }[] = [
-  { value: 'LOW', label: 'Baixa', color: '#4caf50' },
-  { value: 'MEDIUM', label: 'Media', color: '#ff9800' },
-  { value: 'HIGH', label: 'Alta', color: '#f44336' },
-  { value: 'CRITICAL', label: 'Critica', color: '#9c27b0' },
+  { value: 'LOW', label: 'Baixa', color: '#22c55e' },
+  { value: 'MEDIUM', label: 'Media', color: '#eab308' },
+  { value: 'HIGH', label: 'Alta', color: '#ff0040' },  // Vermelho neon
+  { value: 'CRITICAL', label: 'Critica', color: '#8b5cf6' },
 ];
 
 export default function BugReportModal({ isOpen, onClose, gameState }: BugReportModalProps) {
+  const { user } = useAuth();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [category, setCategory] = useState<BugCategory>('GAMEPLAY');
@@ -60,6 +67,17 @@ export default function BugReportModal({ isOpen, onClose, gameState }: BugReport
   const [submitStatus, setSubmitStatus] = useState<'idle' | 'success' | 'error'>('idle');
   const [errorMessage, setErrorMessage] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Bloquear scroll do body quando modal estiver aberto
+  useEffect(() => {
+    if (isOpen) {
+      const originalOverflow = document.body.style.overflow;
+      document.body.style.overflow = 'hidden';
+      return () => {
+        document.body.style.overflow = originalOverflow;
+      };
+    }
+  }, [isOpen]);
 
   const handleScreenshotChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -90,28 +108,35 @@ export default function BugReportModal({ isOpen, onClose, gameState }: BugReport
       return;
     }
 
+    // Verificar se API está configurada
+    if (!ADMIN_API_URL || !GAME_API_KEY) {
+      setErrorMessage('API de bug report nao configurada');
+      return;
+    }
+
     setIsSubmitting(true);
     setErrorMessage('');
 
     try {
-      const token = localStorage.getItem('bangshot_auth_token');
-
+      // Payload compatível com games-admin API
       const payload = {
         title: title.trim(),
         description: description.trim(),
         category,
         priority,
-        screenshot,
-        gameRoomCode: gameState?.roomCode,
-        gameRound: gameState?.round,
-        gameState: gameState ? JSON.stringify(gameState) : undefined,
+        user_id: user?.odUserId || null,
+        game_room_code: gameState?.roomCode || null,
+        game_round: gameState?.round || null,
+        game_state: gameState ? JSON.stringify(gameState) : null,
+        screenshot: screenshot || null,
       };
 
-      const response = await fetch('/api/bugs', {
+      // Usar API do games-admin
+      const response = await fetch(`${ADMIN_API_URL}/api/games/${GAME_CODE}/bug-reports`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...(token && { 'Authorization': `Bearer ${token}` }),
+          'X-API-Key': GAME_API_KEY,
         },
         body: JSON.stringify(payload),
       });
@@ -120,6 +145,16 @@ export default function BugReportModal({ isOpen, onClose, gameState }: BugReport
         // Tratar erro de payload muito grande
         if (response.status === 413) {
           throw new Error('Imagem muito grande. Tente uma imagem menor (max 2MB).');
+        }
+
+        // Tratar erro de API Key inválida
+        if (response.status === 401) {
+          throw new Error('API Key invalida. Contate o suporte.');
+        }
+
+        // Tratar jogo não encontrado
+        if (response.status === 404) {
+          throw new Error('Jogo nao encontrado no servidor.');
         }
 
         // Tentar ler mensagem de erro do servidor
@@ -162,10 +197,10 @@ export default function BugReportModal({ isOpen, onClose, gameState }: BugReport
   if (!isOpen) return null;
 
   return (
-    <div className="bug-report-overlay" onClick={handleClose}>
+    <div className="bug-report-overlay">
       <div className="bug-report-modal" onClick={(e) => e.stopPropagation()}>
         <div className="bug-report-header">
-          <h3><BugIcon size={20} color="#4caf50" /> Reportar Bug</h3>
+          <h3><BugIcon size={20} color="#ff0040" /> Reportar Bug</h3>
           <button className="bug-report-close" onClick={handleClose} disabled={isSubmitting}>
             &times;
           </button>
@@ -173,7 +208,7 @@ export default function BugReportModal({ isOpen, onClose, gameState }: BugReport
 
         {submitStatus === 'success' ? (
           <div className="bug-report-success">
-            <CheckIcon size={48} color="#4caf50" />
+            <CheckIcon size={48} color="#22c55e" />
             <p>Bug reportado com sucesso!</p>
             <p className="success-subtitle">Obrigado por ajudar a melhorar o jogo!</p>
           </div>

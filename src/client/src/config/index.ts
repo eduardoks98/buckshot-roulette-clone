@@ -9,6 +9,9 @@ export const GAME_CODE = import.meta.env.VITE_GAME_CODE || 'BANGSHOT';
 export const API_URL = import.meta.env.VITE_API_URL || '';
 export const ADMIN_API_URL = import.meta.env.VITE_ADMIN_API_URL || '';
 
+// Game API Key (for games-admin SDK)
+export const GAME_API_KEY = import.meta.env.VITE_GAME_API_KEY || '';
+
 // AdSense configuration
 export const ADSENSE_PUBLISHER_ID = import.meta.env.VITE_ADSENSE_PUBLISHER_ID || '';
 export const ADSENSE_TEST_MODE = import.meta.env.VITE_ADSENSE_TEST_MODE === 'true';
@@ -19,6 +22,9 @@ export const AD_SLOTS = {
   header: import.meta.env.VITE_ADSENSE_SLOT_HEADER || '',
   footer: import.meta.env.VITE_ADSENSE_SLOT_FOOTER || '',
 };
+
+// Portal URL
+export const PORTAL_URL = import.meta.env.VITE_PORTAL_URL || 'https://mysys.shop';
 
 // App info
 export const APP_VERSION = '1.0';
