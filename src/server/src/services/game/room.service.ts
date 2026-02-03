@@ -14,6 +14,12 @@ import { GAME_RULES } from '../../../../shared/constants';
 // TYPES
 // ==========================================
 
+// Game modes control progression (stats, XP, rank)
+// - 'normal': Full progression (multiplayer)
+// - 'singleplayer': Stats + XP, NO rank changes
+// - 'debug': Stats + XP, rank is toggleable (dev only)
+export type GameMode = 'normal' | 'singleplayer' | 'debug';
+
 export interface Room {
   code: string;
   host: string;
@@ -38,6 +44,10 @@ export interface Room {
   pausedPlayerId: string | null;
   pausedPlayerName: string | null;
   pauseStartTime: number | null;
+  // Game mode controls progression
+  gameMode: GameMode;
+  // Debug-only: enable rank changes for testing
+  debugRankEnabled: boolean;
 }
 
 interface PlayerStats {
@@ -236,7 +246,9 @@ export class RoomService {
     hostSocketId: string,
     hostName: string,
     password?: string,
-    odUserId?: string
+    odUserId?: string,
+    gameMode: GameMode = 'normal',
+    debugRankEnabled: boolean = false
   ): { room: Room; players: PlayerPublicState[] } {
     let code = this.generateRoomCode();
     while (this.rooms.has(code)) {
@@ -265,6 +277,8 @@ export class RoomService {
       pausedPlayerId: null,
       pausedPlayerName: null,
       pauseStartTime: null,
+      gameMode,
+      debugRankEnabled: gameMode === 'debug' ? debugRankEnabled : false,
     };
 
     this.rooms.set(code, room);
