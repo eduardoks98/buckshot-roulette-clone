@@ -10,7 +10,7 @@ import { Footer } from '../../components/layout/Footer';
 import { AdBanner } from '../../components/common/AdBanner';
 import { MultiProviderLogin } from '../../components/auth/MultiProviderLogin';
 import { PlayersIcon, StarIcon, AchievementIcon, GridIcon } from '../../components/icons';
-import { ADSENSE_PUBLISHER_ID, AD_SLOTS, ADSENSE_TEST_MODE } from '../../config';
+import { ADSENSE_PUBLISHER_ID, AD_SLOTS, ADSENSE_TEST_MODE, PORTAL_URL } from '../../config';
 import { useSounds } from '../../audio/useSounds';
 import './Home.css';
 
@@ -49,6 +49,19 @@ export default function Home() {
   // Overlay é gerenciado automaticamente pelo TabSyncProvider
   return (
     <div className="landing">
+      {/* Header igual ao portal */}
+      <header className="landing__header">
+        <div className="landing__header-content">
+          <a href={PORTAL_URL} className="landing__logo">
+            <div className="landing__logo-icon">M</div>
+            <span>MySys Games</span>
+          </a>
+          <nav className="landing__nav">
+            <a href="#features" className="landing__nav-link">Sobre</a>
+          </nav>
+        </div>
+      </header>
+
       {authError && (
         <div className="auth-error-banner">
           <span>{authError}</span>
