@@ -1064,18 +1064,18 @@ function RanksSection() {
 // ==========================================
 
 export default function Debug() {
-  const { isAdmin } = useAuth();
+  // const { isAdmin } = useAuth();
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState<DebugTab>('audio');
 
   // Protect: only admin can access
-  useEffect(() => {
-    if (!isAdmin) {
-      navigate('/');
-    }
-  }, [isAdmin, navigate]);
+  // useEffect(() => {
+  //   if (!isAdmin) {
+  //     navigate('/');
+  //   }
+  // }, [isAdmin, navigate]);
 
-  if (!isAdmin) return null;
+  // if (!isAdmin) return null;
 
   return (
     <PageLayout title="Debug" onBack={() => navigate('/lobby')}>

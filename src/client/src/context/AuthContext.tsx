@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
+import { createContext, useContext, useState, useEffect, useRef, ReactNode, useCallback } from 'react';
 
 // ==========================================
 // TYPES
@@ -241,18 +241,30 @@ export function AuthProvider({ children }: AuthProviderProps) {
     }
   }, [fetchFullUserData]);
 
+  // Ref para rastrear se o token da URL já foi processado (evita reload duplo)
+  const tokenProcessedRef = useRef(false);
+
   // Initialize auth state
   useEffect(() => {
     const initAuth = async () => {
-      authLog('=== initAuth START ===', {
-        url: window.location.href,
-        pathname: window.location.pathname,
-        search: window.location.search
-      });
-
       // Check for token in URL (after OAuth redirect)
       const urlParams = new URLSearchParams(window.location.search);
       const tokenFromUrl = urlParams.get('token');
+
+      // Se já processamos um token da URL nesta sessão e não há novo token, ignorar
+      // Isso evita o reload duplo causado pelo replaceState que altera a URL e re-dispara o useEffect
+      if (tokenProcessedRef.current && !tokenFromUrl) {
+        authLog('initAuth SKIPPED - token already processed this session');
+        return;
+      }
+
+      authLog('=== initAuth START ===', {
+        url: window.location.href,
+        pathname: window.location.pathname,
+        search: window.location.search,
+        tokenProcessed: tokenProcessedRef.current
+      });
+
       const errorFromUrl = urlParams.get('error');
 
       authLog('initAuth URL params', {
@@ -263,6 +275,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
       if (tokenFromUrl) {
         authLog('initAuth - TOKEN FROM URL - processing');
+        // Marcar como processado ANTES de limpar a URL
+        tokenProcessedRef.current = true;
         // Clean URL
         window.history.replaceState({}, document.title, window.location.pathname);
         authLog('initAuth - URL cleaned, calling handleUserLogin');
@@ -326,7 +340,16 @@ export function AuthProvider({ children }: AuthProviderProps) {
         deleteCookie(COOKIE_NAME);
         window.location.reload();
       } else if (event.data.type === 'LOGIN') {
-        window.location.reload();
+        // Só recarregar se NÃO foi esta aba que enviou o broadcast
+        // A aba que fez login já tem o estado atualizado
+        // Verificar se já estamos autenticados para evitar reload desnecessário
+        const currentToken = localStorage.getItem(TOKEN_KEY);
+        if (!currentToken) {
+          console.log('[BroadcastChannel] Login event from another tab - reloading');
+          window.location.reload();
+        } else {
+          console.log('[BroadcastChannel] Login event ignored - already authenticated');
+        }
       }
     };
 

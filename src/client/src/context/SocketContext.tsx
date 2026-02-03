@@ -12,14 +12,27 @@ import { API_URL } from '../config';
 
 type TypedSocket = Socket<ServerToClientEvents, ClientToServerEvents>;
 
+export interface ActiveGameInfo {
+  roomCode: string;
+  gameStarted: boolean;
+}
+
 interface SocketContextType {
   socket: TypedSocket | null;
   isConnected: boolean;
   isSessionInvalidated: boolean;
   sessionInvalidatedReason: string | null;
+  // Active game state (global)
+  activeGame: ActiveGameInfo | null;
+  isReconnecting: boolean;
+  reconnectedGameData: unknown | null;
   connect: () => void;
   disconnect: () => void;
   clearSessionInvalidated: () => void;
+  // Active game methods
+  clearActiveGame: () => void;
+  setReconnecting: (value: boolean) => void;
+  clearReconnectedGameData: () => void;
 }
 
 // ==========================================
@@ -42,14 +55,35 @@ export function SocketProvider({ children }: SocketProviderProps) {
   const [isSessionInvalidated, setIsSessionInvalidated] = useState(false);
   const [sessionInvalidatedReason, setSessionInvalidatedReason] = useState<string | null>(null);
 
+  // Active game state (global - for reconnection modal)
+  const [activeGame, setActiveGame] = useState<ActiveGameInfo | null>(null);
+  const [isReconnecting, setIsReconnectingState] = useState(false);
+  const [reconnectedGameData, setReconnectedGameData] = useState<unknown | null>(null);
+
   // Usar ref para evitar criacao duplicada de socket em React.StrictMode
   const socketRef = useRef<TypedSocket | null>(null);
   const connectingRef = useRef(false);
+  const activeGameRef = useRef<ActiveGameInfo | null>(null);
 
   // Limpar estado de sessão invalidada
   const clearSessionInvalidated = useCallback(() => {
     setIsSessionInvalidated(false);
     setSessionInvalidatedReason(null);
+  }, []);
+
+  // Active game methods
+  const clearActiveGame = useCallback(() => {
+    setActiveGame(null);
+    activeGameRef.current = null;
+    setIsReconnectingState(false);
+  }, []);
+
+  const setReconnecting = useCallback((value: boolean) => {
+    setIsReconnectingState(value);
+  }, []);
+
+  const clearReconnectedGameData = useCallback(() => {
+    setReconnectedGameData(null);
   }, []);
 
   const connect = useCallback(() => {
@@ -115,6 +149,9 @@ export function SocketProvider({ children }: SocketProviderProps) {
       setSessionInvalidatedReason(data.reason);
     });
 
+    // NOTA: Listeners de active game foram movidos para useEffect separado
+    // para evitar duplicação a cada reconexão
+
     setSocket(newSocket);
   }, []);
 
@@ -138,6 +175,70 @@ export function SocketProvider({ children }: SocketProviderProps) {
     };
   }, []);
 
+  // ==========================================
+  // ACTIVE GAME LISTENERS (Global)
+  // Registrados em useEffect separado para evitar duplicação
+  // ==========================================
+  useEffect(() => {
+    if (!socket) return;
+
+    // Evento: usuário já está em uma sala/partida
+    const handleAlreadyInGame = (data: { roomCode: string; gameStarted: boolean }) => {
+      console.log('[SocketContext] alreadyInGame:', data);
+      setActiveGame({
+        roomCode: data.roomCode,
+        gameStarted: data.gameStarted,
+      });
+      activeGameRef.current = {
+        roomCode: data.roomCode,
+        gameStarted: data.gameStarted,
+      };
+    };
+
+    // Evento: reconectado com sucesso à sala
+    const handleReconnected = (data: unknown) => {
+      console.log('[SocketContext] reconnected:', data);
+      setIsReconnectingState(false);
+      setActiveGame(null);
+      activeGameRef.current = null;
+      // Armazenar dados do jogo para navegação
+      setReconnectedGameData(data);
+    };
+
+    // Evento: jogo abandonado
+    const handleGameAbandoned = () => {
+      console.log('[SocketContext] gameAbandoned');
+      setActiveGame(null);
+      activeGameRef.current = null;
+      setIsReconnectingState(false);
+    };
+
+    // Evento: sala deletada
+    const handleRoomDeleted = (data: { code: string }) => {
+      console.log('[SocketContext] roomDeleted:', data);
+      // Limpar activeGame se for a mesma sala
+      if (activeGameRef.current?.roomCode === data.code) {
+        setActiveGame(null);
+        activeGameRef.current = null;
+        setIsReconnectingState(false);
+      }
+    };
+
+    // Registrar listeners
+    socket.on('alreadyInGame', handleAlreadyInGame);
+    socket.on('reconnected', handleReconnected);
+    socket.on('gameAbandoned', handleGameAbandoned);
+    socket.on('roomDeleted', handleRoomDeleted);
+
+    // Cleanup: remover listeners ao trocar socket ou desmontar
+    return () => {
+      socket.off('alreadyInGame', handleAlreadyInGame);
+      socket.off('reconnected', handleReconnected);
+      socket.off('gameAbandoned', handleGameAbandoned);
+      socket.off('roomDeleted', handleRoomDeleted);
+    };
+  }, [socket]);
+
   // Handler para quando o usuário fecha a aba/navegador
   // IMPORTANTE: NÃO emitir leaveRoom aqui!
   // O servidor detecta a desconexão automaticamente via Socket.IO disconnect event.
@@ -151,9 +252,17 @@ export function SocketProvider({ children }: SocketProviderProps) {
     isConnected,
     isSessionInvalidated,
     sessionInvalidatedReason,
+    // Active game state
+    activeGame,
+    isReconnecting,
+    reconnectedGameData,
     connect,
     disconnect,
     clearSessionInvalidated,
+    // Active game methods
+    clearActiveGame,
+    setReconnecting,
+    clearReconnectedGameData,
   };
 
   return (

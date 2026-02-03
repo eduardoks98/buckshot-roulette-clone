@@ -443,8 +443,8 @@ export default function Profile() {
 
         {/* Title Selector Modal */}
         {showTitleSelector && (
-          <div className="title-selector-overlay" onClick={() => setShowTitleSelector(false)}>
-            <div className="title-selector-modal" onClick={e => e.stopPropagation()}>
+          <div className="title-selector-overlay">
+            <div className="title-selector-modal">
               <h3 className="title-selector-header">Selecionar Titulo</h3>
               <div className="title-selector-list">
                 <button

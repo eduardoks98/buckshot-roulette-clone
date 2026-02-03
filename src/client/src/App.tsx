@@ -15,6 +15,7 @@ import Debug from './pages/Debug/Debug';
 import Preview from './pages/Preview/Preview';
 import { useSocket } from './context/SocketContext';
 import { SessionInvalidatedModal } from './components/common/SessionInvalidatedModal';
+import { ActiveGameModal } from './components/common/ActiveGameModal';
 
 // TabSyncProvider no main.tsx já gerencia overlay e sincronização automaticamente
 
@@ -28,6 +29,9 @@ function App() {
         isVisible={isSessionInvalidated}
         reason={sessionInvalidatedReason}
       />
+
+      {/* Modal de jogo ativo - aparece em qualquer pagina */}
+      <ActiveGameModal />
 
       <Routes>
         {/* Preview route for iframe embedding - no UI, just visuals */}

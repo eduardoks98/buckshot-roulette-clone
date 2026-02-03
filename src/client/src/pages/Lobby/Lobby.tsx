@@ -9,10 +9,22 @@ import { PageLayout } from '../../components/layout/PageLayout';
 import { ActiveRooms } from '../../components/home/ActiveRooms';
 import { MiniLeaderboard } from '../../components/home/MiniLeaderboard';
 import { Changelog } from '../../components/home/Changelog';
-import { AdBanner } from '../../components/common/AdBanner';
-import { ADSENSE_PUBLISHER_ID, AD_SLOTS, ADSENSE_TEST_MODE } from '../../config';
+import { BannerAd } from '../../components/advertising';
 import { useSounds } from '../../audio/useSounds';
 import '../Home/Home.css';
+
+// Debug mode para visualizar placeholder quando não há ads reais
+const AD_DEBUG = import.meta.env.DEV;
+
+// Placeholder do ad do lobby (mesmo padrão do PageLayout)
+function LobbyAdPlaceholder() {
+  return (
+    <div className="ad-placeholder ad-placeholder--lobby">
+      AD: LOBBY
+      <span className="ad-size">300x250</span>
+    </div>
+  );
+}
 
 export default function Lobby() {
   const { isAuthenticated, isLoading } = useAuth();
@@ -58,18 +70,14 @@ export default function Lobby() {
         <section className="lobby-body__right">
           <MiniLeaderboard />
           <Changelog />
-          {/* Ad Banner - Lobby */}
-          {ADSENSE_PUBLISHER_ID && AD_SLOTS.lobby && (
-            <div className="lobby-ad">
-              <AdBanner
-                publisherId={ADSENSE_PUBLISHER_ID}
-                slotId={AD_SLOTS.lobby}
-                format="rectangle"
-                className="ad-lobby"
-                testMode={ADSENSE_TEST_MODE}
-              />
-            </div>
-          )}
+          {/* Ad Banner - Lobby (usa BannerAd com mesmo padrão dos ads laterais) */}
+          <div className="lobby-ad">
+            <BannerAd
+              position="lobby"
+              className="lobby-banner-ad"
+              fallback={AD_DEBUG ? <LobbyAdPlaceholder /> : null}
+            />
+          </div>
         </section>
       </main>
     </PageLayout>
