@@ -7,8 +7,9 @@ import {
   getRandomItem as getRandomItemUtil,
 } from '../../../../shared';
 import { GameBoard, GameBoardRef, GamePlayer, GameItem, ShotResult, RoundAnnouncement, StealModalData } from '../../components/game';
-import { InterstitialAd, VideoRewardedAd } from '../../components/ads';
+import { InterstitialAd, VideoRewardedAd } from '../../components/advertising';
 import { useSounds } from '../../audio';
+import { useMatchTracking } from '../../context/AnalyticsContext';
 import './SinglePlayer.css';
 
 // ========================================
@@ -108,6 +109,7 @@ export default function SinglePlayer() {
     playDamage, playHeal, playItem,
     playRoundStart, playReload, playGameOver
   } = useSounds();
+  const { startMatch, endMatch, trackAction } = useMatchTracking();
   const [gameStarted, setGameStarted] = useState(false);
   const [game, setGame] = useState<GameState>(() => createInitialState(1));
   const [message, setMessage] = useState<string>('');
@@ -165,6 +167,9 @@ export default function SinglePlayer() {
     setGameStarted(true);
     setPlayerLastShell({});
 
+    // Track match start
+    startMatch({ mode: 'singleplayer', players: 1 });
+
     // Tocar som de início de round e recarregar
     playRoundStart();
     playReload();
@@ -177,7 +182,7 @@ export default function SinglePlayer() {
       blank: blankCount,
       hp: initialState.player.maxHp,
     });
-  }, [playRoundStart, playReload]);
+  }, [playRoundStart, playReload, startMatch]);
 
   const startRound = useCallback((roundNumber: number) => {
     const initialState = createInitialState(roundNumber);
@@ -317,11 +322,13 @@ export default function SinglePlayer() {
   const checkRoundEnd = useCallback((): boolean => {
     if (game.player.hp <= 0) {
       playGameOver(false); // Derrota
+      endMatch({ result: 'loss', score: 0 });
       setGameOverData({ show: true, victory: false });
       return true;
     } else if (game.dealer.hp <= 0) {
       if (game.currentRound >= 3) {
         playGameOver(true); // Vitória
+        endMatch({ result: 'win', score: game.currentRound * 100 });
         setGameOverData({ show: true, victory: true });
       } else {
         // Next round after delay
@@ -330,7 +337,7 @@ export default function SinglePlayer() {
       return true;
     }
     return false;
-  }, [game.player.hp, game.dealer.hp, game.currentRound, startRound, playGameOver]);
+  }, [game.player.hp, game.dealer.hp, game.currentRound, startRound, playGameOver, endMatch]);
 
   const handleRestart = useCallback(() => {
     // Show interstitial ad before restarting
@@ -362,6 +369,15 @@ export default function SinglePlayer() {
     const shell = currentShell;
     const sawedOff = game[shooter].sawedOff;
     const damage = sawedOff ? 2 : 1;
+
+    // Track shot action
+    if (shooter === 'player') {
+      trackAction('shot_fired', {
+        shell_type: shell,
+        target_self: target === 'player',
+        damage: shell === 'live' ? damage : 0,
+      });
+    }
 
     // Track shell
     setPlayerLastShell(prev => ({
@@ -404,6 +420,7 @@ export default function SinglePlayer() {
             if (prev.player.hp <= 0) {
               setTimeout(() => {
                 playGameOver(false); // Derrota
+                endMatch({ result: 'loss', score: 0 });
                 setGameOverData({ show: true, victory: false });
               }, 100);
               return prev;
@@ -411,6 +428,7 @@ export default function SinglePlayer() {
               if (prev.currentRound >= 3) {
                 setTimeout(() => {
                   playGameOver(true); // Vitória
+                  endMatch({ result: 'win', score: prev.currentRound * 100 });
                   setGameOverData({ show: true, victory: true });
                 }, 100);
               } else {
@@ -444,7 +462,7 @@ export default function SinglePlayer() {
         }, 3100);
       }
     }, 400);
-  }, [currentShell, game, applyDamage, reloadIfNeeded, startRound, playGameOver]);
+  }, [currentShell, game, applyDamage, reloadIfNeeded, startRound, playGameOver, endMatch, trackAction]);
 
   const shootDealer = useCallback(() => {
     if (game.currentTurn !== 'player' || game.actionInProgress || hasActiveOverlay) return;
@@ -479,6 +497,11 @@ export default function SinglePlayer() {
 
     // Tocar som do item
     playItem(item.id);
+
+    // Track item usage
+    if (user === 'player') {
+      trackAction('item_used', { item_id: item.id });
+    }
 
     setGame(prev => ({
       ...prev,
