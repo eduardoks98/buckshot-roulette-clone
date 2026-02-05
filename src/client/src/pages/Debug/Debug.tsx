@@ -5,13 +5,13 @@
 import { useState, useCallback, useRef, useEffect, ComponentType } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { useSocket } from '../../context/SocketContext';
 import { PageLayout } from '../../components/layout/PageLayout';
 import {
   RevolverCylinderWithSound,
   RevolverCylinderWithSoundRef,
   RevealedChamber
 } from '../../components/game/RevolverCylinder';
-import { GameBoard, GameBoardRef, GameItem, ShotResult, RoundAnnouncement, StealModalData } from '../../components/game';
 import { SoundControl } from '../../components/common/SoundControl';
 import { WaveformVisualizer } from '../../components/common/WaveformVisualizer';
 import { useSounds } from '../../audio/useSounds';
@@ -28,11 +28,9 @@ import {
   MedicineIcon,
   TurnReverserIcon,
   RankIcon,
-  ITEM_ICONS,
-  ItemIconId,
 } from '../../components/icons';
 import { getRankColor } from '../../utils/helpers';
-import { ITEMS, ItemId } from '../../../../shared';
+import { GameMode } from '../../../../shared';
 import './Debug.css';
 
 // ==========================================
@@ -48,19 +46,6 @@ interface AudioItem {
   Icon?: ComponentType<{ size?: number }>;
 }
 
-// Item colors for rendering
-const ITEM_COLORS: Record<string, string> = {
-  magnifying_glass: '#4169e1',
-  beer: '#d4a418',
-  cigarettes: '#4ade80',
-  handcuffs: '#a0a0a0',
-  hand_saw: '#e63946',
-  phone: '#22d3d4',
-  inverter: '#a855f7',
-  adrenaline: '#ec4899',
-  expired_medicine: '#f97316',
-  turn_reverser: '#38bdf8',
-};
 
 // Categorias de audio para o editor
 const AUDIO_CATEGORIES: Record<string, { label: string; items: AudioItem[] }> = {
@@ -114,20 +99,6 @@ const AUDIO_CATEGORIES: Record<string, { label: string; items: AudioItem[] }> = 
     ]
   },
 };
-
-// ==========================================
-// ITEM ICON HELPER
-// ==========================================
-
-function ItemIcon({ item, size = 20 }: { item: GameItem; size?: number }) {
-  const IconComponent = ITEM_ICONS[item.id as ItemIconId];
-  const itemColor = ITEM_COLORS[item.id] || 'var(--gold-accent, #d4a418)';
-
-  if (IconComponent) {
-    return <IconComponent size={size} color={itemColor} />;
-  }
-  return <span style={{ fontSize: size * 0.8 }}>{item.emoji}</span>;
-}
 
 // ==========================================
 // AUDIO SECTION
@@ -595,393 +566,330 @@ function AudioSection() {
 }
 
 // ==========================================
-// GAMEPLAY SECTION
+// GAMEPLAY SECTION - Uses server bots via socket
 // ==========================================
 
+type BotDifficulty = 'easy' | 'medium' | 'hard';
+type LoadingState = 'idle' | 'connecting' | 'creating_room' | 'adding_bots' | 'starting';
+
+interface BotConfig {
+  difficulty: BotDifficulty;
+  name: string;
+}
+
+const DIFFICULTY_INFO: Record<BotDifficulty, { label: string; description: string; color: string }> = {
+  easy: {
+    label: 'Facil',
+    description: 'Usa 20% dos itens, decisoes aleatorias',
+    color: '#22c55e',
+  },
+  medium: {
+    label: 'Medio',
+    description: 'Usa 50% dos itens, considera probabilidades',
+    color: '#f59e0b',
+  },
+  hard: {
+    label: 'Dificil',
+    description: 'Usa 70% dos itens, otimiza alvos',
+    color: '#ef4444',
+  },
+};
+
 function GameplaySection() {
-  const gameBoardRef = useRef<GameBoardRef>(null);
-  const { playDamage, playHeal, playItem } = useSounds();
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { socket, isConnected, connect } = useSocket();
 
-  // Game state
-  const [myHp, setMyHp] = useState(4);
-  const [myMaxHp, setMyMaxHp] = useState(4);
-  const [opponentHp, setOpponentHp] = useState(4);
-  const [opponentMaxHp, setOpponentMaxHp] = useState(4);
-  const [myItems, setMyItems] = useState<GameItem[]>([]);
-  const [opponentItems, setOpponentItems] = useState<GameItem[]>([]);
-  const [shells, setShells] = useState({ total: 8, live: 4, blank: 4, initialTotal: 8, currentPosition: 0 });
-  const [isMyTurn, setIsMyTurn] = useState(true);
-  const [selectedTarget, setSelectedTarget] = useState<string | null>(null);
-  const [revealedShell, setRevealedShell] = useState<'live' | 'blank' | null>(null);
-  const [message, setMessage] = useState('');
-  const [roundAnnouncement, setRoundAnnouncement] = useState<RoundAnnouncement | null>(null);
-  const [lastShotResult, setLastShotResult] = useState<ShotResult | null>(null);
-  const [stealModalData, setStealModalData] = useState<StealModalData | null>(null);
-  const [damagedPlayerId, setDamagedPlayerId] = useState<string | null>(null);
-  const [healedPlayerId, setHealedPlayerId] = useState<string | null>(null);
-  const [playerLastShell, setPlayerLastShell] = useState<Record<string, 'live' | 'blank'>>({});
-  const [isSawed, setIsSawed] = useState(false);
-  const [isHandcuffed, setIsHandcuffed] = useState(false);
-  const [opponentHandcuffed, setOpponentHandcuffed] = useState(false);
-  const [round, setRound] = useState(1);
-
-  // Add item to my inventory
-  const addItem = useCallback((itemId: ItemId) => {
-    const item = ITEMS[itemId];
-    if (item && myItems.length < 8) {
-      setMyItems(prev => [...prev, { ...item }]);
+  // Auto-connect to socket when component mounts
+  useEffect(() => {
+    if (!isConnected) {
+      connect();
     }
-  }, [myItems.length]);
+  }, [isConnected, connect]);
 
-  // Add item to opponent inventory
-  const addOpponentItem = useCallback((itemId: ItemId) => {
-    const item = ITEMS[itemId];
-    if (item && opponentItems.length < 8) {
-      setOpponentItems(prev => [...prev, { ...item }]);
+  // Bot configuration
+  const [botCount, setBotCount] = useState(1);
+  const [bots, setBots] = useState<BotConfig[]>([
+    { difficulty: 'medium', name: 'Bot 1' },
+  ]);
+  const [rankEnabled, setRankEnabled] = useState(false);
+
+  // Loading state
+  const [loadingState, setLoadingState] = useState<LoadingState>('idle');
+  const [error, setError] = useState<string | null>(null);
+  const [botsAdded, setBotsAdded] = useState(0);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (socket && loadingState !== 'idle') {
+        socket.emit('leaveRoom');
+      }
+    };
+  }, [socket, loadingState]);
+
+  // Update bot count
+  const handleBotCountChange = useCallback((count: number) => {
+    setBotCount(count);
+    const newBots: BotConfig[] = [];
+    for (let i = 0; i < count; i++) {
+      if (bots[i]) {
+        newBots.push(bots[i]);
+      } else {
+        newBots.push({
+          difficulty: 'medium',
+          name: `Bot ${i + 1}`,
+        });
+      }
     }
-  }, [opponentItems.length]);
+    setBots(newBots);
+  }, [bots]);
 
-  // Use item
-  const handleUseItem = useCallback((index: number) => {
-    const item = myItems[index];
-    if (!item) return;
+  // Update bot difficulty
+  const handleDifficultyChange = useCallback((botIndex: number, difficulty: BotDifficulty) => {
+    setBots(prev => {
+      const newBots = [...prev];
+      if (newBots[botIndex]) {
+        newBots[botIndex] = { ...newBots[botIndex], difficulty };
+      }
+      return newBots;
+    });
+  }, []);
 
-    playItem(item.id);
-    const newItems = myItems.filter((_, i) => i !== index);
-    setMyItems(newItems);
+  // Start game with server bots
+  const handleStartGame = useCallback(() => {
+    if (!socket || !isConnected) {
+      setError('Nao conectado ao servidor');
+      return;
+    }
 
-    switch (item.id) {
-      case 'magnifying_glass':
-        // Reveal current shell
-        const shellType = Math.random() > 0.5 ? 'live' : 'blank';
-        setRevealedShell(shellType);
-        setMessage(`Cartucho atual: ${shellType === 'live' ? 'LIVE' : 'BLANK'}`);
-        setTimeout(() => setMessage(''), 2000);
-        break;
+    setLoadingState('connecting');
+    setError(null);
+    setBotsAdded(0);
 
-      case 'beer':
-        // Eject current shell
-        const ejected = Math.random() > 0.5 ? 'live' : 'blank';
-        setPlayerLastShell({ player: ejected });
-        setShells(prev => ({
-          ...prev,
-          total: Math.max(0, prev.total - 1),
-          live: ejected === 'live' ? Math.max(0, prev.live - 1) : prev.live,
-          blank: ejected === 'blank' ? Math.max(0, prev.blank - 1) : prev.blank,
-          currentPosition: prev.currentPosition + 1,
-        }));
-        setRevealedShell(null);
-        setMessage(`Ejetado: ${ejected === 'live' ? 'LIVE' : 'BLANK'}`);
-        setTimeout(() => setMessage(''), 2000);
-        break;
+    // Step 1: Create room in DEBUG mode
+    setLoadingState('creating_room');
 
-      case 'cigarettes':
-        playHeal();
-        setMyHp(prev => Math.min(prev + 1, myMaxHp));
-        setHealedPlayerId('player');
-        setTimeout(() => setHealedPlayerId(null), 500);
-        setMessage('+1 HP');
-        setTimeout(() => setMessage(''), 1500);
-        break;
+    const handleRoomCreated = (data: { code: string }) => {
+      console.log('[Debug] Room created:', data.code);
+      setLoadingState('adding_bots');
 
-      case 'handcuffs':
-        setOpponentHandcuffed(true);
-        setMessage('Oponente algemado!');
-        setTimeout(() => setMessage(''), 2000);
-        break;
+      // Step 2: Add bots one by one
+      let currentBotIndex = 0;
 
-      case 'hand_saw':
-        setIsSawed(true);
-        setMessage('Proximo tiro: 2x dano!');
-        setTimeout(() => setMessage(''), 2000);
-        break;
-
-      case 'phone':
-        const pos = Math.floor(Math.random() * shells.total) + 1;
-        const type = Math.random() > 0.5 ? 'LIVE' : 'BLANK';
-        setMessage(`Posicao ${pos}: ${type}`);
-        setTimeout(() => setMessage(''), 3000);
-        break;
-
-      case 'inverter':
-        setRevealedShell(null);
-        setMessage('Cartucho invertido!');
-        setTimeout(() => setMessage(''), 2000);
-        break;
-
-      case 'adrenaline':
-        if (opponentItems.length > 0) {
-          setStealModalData({
-            playerId: 'opponent',
-            playerName: 'Oponente',
-            items: opponentItems,
+      const addNextBot = () => {
+        if (currentBotIndex < bots.length) {
+          const bot = bots[currentBotIndex];
+          socket.emit('addBot', {
+            botName: bot.name,
+            difficulty: bot.difficulty,
           });
         } else {
-          setMessage('Sem itens para roubar');
-          setTimeout(() => setMessage(''), 2000);
+          // All bots added, start game
+          setLoadingState('starting');
+          socket.emit('startGame');
         }
-        break;
+      };
 
-      case 'expired_medicine':
-        const success = Math.random() < 0.5;
-        if (success) {
-          playHeal();
-          setMyHp(prev => Math.min(prev + 2, myMaxHp));
-          setHealedPlayerId('player');
-          setTimeout(() => setHealedPlayerId(null), 500);
-          setMessage('Funcionou! +2 HP');
-        } else {
-          playDamage();
-          setMyHp(prev => Math.max(prev - 1, 0));
-          setDamagedPlayerId('player');
-          setTimeout(() => setDamagedPlayerId(null), 500);
-          setMessage('Vencido! -1 HP');
-        }
-        setTimeout(() => setMessage(''), 2000);
-        break;
+      const handleBotAdded = () => {
+        currentBotIndex++;
+        setBotsAdded(currentBotIndex);
+        addNextBot();
+      };
 
-      case 'turn_reverser':
-        setMessage('Ordem dos turnos invertida!');
-        setTimeout(() => setMessage(''), 2000);
-        break;
-    }
-  }, [myItems, opponentItems, shells.total, myMaxHp, playItem, playHeal, playDamage]);
+      const handleBotError = (data: { message: string }) => {
+        console.error('[Debug] Bot error:', data.message);
+        setError(data.message);
+        setLoadingState('idle');
+        socket.off('botAdded', handleBotAdded);
+        socket.off('botError', handleBotError);
+      };
 
-  // Steal item
-  const handleStealItem = useCallback((index: number) => {
-    const stolenItem = opponentItems[index];
-    setStealModalData(null);
-    setOpponentItems(prev => prev.filter((_, i) => i !== index));
-    setMyItems(prev => [...prev, stolenItem]);
-    setMessage(`Roubou ${stolenItem.name}!`);
-    setTimeout(() => setMessage(''), 2000);
-  }, [opponentItems]);
+      socket.on('botAdded', handleBotAdded);
+      socket.on('botError', handleBotError);
 
-  // Cancel steal
-  const handleCancelSteal = useCallback(() => {
-    setStealModalData(null);
-    // Return adrenaline item
-    setMyItems(prev => [...prev, { ...ITEMS.adrenaline }]);
-  }, []);
+      // Start adding bots
+      addNextBot();
+    };
 
-  // Shoot
-  const handleShoot = useCallback((targetId: string) => {
-    const isLive = Math.random() > 0.5;
-    gameBoardRef.current?.triggerShot(isLive);
+    const handleRoundStarted = () => {
+      console.log('[Debug] Game started, navigating to multiplayer');
+      // Navigate to multiplayer game page
+      navigate('/multiplayer/game');
+      cleanup();
+    };
 
-    const damage = isSawed ? 2 : 1;
-    setIsSawed(false);
-    setRevealedShell(null);
+    const handleJoinError = (message: string) => {
+      console.error('[Debug] Join error:', message);
+      setError(message);
+      setLoadingState('idle');
+      cleanup();
+    };
 
-    setPlayerLastShell({ player: isLive ? 'live' : 'blank' });
-    setShells(prev => ({
-      ...prev,
-      total: Math.max(0, prev.total - 1),
-      live: isLive ? Math.max(0, prev.live - 1) : prev.live,
-      blank: !isLive ? Math.max(0, prev.blank - 1) : prev.blank,
-      currentPosition: prev.currentPosition + 1,
-    }));
+    const handleStartError = (message: string) => {
+      console.error('[Debug] Start error:', message);
+      setError(message);
+      setLoadingState('idle');
+      cleanup();
+    };
 
-    setLastShotResult({
-      type: isLive ? 'live' : 'blank',
-      shooter: 'Voce',
-      target: targetId === 'opponent' ? 'Oponente' : 'voce',
-      damage: isLive ? damage : 0,
+    const cleanup = () => {
+      socket.off('roomCreated', handleRoomCreated);
+      socket.off('roundStarted', handleRoundStarted);
+      socket.off('joinError', handleJoinError);
+      socket.off('startError', handleStartError);
+    };
+
+    // Set up listeners
+    socket.on('roomCreated', handleRoomCreated);
+    socket.on('roundStarted', handleRoundStarted);
+    socket.on('joinError', handleJoinError);
+    socket.on('startError', handleStartError);
+
+    // Create room with DEBUG mode
+    socket.emit('createRoom', {
+      playerName: user?.display_name || 'Debug Player',
+      gameMode: GameMode.DEBUG,
+      debugRankEnabled: rankEnabled,
     });
+  }, [socket, isConnected, bots, rankEnabled, navigate, user]);
 
-    if (isLive) {
-      playDamage();
-      if (targetId === 'opponent') {
-        setOpponentHp(prev => Math.max(prev - damage, 0));
-        setDamagedPlayerId('opponent');
-      } else {
-        setMyHp(prev => Math.max(prev - damage, 0));
-        setDamagedPlayerId('player');
-      }
-      setTimeout(() => setDamagedPlayerId(null), 600);
-    }
+  // Loading screen
+  if (loadingState !== 'idle') {
+    const messages: Record<LoadingState, string> = {
+      idle: '',
+      connecting: 'Conectando ao servidor...',
+      creating_room: 'Criando sala de debug...',
+      adding_bots: `Adicionando bots (${botsAdded}/${bots.length})...`,
+      starting: 'Iniciando partida...',
+    };
 
-    setTimeout(() => {
-      setLastShotResult(null);
-      setSelectedTarget(null);
-    }, 2000);
-  }, [isSawed, playDamage]);
-
-  // Shoot self
-  const handleShootSelf = useCallback(() => {
-    handleShoot('player');
-  }, [handleShoot]);
-
-  // Select target
-  const handleSelectTarget = useCallback((playerId: string) => {
-    setSelectedTarget(prev => prev === playerId ? null : playerId);
-  }, []);
-
-  // Reload
-  const handleReload = useCallback(() => {
-    const live = Math.floor(Math.random() * 4) + 2;
-    const blank = Math.floor(Math.random() * 4) + 2;
-    setShells({ total: live + blank, live, blank, initialTotal: live + blank, currentPosition: 0 });
-    setRevealedShell(null);
-    gameBoardRef.current?.triggerReloadSpin();
-    setRoundAnnouncement({ round, live, blank, hp: myMaxHp });
-  }, [round, myMaxHp]);
-
-  // Reset
-  const handleReset = useCallback(() => {
-    setMyHp(4);
-    setMyMaxHp(4);
-    setOpponentHp(4);
-    setOpponentMaxHp(4);
-    setMyItems([]);
-    setOpponentItems([]);
-    setShells({ total: 8, live: 4, blank: 4, initialTotal: 8, currentPosition: 0 });
-    setIsMyTurn(true);
-    setSelectedTarget(null);
-    setRevealedShell(null);
-    setMessage('');
-    setRoundAnnouncement(null);
-    setLastShotResult(null);
-    setStealModalData(null);
-    setDamagedPlayerId(null);
-    setHealedPlayerId(null);
-    setPlayerLastShell({});
-    setIsSawed(false);
-    setIsHandcuffed(false);
-    setOpponentHandcuffed(false);
-    setRound(1);
-  }, []);
-
-  const opponent = {
-    id: 'opponent',
-    name: 'Oponente',
-    hp: opponentHp,
-    maxHp: opponentMaxHp,
-    items: opponentItems,
-    handcuffed: opponentHandcuffed,
-    sawedOff: false,
-    alive: opponentHp > 0,
-  };
-
-  const me = {
-    id: 'player',
-    name: 'Voce',
-    hp: myHp,
-    maxHp: myMaxHp,
-    items: myItems,
-    handcuffed: isHandcuffed,
-    sawedOff: isSawed,
-    alive: myHp > 0,
-  };
+    return (
+      <div className="debug-gameplay debug-gameplay--loading">
+        <div className="debug-loading">
+          <div className="debug-loading__spinner" />
+          <span className="debug-loading__text">{messages[loadingState]}</span>
+          {error && <span className="debug-loading__error">{error}</span>}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="debug-gameplay">
-      {/* Debug Controls */}
-      <div className="debug-gameplay-controls">
-        <div className="debug-controls-section">
-          <h4>Adicionar Itens (Meus)</h4>
-          <div className="debug-items-grid">
-            {(Object.keys(ITEMS) as ItemId[]).map(itemId => (
+      <div className="debug-gameplay-setup">
+        {/* Header */}
+        <div className="debug-setup__header">
+          <h3>Teste de Gameplay com Bots</h3>
+          <p className="debug-setup__subtitle">
+            Usa o mesmo sistema de bots do multiplayer (bot.service.ts do servidor)
+          </p>
+        </div>
+
+        {/* Error */}
+        {error && (
+          <div className="debug-setup__error">
+            {error}
+          </div>
+        )}
+
+        {/* Rank Toggle */}
+        <div className="debug-setup__section debug-setup__section--rank">
+          <label className="debug-setup__label">
+            <RankIcon tier="Gold" size="sm" />
+            <span>Progressao de Rank</span>
+          </label>
+          <div className="debug-setup__toggle-wrapper">
+            <button
+              className={`debug-setup__toggle ${rankEnabled ? 'debug-setup__toggle--active' : ''}`}
+              onClick={() => setRankEnabled(!rankEnabled)}
+            >
+              <span className="debug-setup__toggle-track">
+                <span className="debug-setup__toggle-thumb" />
+              </span>
+              <span className="debug-setup__toggle-label">
+                {rankEnabled ? 'ATIVADO' : 'DESATIVADO'}
+              </span>
+            </button>
+            <span className="debug-setup__toggle-hint">
+              {rankEnabled
+                ? 'LP/MMR/ELO serao alterados (para testes de ranking)'
+                : 'Apenas Stats + XP (sem mudancas no rank)'}
+            </span>
+          </div>
+        </div>
+
+        {/* Bot Count */}
+        <div className="debug-setup__section">
+          <label className="debug-setup__label">
+            <span>Numero de Bots</span>
+          </label>
+          <div className="debug-setup__bot-count">
+            {[1, 2, 3].map(count => (
               <button
-                key={itemId}
-                className="debug-item-add-btn"
-                onClick={() => addItem(itemId)}
-                title={ITEMS[itemId].name}
+                key={count}
+                className={`debug-setup__count-btn ${botCount === count ? 'active' : ''}`}
+                onClick={() => handleBotCountChange(count)}
               >
-                <ItemIcon item={ITEMS[itemId]} size={24} />
+                {count}
               </button>
             ))}
           </div>
         </div>
 
-        <div className="debug-controls-section">
-          <h4>Adicionar Itens (Oponente)</h4>
-          <div className="debug-items-grid">
-            {(Object.keys(ITEMS) as ItemId[]).map(itemId => (
-              <button
-                key={itemId}
-                className="debug-item-add-btn debug-item-add-btn--opponent"
-                onClick={() => addOpponentItem(itemId)}
-                title={ITEMS[itemId].name}
-              >
-                <ItemIcon item={ITEMS[itemId]} size={24} />
-              </button>
-            ))}
-          </div>
+        {/* Bot Cards */}
+        <div className="debug-setup__bots">
+          {bots.map((bot, index) => (
+            <div key={index} className="debug-setup__bot-card">
+              <div className="debug-setup__bot-header">
+                <span className="debug-setup__bot-icon">🤖</span>
+                <span className="debug-setup__bot-name">{bot.name}</span>
+              </div>
+
+              <div className="debug-setup__difficulty">
+                <span className="debug-setup__difficulty-label">Dificuldade:</span>
+                <div className="debug-setup__difficulty-options">
+                  {(Object.keys(DIFFICULTY_INFO) as BotDifficulty[]).map(diff => {
+                    const info = DIFFICULTY_INFO[diff];
+                    const isSelected = bot.difficulty === diff;
+                    return (
+                      <button
+                        key={diff}
+                        className={`debug-setup__diff-btn ${isSelected ? 'active' : ''}`}
+                        style={{
+                          '--diff-color': info.color,
+                        } as React.CSSProperties}
+                        onClick={() => handleDifficultyChange(index, diff)}
+                        title={info.description}
+                      >
+                        {info.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+          ))}
         </div>
 
-        <div className="debug-controls-section">
-          <h4>Controles</h4>
-          <div className="debug-hp-controls">
-            <div className="debug-hp-row">
-              <span>Meu HP:</span>
-              <button onClick={() => setMyHp(h => Math.max(h - 1, 0))}>-</button>
-              <span>{myHp}/{myMaxHp}</span>
-              <button onClick={() => setMyHp(h => Math.min(h + 1, myMaxHp))}>+</button>
-              <button onClick={() => setMyMaxHp(m => Math.min(m + 1, 6))}>+Max</button>
-            </div>
-            <div className="debug-hp-row">
-              <span>Oponente:</span>
-              <button onClick={() => setOpponentHp(h => Math.max(h - 1, 0))}>-</button>
-              <span>{opponentHp}/{opponentMaxHp}</span>
-              <button onClick={() => setOpponentHp(h => Math.min(h + 1, opponentMaxHp))}>+</button>
-              <button onClick={() => setOpponentMaxHp(m => Math.min(m + 1, 6))}>+Max</button>
-            </div>
-          </div>
-          <div className="debug-buttons">
-            <button className="debug-btn" onClick={() => setIsMyTurn(!isMyTurn)}>
-              Trocar Turno
-            </button>
-            <button className="debug-btn" onClick={() => setRound(r => r + 1)}>
-              +Round
-            </button>
-            <button className="debug-btn debug-btn--sequence" onClick={handleReload}>
-              Reload
-            </button>
-            <button className="debug-btn debug-btn--secondary" onClick={handleReset}>
-              Reset
-            </button>
-          </div>
-        </div>
-      </div>
+        {/* Start Button */}
+        <button
+          className="debug-setup__start-btn"
+          onClick={handleStartGame}
+          disabled={!isConnected}
+        >
+          {isConnected ? 'INICIAR TESTE' : 'CONECTANDO...'}
+        </button>
 
-      {/* GameBoard */}
-      <div className="debug-gameboard-wrapper">
-        <GameBoard
-          ref={gameBoardRef}
-          round={round}
-          maxRounds={3}
-          shells={shells}
-          currentPlayerId={isMyTurn ? 'player' : 'opponent'}
-          myId="player"
-          opponents={[opponent]}
-          me={me}
-          myItems={myItems}
-          isMyTurn={isMyTurn}
-          selectedTarget={selectedTarget}
-          revealedShell={revealedShell}
-          message={message}
-          roundAnnouncement={roundAnnouncement}
-          lastShotResult={lastShotResult}
-          stealModalData={stealModalData}
-          itemActionModal={null}
-          gameOverData={null}
-          damagedPlayerId={damagedPlayerId}
-          healedPlayerId={healedPlayerId}
-          playerLastShell={playerLastShell}
-          isSawed={isSawed}
-          onSelectTarget={handleSelectTarget}
-          onShoot={handleShoot}
-          onShootSelf={handleShootSelf}
-          onUseItem={handleUseItem}
-          onStealItem={handleStealItem}
-          onCancelSteal={handleCancelSteal}
-          onBack={() => {}}
-          onRoundAnnouncementComplete={() => {
-            setRoundAnnouncement(null);
-            gameBoardRef.current?.triggerReloadSpin();
-          }}
-        />
+        {/* Info */}
+        <div className="debug-setup__info">
+          <h4>Diferencas do modo Debug:</h4>
+          <ul>
+            <li>✅ Estatisticas sao registradas (kills, damage, etc)</li>
+            <li>✅ XP e ganho normalmente</li>
+            <li>{rankEnabled ? '✅' : '❌'} Mudancas de LP/MMR/ELO {rankEnabled ? '(ativado)' : '(desativado)'}</li>
+          </ul>
+        </div>
       </div>
     </div>
   );

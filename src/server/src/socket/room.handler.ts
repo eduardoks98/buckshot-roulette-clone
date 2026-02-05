@@ -11,6 +11,7 @@ import { startTurnTimer, RoomWithTimer, calculateAwards } from './game.handler';
 import { startMatchSession, endMatchSession } from '../services/session.service';
 import { Item, PlayerPublicState } from '../../../shared/types';
 import { logger, LOG_CATEGORIES } from '../services/logger.service';
+import { botService } from '../services/bot/bot.service';
 
 const gameService = new GameService();
 
@@ -68,8 +69,11 @@ export function setupRoomCallbacks(
   io: TypedIOServer,
   roomService: RoomService
 ): void {
-  // Callback quando jogo é cancelado (todos desconectaram)
+  // Callback quando jogo é cancelado (todos desconectaram ou todos humanos abandonaram treino)
   roomService.onGameCancelled = (roomCode: string, playerIds: string[]) => {
+    // Limpar timeouts dos bots (evita bots jogando sozinhos)
+    botService.cleanupRoom(roomCode);
+
     io.to(roomCode).emit('gameOver', {
       winner: null,
       reason: 'Todos os jogadores abandonaram a partida',
@@ -78,7 +82,7 @@ export function setupRoomCallbacks(
       .catch(err => console.error('[DB] Erro ao abandonar jogo:', err));
     // Finalizar sessão de match no games-admin (tracking de tempo)
     endMatchSession(roomCode, playerIds);
-    console.log(`[Room] Jogo ${roomCode} cancelado - todos desconectaram`);
+    console.log(`[Room] Jogo ${roomCode} cancelado - todos desconectaram/abandonaram`);
   };
 
   // Callback quando jogador vence por WO
@@ -88,6 +92,34 @@ export function setupRoomCallbacks(
     // Finalizar sessão de match no games-admin (tracking de tempo)
     const playerSocketIds = room.players.map(p => p.id);
     endMatchSession(roomCode, playerSocketIds);
+
+    // =========================================
+    // VERIFICAR SE É TREINO E VENCEDOR É BOT
+    // Se humano abandonou contra bots, deletar jogo (sem XP/stats)
+    // =========================================
+    const gameInfo = await gamePersistenceService.getGameByRoomCode(roomCode);
+
+    if (gameInfo && !gameInfo.is_ranked) {
+      // Jogo não é ranked (modo Treino)
+      // Verificar se o vencedor é um bot (nome contém [BOT])
+      const winnerIsBot = player.name.includes('[BOT]');
+
+      if (winnerIsBot) {
+        // Humano abandonou contra bots - deletar jogo completamente
+        console.log(`[Room] Treino abandonado (bot venceu) - deletando jogo ${roomCode}`);
+
+        // Limpar timeouts dos bots
+        botService.cleanupRoom(roomCode);
+
+        await gamePersistenceService.deleteGame(roomCode);
+
+        io.to(roomCode).emit('gameOver', {
+          winner: null,
+          reason: 'Partida abandonada',
+        });
+        return;
+      }
+    }
 
     // Build player stats
     const sortedPlayers = [...room.players].sort((a, b) => b.roundWins - a.roundWins);
@@ -365,6 +397,7 @@ export function registerRoomHandlers(
             players: result.players,
             isHost: true,
             hasPassword: !!password,
+            gameMode: mode,
           });
 
           // Notificar todos os clientes que uma nova sala foi criada
@@ -419,6 +452,7 @@ export function registerRoomHandlers(
         players: result.players,
         isHost: true,
         hasPassword: !!password,
+        gameMode: mode,
       });
 
       // Notificar todos os clientes que uma nova sala foi criada
@@ -507,6 +541,7 @@ export function registerRoomHandlers(
         code: result.room.code,
         players: result.players,
         isHost: result.room.host === socket.id,
+        gameMode: result.room.gameMode,
       });
 
       // Notificar outros jogadores
@@ -673,6 +708,13 @@ export function registerRoomHandlers(
           }
         }
       });
+
+      // Persistir estado completo do jogo após iniciar (para crash recovery)
+      const gameState = roomService.serializeRoomState(result.room.code);
+      if (gameState) {
+        gamePersistenceService.saveGameState(result.room.code, gameState)
+          .catch(err => console.error('[DB] Erro ao salvar estado inicial do jogo:', err));
+      }
 
       logger.info(LOG_CATEGORIES.GAME, `Jogo iniciado: ${result.room.code}`, {
         roomCode: result.room.code,

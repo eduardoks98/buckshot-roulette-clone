@@ -67,7 +67,7 @@ interface PaginatedResult {
 
 export default function History() {
   const navigate = useNavigate();
-  const { user, isLoading: authLoading, token } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
 
   const [games, setGames] = useState<GameHistoryEntry[]>([]);
   const [stats, setStats] = useState<UserGameStats | null>(null);
@@ -78,7 +78,7 @@ export default function History() {
 
   // Fetch history
   useEffect(() => {
-    if (!token) return;
+    if (!user) return;
 
     const fetchHistory = async () => {
       try {
@@ -86,9 +86,7 @@ export default function History() {
         setError(null);
 
         const response = await fetch(`/api/history?page=${page}&limit=10`, {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          credentials: 'include',
         });
 
         if (!response.ok) {
@@ -106,18 +104,16 @@ export default function History() {
     };
 
     fetchHistory();
-  }, [token, page]);
+  }, [user, page]);
 
   // Fetch stats
   useEffect(() => {
-    if (!token) return;
+    if (!user) return;
 
     const fetchStats = async () => {
       try {
         const response = await fetch('/api/history/stats', {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          credentials: 'include',
         });
 
         if (response.ok) {
@@ -130,7 +126,7 @@ export default function History() {
     };
 
     fetchStats();
-  }, [token]);
+  }, [user]);
 
   // Get position badge
   const getPositionBadge = (position: number | null, totalPlayers: number) => {

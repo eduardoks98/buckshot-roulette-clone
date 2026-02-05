@@ -11,7 +11,7 @@ export interface UseRoomActionsReturn {
   /** Sair da sala */
   leaveRoom: () => void;
   /** Adicionar bot (development only) */
-  addBot: (difficulty?: 'easy' | 'medium' | 'hard') => void;
+  addBot: (botName?: string, difficulty?: 'easy' | 'medium' | 'hard') => void;
   /** Remover bot (development only) */
   removeBot: (botId: string) => void;
 }
@@ -33,9 +33,9 @@ export function useRoomActions(): UseRoomActionsReturn {
     socket.emit('leaveRoom');
   }, [socket]);
 
-  const addBot = useCallback((difficulty: 'easy' | 'medium' | 'hard' = 'medium') => {
+  const addBot = useCallback((botName?: string, difficulty: 'easy' | 'medium' | 'hard' = 'medium') => {
     if (!socket) return;
-    socket.emit('addBot', { difficulty });
+    socket.emit('addBot', { botName, difficulty });
   }, [socket]);
 
   const removeBot = useCallback((botId: string) => {

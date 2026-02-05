@@ -5,11 +5,13 @@
 import { useCallback } from 'react';
 import { useSocket } from '../../context/SocketContext';
 
+import { GameMode } from '../../../../shared/types';
+
 export interface UseLobbyActionsReturn {
   /** Listar salas disponíveis */
   listRooms: () => void;
   /** Criar nova sala */
-  createRoom: (playerName: string, password?: string) => void;
+  createRoom: (playerName: string, password?: string, gameMode?: GameMode) => void;
   /** Entrar em uma sala */
   joinRoom: (code: string, playerName: string, password?: string) => void;
   /** Sair da sala atual */
@@ -34,11 +36,12 @@ export function useLobbyActions(): UseLobbyActionsReturn {
     socket.emit('listRooms');
   }, [socket]);
 
-  const createRoom = useCallback((playerName: string, password?: string) => {
+  const createRoom = useCallback((playerName: string, password?: string, gameMode?: GameMode) => {
     if (!socket) return;
     socket.emit('createRoom', {
       playerName,
       password,
+      gameMode,
     });
   }, [socket]);
 

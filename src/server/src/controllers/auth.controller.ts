@@ -6,22 +6,42 @@ import { Request, Response } from 'express';
 import { authService } from '../services/auth.service';
 
 // ==========================================
+// HELPERS
+// ==========================================
+
+/**
+ * Extract token from request (Bearer header or httpOnly cookie)
+ */
+function extractToken(req: Request): string | null {
+  // Try Bearer token first (for API clients)
+  const authHeader = req.headers.authorization;
+  if (authHeader?.startsWith('Bearer ')) {
+    return authHeader.split(' ')[1];
+  }
+
+  // Fallback: httpOnly cookie (for browser with credentials: 'include')
+  const cookieToken = req.cookies?.mysys_token;
+  if (cookieToken) {
+    return cookieToken;
+  }
+
+  return null;
+}
+
+// ==========================================
 // SESSION
 // ==========================================
 
 export const getMe = async (req: Request, res: Response) => {
   console.log('[Auth] getMe - Request received');
   try {
-    const authHeader = req.headers.authorization;
-    console.log('[Auth] getMe - Auth header present:', !!authHeader);
+    const token = extractToken(req);
+    console.log('[Auth] getMe - Token present:', !!token, token ? `(length: ${token.length})` : '');
 
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      console.log('[Auth] getMe - No valid auth header, returning 401');
+    if (!token) {
+      console.log('[Auth] getMe - No token found, returning 401');
       return res.status(401).json({ error: 'Token nao fornecido' });
     }
-
-    const token = authHeader.split(' ')[1];
-    console.log('[Auth] getMe - Token length:', token.length);
 
     const user = await authService.validateToken(token);
     console.log('[Auth] getMe - User from validateToken:', user ? user.email : 'null');
@@ -43,16 +63,35 @@ export const getMe = async (req: Request, res: Response) => {
 
 export const logout = async (req: Request, res: Response) => {
   try {
-    const authHeader = req.headers.authorization;
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    const token = extractToken(req);
+    if (!token) {
       return res.status(200).json({ message: 'Logout realizado' });
     }
 
-    const token = authHeader.split(' ')[1];
-    const user = await authService.validateToken(token);
+    // CRITICAL: Call MySys API to trigger AuthSyncEvent broadcast
+    // This notifies all other games (Champion Forge, Portal, etc.) that user logged out
+    const apiUrl = process.env.GAMES_ADMIN_API_URL || 'http://localhost:8000';
+    const gameCode = process.env.GAME_CODE || 'BANGSHOT';
 
+    try {
+      const response = await fetch(
+        `${apiUrl}/api/games/${gameCode}/auth/logout`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Accept': 'application/json',
+          },
+        }
+      );
+      console.log('[Auth] MySys logout API called:', response.status);
+    } catch (error) {
+      console.error('[Auth] Failed to call MySys logout API:', error);
+    }
+
+    // Also invalidate local sessions
+    const user = await authService.validateToken(token);
     if (user) {
-      // Invalidate all sessions for this user
       await authService.invalidateAllSessions(user.id);
     }
 

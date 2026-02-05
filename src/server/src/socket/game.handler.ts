@@ -12,6 +12,16 @@ import { Item, ItemId, GameAward } from '../../../shared/types';
 import { logger, LOG_CATEGORIES } from '../services/logger.service';
 import { endMatchSession } from '../services/session.service';
 
+// Helper to persist game state after each action
+function persistGameState(roomService: RoomService, code: string): void {
+  const state = roomService.serializeRoomState(code);
+  if (state) {
+    gamePersistenceService.saveGameState(code, state).catch(err => {
+      console.error('[DB] Erro ao salvar estado do jogo:', err);
+    });
+  }
+}
+
 const gameService = new GameService();
 
 export function registerGameHandlers(
@@ -94,6 +104,9 @@ export function registerGameHandlers(
         players: room.players.map(p => gameService.toPublicPlayer(p)),
         turnElapsed: 0, // Turno acabou de começar
       });
+
+      // Persistir estado do jogo após cada ação
+      persistGameState(roomService, code);
 
       // Se o próximo jogador é um bot, agendar jogada
       const nextPlayer = room.players.find(p => p.id === nextPlayerId);
@@ -311,6 +324,9 @@ export function registerGameHandlers(
           socketId: socket.id,
         });
       }
+
+      // Persistir estado do jogo após uso de item
+      persistGameState(roomService, code);
 
       // Log do uso de item
       const user = room.players.find(p => p.id === socket.id);
@@ -814,6 +830,9 @@ export async function handleRoundEnd(
         });
       }
     });
+
+    // Persistir estado do jogo após início do round
+    persistGameState(roomService, code);
   }, 3000);
 }
 

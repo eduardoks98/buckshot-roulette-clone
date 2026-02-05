@@ -196,12 +196,14 @@ export interface RoomCreatedPayload {
   players: PlayerPublicState[];
   isHost: boolean;
   hasPassword: boolean;
+  gameMode?: GameMode;
 }
 
 export interface RoomJoinedPayload {
   code: string;
   players: PlayerPublicState[];
   isHost: boolean;
+  gameMode?: GameMode;
 }
 
 export interface PlayerJoinedPayload {

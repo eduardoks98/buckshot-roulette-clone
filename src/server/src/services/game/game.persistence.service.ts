@@ -668,8 +668,32 @@ export class GamePersistenceService {
   }
 
   // Abandon game (when game is interrupted)
+  // For non-ranked games (singleplayer/treino), DELETE the game completely
+  // For ranked games, mark as ABANDONED
   async abandonGame(roomCode: string): Promise<void> {
     try {
+      // First, check if the game is ranked
+      const game = await prisma.game.findUnique({
+        where: { room_code: roomCode },
+        select: { id: true, is_ranked: true, status: true },
+      });
+
+      if (!game) {
+        console.log(`[DB] Jogo não encontrado para abandonar: ${roomCode}`);
+        return;
+      }
+
+      // If NOT ranked (singleplayer/treino), delete completely
+      // This ensures abandoned training games don't appear in history
+      if (!game.is_ranked) {
+        console.log(`[DB] Jogo não-ranked abandonado - DELETANDO: ${roomCode}`);
+        await prisma.game.delete({
+          where: { room_code: roomCode },
+        });
+        return;
+      }
+
+      // If ranked, keep as ABANDONED (current behavior)
       await prisma.game.update({
         where: { room_code: roomCode },
         data: {
@@ -678,7 +702,7 @@ export class GamePersistenceService {
         },
       });
 
-      console.log(`[DB] Jogo abandonado: ${roomCode}`);
+      console.log(`[DB] Jogo ranked abandonado: ${roomCode}`);
     } catch (error) {
       console.error('[DB] Erro ao abandonar jogo:', error);
     }
@@ -691,14 +715,16 @@ export class GamePersistenceService {
   // Save full game state snapshot (chamado após cada ação)
   async saveGameState(roomCode: string, gameState: object): Promise<void> {
     try {
+      const stateJson = JSON.stringify(gameState);
       await prisma.game.update({
         where: { room_code: roomCode },
         data: {
-          game_state: JSON.stringify(gameState),
+          game_state: stateJson,
           game_state_updated_at: new Date(),
         },
       });
-      // Log silencioso para não poluir
+      // Log para debug (mostra tamanho do estado salvo)
+      console.log(`[DB] Estado salvo para ${roomCode} (${Math.round(stateJson.length / 1024)}KB)`);
     } catch (error) {
       console.error('[DB] Erro ao salvar estado do jogo:', error);
     }
@@ -724,6 +750,7 @@ export class GamePersistenceService {
         select: {
           room_code: true,
           game_state: true,
+          game_state_updated_at: true,
           game_participants: {
             select: {
               user_id: true,
@@ -733,6 +760,12 @@ export class GamePersistenceService {
             },
           },
         },
+      });
+
+      console.log(`[DB] Encontrados ${games.length} jogos em progresso com estado salvo`);
+      games.forEach(g => {
+        const stateSize = g.game_state ? Math.round(g.game_state.length / 1024) : 0;
+        console.log(`[DB]   - ${g.room_code}: ${stateSize}KB, atualizado em ${g.game_state_updated_at?.toISOString()}`);
       });
 
       return games.map(game => ({
@@ -800,6 +833,126 @@ export class GamePersistenceService {
       });
     } catch (error) {
       console.error('[DB] Erro ao limpar estado do jogo:', error);
+    }
+  }
+
+  // ==========================================
+  // CLEANUP ORPHANED GAMES (called on server startup)
+  // ==========================================
+
+  /**
+   * Clean up orphaned training games on server startup
+   *
+   * This handles edge cases where games get stuck in WAITING/IN_PROGRESS:
+   * - Server restart during a game
+   * - Socket disconnection without proper cleanup
+   * - Other edge cases where callbacks weren't triggered
+   *
+   * For non-ranked games (training mode with bots):
+   * - DELETE games in WAITING or IN_PROGRESS status
+   *
+   * For ranked games:
+   * - Mark as ABANDONED (preserve history)
+   */
+  async cleanupOrphanedGames(): Promise<{ deleted: number; abandoned: number }> {
+    console.log('[DB] Starting orphaned games cleanup...');
+
+    let deleted = 0;
+    let abandoned = 0;
+
+    // Grace period: só limpar jogos parados há mais de 5 minutos
+    // Isso permite reconexão após restart rápido do servidor
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+
+    try {
+      // 1. Find and delete orphaned NON-RANKED games (training with bots)
+      // Only if they've been stuck for more than 5 minutes (to allow reconnection on quick restart)
+      const orphanedTrainingGames = await prisma.game.findMany({
+        where: {
+          is_ranked: false,
+          status: {
+            in: [GameStatus.WAITING, GameStatus.IN_PROGRESS],
+          },
+          created_at: {
+            lt: fiveMinutesAgo, // Só jogos criados há mais de 5 minutos
+          },
+        },
+        select: {
+          id: true,
+          room_code: true,
+          status: true,
+          created_at: true,
+        },
+      });
+
+      if (orphanedTrainingGames.length > 0) {
+        console.log(`[DB] Found ${orphanedTrainingGames.length} orphaned training games (older than 5 min):`);
+        orphanedTrainingGames.forEach(g => {
+          console.log(`  - ${g.room_code} (${g.status}) created at ${g.created_at.toISOString()}`);
+        });
+
+        const deleteResult = await prisma.game.deleteMany({
+          where: {
+            id: {
+              in: orphanedTrainingGames.map(g => g.id),
+            },
+          },
+        });
+        deleted = deleteResult.count;
+        console.log(`[DB] Deleted ${deleted} orphaned training games`);
+      }
+
+      // 2. Find and mark as ABANDONED orphaned RANKED games
+      // Only if they've been stuck for more than 5 minutes (to avoid killing active games on quick restart)
+
+      const orphanedRankedGames = await prisma.game.findMany({
+        where: {
+          is_ranked: true,
+          status: {
+            in: [GameStatus.WAITING, GameStatus.IN_PROGRESS],
+          },
+          // Only consider games older than 5 minutes
+          created_at: {
+            lt: fiveMinutesAgo,
+          },
+        },
+        select: {
+          id: true,
+          room_code: true,
+          status: true,
+          created_at: true,
+        },
+      });
+
+      if (orphanedRankedGames.length > 0) {
+        console.log(`[DB] Found ${orphanedRankedGames.length} orphaned ranked games (older than 5 min):`);
+        orphanedRankedGames.forEach(g => {
+          console.log(`  - ${g.room_code} (${g.status}) created at ${g.created_at.toISOString()}`);
+        });
+
+        const updateResult = await prisma.game.updateMany({
+          where: {
+            id: {
+              in: orphanedRankedGames.map(g => g.id),
+            },
+          },
+          data: {
+            status: GameStatus.ABANDONED,
+            ended_at: new Date(),
+          },
+        });
+        abandoned = updateResult.count;
+        console.log(`[DB] Marked ${abandoned} orphaned ranked games as ABANDONED`);
+      }
+
+      if (deleted === 0 && abandoned === 0) {
+        console.log('[DB] No orphaned games found - database is clean');
+      }
+
+      return { deleted, abandoned };
+    } catch (error) {
+      console.error('[DB] Error cleaning up orphaned games:', error);
+      return { deleted: 0, abandoned: 0 };
     }
   }
 }

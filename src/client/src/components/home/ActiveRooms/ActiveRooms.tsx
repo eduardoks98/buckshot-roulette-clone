@@ -13,7 +13,8 @@ import {
   useGameSession,
 } from '../../../hooks';
 import type { RoomInfo, RoomCreatedPayload, RoomJoinedPayload } from '../../../hooks';
-import { PlayersIcon, RefreshIcon, UserIcon, PlusIcon, TargetCircleIcon, GamepadIcon, LockIcon } from '../../icons';
+import { PlayersIcon, RefreshIcon, UserIcon, PlusIcon, GamepadIcon, LockIcon, TargetCircleIcon } from '../../icons';
+import { GameMode } from '../../../../../shared/types';
 import { Modal } from '../../common/Modal';
 import './ActiveRooms.css';
 
@@ -47,6 +48,7 @@ export function ActiveRooms() {
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [createPassword, setCreatePassword] = useState('');
   const [usePassword, setUsePassword] = useState(false);
+  const [gameMode, setGameMode] = useState<GameMode>(GameMode.NORMAL);
 
   // Handlers para eventos do lobby
   const handleRoomList = useCallback((data: RoomInfo[]) => {
@@ -60,7 +62,7 @@ export function ActiveRooms() {
   }, [listRooms]);
 
   const handleRoomCreated = useCallback((data: RoomCreatedPayload) => {
-    console.log('Sala criada:', data.code);
+    console.log('Sala criada:', data.code, 'gameMode:', data.gameMode);
     setCreating(false);
     // Nota: session não é mais salva no cliente - servidor gerencia via getRoomByUserId()
     navigate('/multiplayer/room', {
@@ -68,12 +70,13 @@ export function ActiveRooms() {
         roomCode: data.code,
         isHost: data.isHost,
         players: data.players,
+        gameMode: data.gameMode,
       },
     });
   }, [navigate]);
 
   const handleRoomJoined = useCallback((data: RoomJoinedPayload) => {
-    console.log('Entrou na sala:', data.code);
+    console.log('Entrou na sala:', data.code, 'gameMode:', data.gameMode);
     setJoining(false);
     setShowPasswordModal(false);
     // Nota: session não é mais salva no cliente - servidor gerencia via getRoomByUserId()
@@ -82,6 +85,7 @@ export function ActiveRooms() {
         roomCode: data.code,
         isHost: data.isHost,
         players: data.players,
+        gameMode: data.gameMode,
       },
     });
   }, [navigate]);
@@ -177,6 +181,7 @@ export function ActiveRooms() {
     setShowCreateModal(true);
     setCreatePassword('');
     setUsePassword(false);
+    setGameMode(GameMode.NORMAL);
     setJoinError('');
   }, [isConnected, user, activeGame]);
 
@@ -190,14 +195,15 @@ export function ActiveRooms() {
     setCreating(true);
     setShowCreateModal(false);
     setJoinError('');
-    createRoom(user.display_name, usePassword ? createPassword : undefined);
-  }, [isConnected, user, clearSession, createRoom, usePassword, createPassword]);
+    createRoom(user.display_name, usePassword ? createPassword : undefined, gameMode);
+  }, [isConnected, user, clearSession, createRoom, usePassword, createPassword, gameMode]);
 
   // Fechar modal de criação
   const closeCreateModal = useCallback(() => {
     setShowCreateModal(false);
     setCreatePassword('');
     setUsePassword(false);
+    setGameMode(GameMode.NORMAL);
   }, []);
 
   // Entrar em sala da lista
@@ -347,13 +353,6 @@ export function ActiveRooms() {
           <PlusIcon size={16} />
           {creating ? 'Criando...' : 'Criar Sala'}
         </button>
-        <button
-          className="btn-secondary btn-solo"
-          onClick={() => navigate('/singleplayer')}
-        >
-          <TargetCircleIcon size={16} />
-          Jogar Solo
-        </button>
       </div>
 
       {/* Modal de senha para entrar */}
@@ -400,6 +399,34 @@ export function ActiveRooms() {
       >
         <div className="create-room-modal-content">
           <p>Configure sua nova sala</p>
+
+          {/* Toggle de modo de jogo */}
+          <div className="create-room__mode">
+            <span className="create-room__mode-label">Modo de Jogo:</span>
+            <div className="create-room__mode-options">
+              <button
+                type="button"
+                className={`create-room__mode-btn ${gameMode === GameMode.NORMAL ? 'active' : ''}`}
+                onClick={() => setGameMode(GameMode.NORMAL)}
+              >
+                <PlayersIcon size={16} />
+                Multiplayer
+              </button>
+              <button
+                type="button"
+                className={`create-room__mode-btn ${gameMode === GameMode.SINGLEPLAYER ? 'active' : ''}`}
+                onClick={() => setGameMode(GameMode.SINGLEPLAYER)}
+              >
+                <TargetCircleIcon size={16} />
+                Treino (vs Bots)
+              </button>
+            </div>
+            {gameMode === GameMode.SINGLEPLAYER && (
+              <p className="create-room__mode-hint">
+                No modo treino voce ganha XP mas nao afeta seu ranking
+              </p>
+            )}
+          </div>
 
           <div className="create-room__option">
             <label className="create-room__toggle">

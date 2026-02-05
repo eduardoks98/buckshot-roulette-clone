@@ -4,6 +4,7 @@
 
 import express, { Express, Request, Response, NextFunction } from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import http from 'http';
 import path from 'path';
 import { ENV } from './config/env.config';
@@ -14,6 +15,7 @@ import historyRoutes from './routes/history.routes';
 import bugRoutes from './routes/bug.routes';
 import achievementRoutes from './routes/achievement.routes';
 import oauthRoutes from './routes/oauth.routes';
+import statsRoutes from './routes/stats.routes';
 import { AVATARS_DIR } from './services/avatar.service';
 
 export function createServer(): { app: Express; httpServer: http.Server } {
@@ -37,6 +39,9 @@ export function createServer(): { app: Express; httpServer: http.Server } {
     res.setHeader('Content-Security-Policy', "frame-ancestors 'self' https://mysys.shop https://*.mysys.shop");
     next();
   });
+
+  // Cookie parser (for httpOnly SSO cookies)
+  app.use(cookieParser());
 
   // JSON parser
   app.use(express.json());
@@ -107,6 +112,9 @@ export function createServer(): { app: Express; httpServer: http.Server } {
 
   // OAuth routes (SSO with Portal)
   app.use('/api/oauth', oauthRoutes);
+
+  // Stats routes (progression system)
+  app.use('/api/stats', statsRoutes);
 
   // Avatars - servir arquivos estáticos da pasta de uploads
   app.use('/api/avatars', express.static(AVATARS_DIR));

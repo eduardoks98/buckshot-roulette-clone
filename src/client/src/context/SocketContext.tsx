@@ -31,6 +31,7 @@ interface SocketContextType {
   clearSessionInvalidated: () => void;
   // Active game methods
   clearActiveGame: () => void;
+  abandonGame: (roomCode: string) => void;
   setReconnecting: (value: boolean) => void;
   clearReconnectedGameData: () => void;
 }
@@ -64,6 +65,8 @@ export function SocketProvider({ children }: SocketProviderProps) {
   const socketRef = useRef<TypedSocket | null>(null);
   const connectingRef = useRef(false);
   const activeGameRef = useRef<ActiveGameInfo | null>(null);
+  // Ref para rastrear sala sendo abandonada (evita race condition)
+  const abandoningRoomRef = useRef<string | null>(null);
 
   // Limpar estado de sessão invalidada
   const clearSessionInvalidated = useCallback(() => {
@@ -73,6 +76,16 @@ export function SocketProvider({ children }: SocketProviderProps) {
 
   // Active game methods
   const clearActiveGame = useCallback(() => {
+    setActiveGame(null);
+    activeGameRef.current = null;
+    setIsReconnectingState(false);
+  }, []);
+
+  // Abandona jogo e marca para ignorar alreadyInGame (evita race condition)
+  const abandonGame = useCallback((roomCode: string) => {
+    console.log('[SocketContext] Abandonando sala:', roomCode);
+    abandoningRoomRef.current = roomCode;
+    socketRef.current?.emit('abandonGame', { roomCode });
     setActiveGame(null);
     activeGameRef.current = null;
     setIsReconnectingState(false);
@@ -111,15 +124,12 @@ export function SocketProvider({ children }: SocketProviderProps) {
 
     console.log('Conectando ao servidor:', serverUrl);
 
-    // Pegar token de autenticação se existir
-    const authToken = localStorage.getItem('bangshot_auth_token');
-
     const newSocket: TypedSocket = io(serverUrl, {
       transports: ['websocket', 'polling'],
       timeout: 10000,
       reconnectionAttempts: 5,
       reconnectionDelay: 1000,
-      auth: authToken ? { token: authToken } : undefined,
+      withCredentials: true, // Send httpOnly cookie automatically
     });
 
     socketRef.current = newSocket;
@@ -184,6 +194,12 @@ export function SocketProvider({ children }: SocketProviderProps) {
 
     // Evento: usuário já está em uma sala/partida
     const handleAlreadyInGame = (data: { roomCode: string; gameStarted: boolean }) => {
+      // Guard: ignorar se estamos abandonando esta sala (evita race condition)
+      if (abandoningRoomRef.current === data.roomCode) {
+        console.log('[SocketContext] alreadyInGame ignorado - sala sendo abandonada:', data.roomCode);
+        return;
+      }
+
       console.log('[SocketContext] alreadyInGame:', data);
       setActiveGame({
         roomCode: data.roomCode,
@@ -208,6 +224,7 @@ export function SocketProvider({ children }: SocketProviderProps) {
     // Evento: jogo abandonado
     const handleGameAbandoned = () => {
       console.log('[SocketContext] gameAbandoned');
+      abandoningRoomRef.current = null; // Limpar ref de sala sendo abandonada
       setActiveGame(null);
       activeGameRef.current = null;
       setIsReconnectingState(false);
@@ -224,11 +241,53 @@ export function SocketProvider({ children }: SocketProviderProps) {
       }
     };
 
+    // Evento: gameOver - limpar activeGame se partida foi abandonada/cancelada
+    const handleGameOver = (data: { winner: unknown; reason?: string }) => {
+      // Se winner é null e reason indica abandono, limpar activeGame
+      // Isso cobre o caso de treino abandonado (bots jogando sozinhos)
+      if (data.winner === null) {
+        console.log('[SocketContext] gameOver com winner=null, limpando activeGame');
+        abandoningRoomRef.current = null;
+        setActiveGame(null);
+        activeGameRef.current = null;
+        setIsReconnectingState(false);
+      }
+    };
+
+    // Evento: joinError - falha ao reconectar (sala não existe mais)
+    const handleJoinError = (message: string) => {
+      console.log('[SocketContext] joinError:', message);
+      // Se estávamos tentando reconectar, limpar estado
+      if (activeGameRef.current) {
+        console.log('[SocketContext] Limpando activeGame após joinError');
+        abandoningRoomRef.current = null;
+        setActiveGame(null);
+        activeGameRef.current = null;
+        setIsReconnectingState(false);
+      }
+    };
+
+    // Evento: reconnectError - falha ao reconectar com token
+    const handleReconnectError = (data: { message: string }) => {
+      console.log('[SocketContext] reconnectError:', data.message);
+      // Se estávamos tentando reconectar, limpar estado
+      if (activeGameRef.current) {
+        console.log('[SocketContext] Limpando activeGame após reconnectError');
+        abandoningRoomRef.current = null;
+        setActiveGame(null);
+        activeGameRef.current = null;
+        setIsReconnectingState(false);
+      }
+    };
+
     // Registrar listeners
     socket.on('alreadyInGame', handleAlreadyInGame);
     socket.on('reconnected', handleReconnected);
     socket.on('gameAbandoned', handleGameAbandoned);
     socket.on('roomDeleted', handleRoomDeleted);
+    socket.on('gameOver', handleGameOver);
+    socket.on('joinError', handleJoinError);
+    socket.on('reconnectError', handleReconnectError);
 
     // Cleanup: remover listeners ao trocar socket ou desmontar
     return () => {
@@ -236,6 +295,9 @@ export function SocketProvider({ children }: SocketProviderProps) {
       socket.off('reconnected', handleReconnected);
       socket.off('gameAbandoned', handleGameAbandoned);
       socket.off('roomDeleted', handleRoomDeleted);
+      socket.off('gameOver', handleGameOver);
+      socket.off('joinError', handleJoinError);
+      socket.off('reconnectError', handleReconnectError);
     };
   }, [socket]);
 
@@ -261,6 +323,7 @@ export function SocketProvider({ children }: SocketProviderProps) {
     clearSessionInvalidated,
     // Active game methods
     clearActiveGame,
+    abandonGame,
     setReconnecting,
     clearReconnectedGameData,
   };

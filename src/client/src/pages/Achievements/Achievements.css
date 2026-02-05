@@ -106,7 +106,17 @@
 }
 
 /* ==========================================
-   ACHIEVEMENT GRID
+   STATS LIST (Novo sistema de progressao)
+   ========================================== */
+
+.stats-list {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+/* ==========================================
+   ACHIEVEMENT GRID (Legacy)
    ========================================== */
 
 .achievement-grid {

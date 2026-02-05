@@ -1,56 +1,30 @@
 // ==========================================
-// ACHIEVEMENTS PAGE
+// ACHIEVEMENTS PAGE - Sistema de Progressao
 // ==========================================
 
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
-import { MILESTONES } from '@shared/constants/achievements';
 import { PageLayout, InlineAd } from '../../components/layout/PageLayout';
 import { LoadingState } from '../../components/common/LoadingState';
-import { LockIcon } from '../../components/icons';
-import { ACHIEVEMENT_ICONS_BY_ID, ACHIEVEMENT_ICONS } from '../../components/icons/achievements';
+import { StatProgressCard } from '../../components/stats';
+import {
+  UserStatsResponse,
+  StatCategory,
+} from '@shared/types/stats.types';
+import { getStatsByCategory } from '@shared/constants/stats';
 import './Achievements.css';
 
 // ==========================================
 // TYPES
 // ==========================================
 
-interface UnlockedMilestone {
-  achievementId: string;
-  unlockedAt: string;
-  gameId?: string;
-}
-
-interface AchievementsResponse {
-  milestones: UnlockedMilestone[];
-  totalUnlocked: number;
-  totalAvailable: number;
-  activeTitle: {
-    titleId: string;
-    name: string;
-    icon: string;
-    period: string;
-  } | null;
-  recentBadges: {
-    badgeId: string;
-    gameId: string;
-    awardedAt: string;
-  }[];
-}
-
-// ==========================================
-// CONSTANTS
-// ==========================================
-
-type CategoryKey = 'combat' | 'survival' | 'items' | 'games' | 'social';
+type CategoryKey = StatCategory;
 
 const CATEGORY_TABS: { key: CategoryKey; label: string }[] = [
   { key: 'combat', label: 'Combate' },
-  { key: 'survival', label: 'Sobrevivencia' },
+  { key: 'matches', label: 'Partidas' },
   { key: 'items', label: 'Itens' },
-  { key: 'games', label: 'Jogos' },
-  { key: 'social', label: 'Social' },
 ];
 
 // ==========================================
@@ -59,11 +33,10 @@ const CATEGORY_TABS: { key: CategoryKey; label: string }[] = [
 
 export default function Achievements() {
   const navigate = useNavigate();
-  const { user, isAuthenticated, isLoading: authLoading, token } = useAuth();
+  const { user, isAuthenticated, isLoading: authLoading } = useAuth();
 
   const [activeTab, setActiveTab] = useState<CategoryKey>('combat');
-  const [unlockedIds, setUnlockedIds] = useState<Set<string>>(new Set());
-  const [totalUnlocked, setTotalUnlocked] = useState(0);
+  const [statsData, setStatsData] = useState<UserStatsResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -74,29 +47,25 @@ export default function Achievements() {
     }
   }, [authLoading, isAuthenticated, navigate]);
 
-  // Fetch achievements
+  // Fetch stats
   useEffect(() => {
-    if (!isAuthenticated || !token) return;
+    if (!isAuthenticated || !user?.game_user_id) return;
 
-    const fetchAchievements = async () => {
+    const fetchStats = async () => {
       try {
         setLoading(true);
         setError(null);
 
-        const response = await fetch('/api/achievements', {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+        const response = await fetch(`/api/stats/od/${user.game_user_id}`, {
+          credentials: 'include',
         });
 
         if (!response.ok) {
-          throw new Error('Erro ao buscar conquistas');
+          throw new Error('Erro ao buscar estatisticas');
         }
 
-        const data: AchievementsResponse = await response.json();
-        const ids = new Set(data.milestones.map(m => m.achievementId));
-        setUnlockedIds(ids);
-        setTotalUnlocked(data.totalUnlocked);
+        const data: UserStatsResponse = await response.json();
+        setStatsData(data);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'Erro desconhecido');
       } finally {
@@ -104,22 +73,47 @@ export default function Achievements() {
       }
     };
 
-    fetchAchievements();
-  }, [isAuthenticated, token]);
+    fetchStats();
+  }, [isAuthenticated, user?.game_user_id]);
 
-  // Filter milestones by active tab
-  const filteredMilestones = MILESTONES.filter(m => m.category === activeTab);
+  // Get stat progress by key
+  const getStatProgress = (statKey: string) => {
+    return statsData?.progress.find((p) => p.key === statKey);
+  };
 
-  // Progress percentage
-  const totalAvailable = MILESTONES.length;
-  const progressPercent = totalAvailable > 0
-    ? (totalUnlocked / totalAvailable) * 100
+  // Get stats for current category
+  const currentCategoryStats = getStatsByCategory(activeTab);
+
+  // Calculate total milestones
+  const getTotalMilestones = () => {
+    if (!statsData) return { completed: 0, total: 0 };
+
+    let completed = 0;
+    let total = 0;
+
+    for (const progress of statsData.progress) {
+      completed += progress.completedMilestones.length;
+      const definition = getStatsByCategory('combat')
+        .concat(getStatsByCategory('matches'))
+        .concat(getStatsByCategory('items'))
+        .find((d) => d.key === progress.key);
+      if (definition) {
+        total += definition.milestones.length;
+      }
+    }
+
+    return { completed, total };
+  };
+
+  const milestones = getTotalMilestones();
+  const progressPercent = milestones.total > 0
+    ? (milestones.completed / milestones.total) * 100
     : 0;
 
   // Loading state
   if (authLoading) {
     return (
-      <PageLayout title="Conquistas">
+      <PageLayout title="Estatisticas">
         <LoadingState message="Carregando..." />
       </PageLayout>
     );
@@ -132,9 +126,9 @@ export default function Achievements() {
         <button className="back-btn" onClick={() => navigate('/lobby')}>
           Voltar
         </button>
-        <h1 className="page-title">CONQUISTAS</h1>
+        <h1 className="page-title">ESTATISTICAS</h1>
         <div className="login-required">
-          <p>Faca login para ver suas conquistas</p>
+          <p>Faca login para ver suas estatisticas</p>
           <button className="action-btn primary" onClick={() => navigate('/profile')}>
             Fazer Login
           </button>
@@ -144,16 +138,18 @@ export default function Achievements() {
   }
 
   return (
-    <PageLayout title="Conquistas">
+    <PageLayout title="Estatisticas">
       <div className="achievements-content">
 
-        {/* Progress Bar */}
+        {/* Progress Header */}
         <div className="achievements-progress">
           <div className="progress-header">
             <span className="progress-text">
-              {totalUnlocked}/{totalAvailable} Conquistas Desbloqueadas
+              {milestones.completed}/{milestones.total} Milestones Completados
             </span>
-            <span className="progress-percent">{progressPercent.toFixed(0)}%</span>
+            <span className="progress-percent">
+              {statsData ? `${statsData.totalXpEarned.toLocaleString()} XP` : '0 XP'}
+            </span>
           </div>
           <div className="progress-bar-track">
             <div
@@ -163,7 +159,7 @@ export default function Achievements() {
           </div>
         </div>
 
-        {/* Inline Ad - visible on smaller screens */}
+        {/* Inline Ad */}
         <InlineAd position="inline-top" />
 
         {/* Category Tabs */}
@@ -186,35 +182,22 @@ export default function Achievements() {
 
         {/* Loading State */}
         {loading && (
-          <LoadingState message="Carregando conquistas..." />
+          <LoadingState message="Carregando estatisticas..." />
         )}
 
-        {/* Achievement Grid */}
-        {!loading && (
-          <div className="achievement-grid">
-            {filteredMilestones.map(milestone => {
-              const isUnlocked = unlockedIds.has(milestone.id);
-              // Usar novo sistema de ícones por ID, fallback para sistema antigo
-              const IconComponent = ACHIEVEMENT_ICONS_BY_ID[milestone.id] || ACHIEVEMENT_ICONS[milestone.icon];
+        {/* Stats List */}
+        {!loading && statsData && (
+          <div className="stats-list">
+            {currentCategoryStats.map(definition => {
+              const progress = getStatProgress(definition.key);
+              if (!progress) return null;
 
               return (
-                <div
-                  key={milestone.id}
-                  className={`achievement-card ${isUnlocked ? 'unlocked' : 'locked'}`}
-                >
-                  <div className="achievement-icon-wrapper">
-                    <span className="achievement-icon">
-                      {IconComponent ? <IconComponent size={48} /> : milestone.icon}
-                    </span>
-                    {!isUnlocked && (
-                      <span className="lock-overlay"><LockIcon size={16} /></span>
-                    )}
-                  </div>
-                  <div className="achievement-info">
-                    <span className="achievement-name">{milestone.name}</span>
-                    <span className="achievement-description">{milestone.description}</span>
-                  </div>
-                </div>
+                <StatProgressCard
+                  key={definition.key}
+                  stat={progress}
+                  definition={definition}
+                />
               );
             })}
           </div>

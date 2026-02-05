@@ -181,14 +181,11 @@ export function AdsProvider({ children }: AdsProviderProps) {
 
   const claimReward = useCallback(async (adId: string, placementId?: string): Promise<boolean> => {
     try {
-      const token = localStorage.getItem('bangshot_auth_token');
-      if (!token) return false;
-
       const response = await fetch(`${ADMIN_API_URL}/api/games/${GAME_CODE}/ads/${adId}/claim-reward`, {
         method: 'POST',
+        credentials: 'include', // Send httpOnly cookie
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`,
         },
         body: JSON.stringify({ placement_id: placementId }),
       });

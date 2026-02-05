@@ -775,6 +775,27 @@
 }
 
 /* ==========================================
+   DNF E XP STYLES
+   ========================================== */
+
+/* DNF para partidas abandonadas/sem posição */
+.profile-game__dnf {
+  color: rgba(255, 255, 255, 0.4);
+  font-style: italic;
+  font-size: 0.75rem;
+}
+
+/* XP verde no histórico */
+.profile-game__stat--xp {
+  color: #22c55e !important;
+}
+
+/* XP verde no modal de detalhes */
+.xp-value {
+  color: #22c55e;
+}
+
+/* ==========================================
    RESPONSIVE
    ========================================== */
 

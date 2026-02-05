@@ -32,7 +32,19 @@
       "Bash(npm run build:*)",
       "Bash(composer install:*)",
       "Bash(git add:*)",
-      "Bash(php -r:*)"
+      "Bash(php -r:*)",
+      "Read(//e/Cursor/larakit/node-sdk/packages/client/src/providers/**)",
+      "WebFetch(domain:www.youtube.com)",
+      "Bash(npx ts-node:*)",
+      "Bash(curl:*)",
+      "WebFetch(domain:kenney.nl)",
+      "Bash(unzip:*)",
+      "Bash(choco install:*)",
+      "Bash(git commit:*)",
+      "Bash(git push)",
+      "Bash(node -e:*)",
+      "Bash(gh repo create:*)",
+      "Bash(npx prisma migrate dev:*)"
     ]
   }
 }

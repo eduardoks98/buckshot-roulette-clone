@@ -6,14 +6,14 @@ import type {
   TokenValidationResult,
 } from './types';
 
-const TOKEN_KEY = 'games_admin_token';
-
 /**
  * Get available OAuth providers for the current game
  */
 export async function getAvailableProviders(): Promise<ProviderInfo[]> {
   try {
-    const response = await fetch(`${getGameApiUrl()}/auth/providers`);
+    const response = await fetch(`${getGameApiUrl()}/auth/providers`, {
+      credentials: 'include',
+    });
 
     if (!response.ok) {
       throw new Error(`Failed to fetch providers: ${response.status}`);
@@ -38,7 +38,8 @@ export async function login(provider: OAuthProvider): Promise<void> {
     const redirectUrl = encodeURIComponent(currentUrl);
 
     const response = await fetch(
-      `${getGameApiUrl()}/auth/${provider}/redirect?redirect_url=${redirectUrl}`
+      `${getGameApiUrl()}/auth/${provider}/redirect?redirect_url=${redirectUrl}`,
+      { credentials: 'include' }
     );
 
     if (!response.ok) {
@@ -58,54 +59,43 @@ export async function login(provider: OAuthProvider): Promise<void> {
 
 /**
  * Handle OAuth callback
- * Call this on your callback page to process the token
+ * With httpOnly cookies, the token is handled server-side
+ * This function now just cleans up the URL and checks for errors
  */
-export function handleCallback(): string | null {
+export function handleCallback(): boolean {
   const urlParams = new URLSearchParams(window.location.search);
-  const token = urlParams.get('token');
   const error = urlParams.get('error');
 
   if (error) {
     handleError(new Error(`OAuth error: ${error}`));
-    return null;
+    return false;
   }
 
-  if (token) {
-    setToken(token);
-    debugLog('Token received and stored');
-
-    // Clean up URL
-    const url = new URL(window.location.href);
-    url.searchParams.delete('token');
-    window.history.replaceState({}, document.title, url.pathname + url.search);
-
-    return token;
+  // Clean up URL (remove any query params)
+  const url = new URL(window.location.href);
+  if (url.search) {
+    window.history.replaceState({}, document.title, url.pathname);
   }
 
-  return null;
+  debugLog('OAuth callback processed');
+  return true;
 }
 
 /**
- * Validate a JWT token with the Games Admin server
+ * Validate current session with the server
  */
-export async function validateToken(token?: string): Promise<TokenValidationResult> {
+export async function validateSession(): Promise<TokenValidationResult> {
   try {
-    const tokenToValidate = token || getToken();
-
-    if (!tokenToValidate) {
-      return { valid: false, error: 'No token provided' };
-    }
-
     const response = await fetch(`${getGameApiUrl()}/auth/validate`, {
       method: 'POST',
+      credentials: 'include',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ token: tokenToValidate }),
     });
 
     const data = await response.json();
-    debugLog('Token validation result:', data);
+    debugLog('Session validation result:', data);
 
     return data;
   } catch (error) {
@@ -119,21 +109,12 @@ export async function validateToken(token?: string): Promise<TokenValidationResu
  */
 export async function getCurrentUser(): Promise<GameUser | null> {
   try {
-    const token = getToken();
-
-    if (!token) {
-      return null;
-    }
-
     const response = await fetch(`${getGameApiUrl()}/auth/me`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
+      credentials: 'include',
     });
 
     if (!response.ok) {
       if (response.status === 401) {
-        removeToken();
         notifyAuthStateChange(null);
         return null;
       }
@@ -156,50 +137,23 @@ export async function getCurrentUser(): Promise<GameUser | null> {
  */
 export async function logout(): Promise<void> {
   try {
-    const token = getToken();
-
-    if (token) {
-      await fetch(`${getGameApiUrl()}/auth/logout`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-    }
+    await fetch(`${getGameApiUrl()}/auth/logout`, {
+      method: 'POST',
+      credentials: 'include',
+    });
   } catch (error) {
     debugLog('Logout request failed (non-critical):', error);
   } finally {
-    removeToken();
     notifyAuthStateChange(null);
   }
 }
 
 /**
- * Check if user is logged in
+ * Check if user is logged in by calling the server
  */
-export function isLoggedIn(): boolean {
-  return getToken() !== null;
-}
-
-/**
- * Get stored token
- */
-export function getToken(): string | null {
-  return localStorage.getItem(TOKEN_KEY);
-}
-
-/**
- * Store token
- */
-export function setToken(token: string): void {
-  localStorage.setItem(TOKEN_KEY, token);
-}
-
-/**
- * Remove stored token
- */
-export function removeToken(): void {
-  localStorage.removeItem(TOKEN_KEY);
+export async function isLoggedIn(): Promise<boolean> {
+  const user = await getCurrentUser();
+  return user !== null;
 }
 
 /**
@@ -210,4 +164,27 @@ function notifyAuthStateChange(user: GameUser | null): void {
   if (config.onAuthStateChange) {
     config.onAuthStateChange(user);
   }
+}
+
+// Legacy exports for backwards compatibility (deprecated)
+/** @deprecated Use credentials: 'include' instead */
+export function getToken(): string | null {
+  console.warn('getToken() is deprecated. Auth is now handled via httpOnly cookies.');
+  return null;
+}
+
+/** @deprecated Token is now handled via httpOnly cookies */
+export function setToken(_token: string): void {
+  console.warn('setToken() is deprecated. Auth is now handled via httpOnly cookies.');
+}
+
+/** @deprecated Token is now handled via httpOnly cookies */
+export function removeToken(): void {
+  console.warn('removeToken() is deprecated. Auth is now handled via httpOnly cookies.');
+}
+
+/** @deprecated Use validateSession() instead */
+export async function validateToken(_token?: string): Promise<TokenValidationResult> {
+  console.warn('validateToken() is deprecated. Use validateSession() instead.');
+  return validateSession();
 }

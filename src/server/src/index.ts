@@ -4,7 +4,8 @@
 
 import { ENV, validateEnv } from './config/env.config';
 import { createServer } from './app';
-import { setupSocketIO } from './socket';
+import { setupSocketIO, roomService } from './socket';
+import { gamePersistenceService } from './services/game/game.persistence.service';
 
 async function main() {
   try {
@@ -16,6 +17,26 @@ async function main() {
 
     // Configurar Socket.IO
     const io = setupSocketIO(httpServer);
+
+    // Cleanup orphaned games from previous server instance (games older than 5 minutes)
+    await gamePersistenceService.cleanupOrphanedGames();
+
+    // Restore active games from database (games within 5-minute grace period)
+    // This enables players to reconnect after server restart
+    const inProgressGames = await gamePersistenceService.getInProgressGames();
+    let restoredCount = 0;
+    for (const game of inProgressGames) {
+      if (game.gameState) {
+        const restored = roomService.restoreRoomFromState(game.gameState);
+        if (restored) {
+          restoredCount++;
+          console.log(`[Startup] Sala ${game.roomCode} restaurada do banco - aguardando jogadores reconectarem`);
+        }
+      }
+    }
+    if (restoredCount > 0) {
+      console.log(`[Startup] ${restoredCount} salas restauradas do banco de dados`);
+    }
 
     // Iniciar servidor
     httpServer.listen(ENV.PORT, () => {

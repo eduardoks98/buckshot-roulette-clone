@@ -13,6 +13,7 @@ export default defineConfig({
   },
   server: {
     port: 5173,
+    allowedHosts: ['bangshot.mysys.net', 'localhost'],
     proxy: {
       '/socket.io': {
         target: 'http://localhost:3000',

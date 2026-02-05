@@ -16,11 +16,11 @@ export function ActiveGameModal() {
     isReconnecting,
     isConnected,
     reconnectedGameData,
-    clearActiveGame,
+    abandonGame,
     setReconnecting,
     clearReconnectedGameData,
   } = useSocket();
-  const { rejoinGame, abandonGame } = useLobbyActions();
+  const { rejoinGame } = useLobbyActions();
 
   // Navegar quando reconectado com sucesso
   useEffect(() => {
@@ -42,8 +42,8 @@ export function ActiveGameModal() {
   };
 
   const handleAbandon = () => {
+    // Usa abandonGame do contexto que ja faz tudo (emite evento + limpa estado + marca ref)
     abandonGame(activeGame.roomCode);
-    clearActiveGame();
   };
 
   return (

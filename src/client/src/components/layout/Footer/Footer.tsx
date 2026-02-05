@@ -1,28 +1,34 @@
-// ==========================================
-// FOOTER - Componente de footer reutilizável
-// ==========================================
-
-import { useNavigate } from 'react-router-dom';
 import './Footer.css';
 
+const PORTAL_URL = import.meta.env.VITE_PORTAL_URL || 'http://localhost:8000';
+
 export function Footer() {
-  const navigate = useNavigate();
+  const currentYear = new Date().getFullYear();
 
   return (
-    <footer className="app-footer">
-      <div className="app-footer__content">
-        <div className="app-footer__brand">
-          <span className="app-footer__logo">BANGSHOT</span>
-          <p>Um jogo de estrategia e sorte.</p>
-        </div>
-        <div className="app-footer__links">
-          <button onClick={() => navigate('/privacy')}>Privacidade</button>
-          <button onClick={() => navigate('/terms')}>Termos de Uso</button>
-          <button onClick={() => navigate('/cookies')}>Cookies</button>
-        </div>
-      </div>
-      <div className="app-footer__bottom">
-        <p>© {new Date().getFullYear()} Bang Shot. Todos os direitos reservados.</p>
+    <footer className="footer">
+      <div className="footer__content">
+        <div className="footer__logo">MySys Games</div>
+        <nav className="footer__links">
+          <a href={`${PORTAL_URL}/legal/about`} className="footer__link">
+            Sobre Nos
+          </a>
+          <a href={`${PORTAL_URL}/legal/contact`} className="footer__link">
+            Contato
+          </a>
+          <a href={`${PORTAL_URL}/legal/privacy`} className="footer__link">
+            Privacidade
+          </a>
+          <a href={`${PORTAL_URL}/legal/terms`} className="footer__link">
+            Termos de Uso
+          </a>
+          <a href={`${PORTAL_URL}/legal/cookies`} className="footer__link">
+            Cookies
+          </a>
+        </nav>
+        <p className="footer__copy">
+          &copy; {currentYear} MySys Games. Todos os direitos reservados.
+        </p>
       </div>
     </footer>
   );

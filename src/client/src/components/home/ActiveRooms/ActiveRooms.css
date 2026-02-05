@@ -483,6 +483,62 @@
   color: var(--gold-accent, #d4a418);
 }
 
+/* ==========================================
+   GAME MODE SELECTOR
+   ========================================== */
+
+.create-room__mode {
+  margin-bottom: 1.25rem;
+  text-align: left;
+}
+
+.create-room__mode-label {
+  display: block;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 0.5rem;
+}
+
+.create-room__mode-options {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.create-room__mode-btn {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 10px;
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.create-room__mode-btn:hover {
+  border-color: rgba(212, 164, 24, 0.3);
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.create-room__mode-btn.active {
+  background: rgba(212, 164, 24, 0.15);
+  border-color: rgba(212, 164, 24, 0.5);
+  color: var(--gold-accent, #d4a418);
+}
+
+.create-room__mode-hint {
+  font-size: 0.75rem;
+  color: rgba(212, 164, 24, 0.8);
+  margin: 0.5rem 0 0;
+  text-align: center;
+}
+
 /* Disabled button state */
 .btn-primary:disabled,
 .btn-secondary:disabled,

@@ -79,7 +79,7 @@ interface RecentStats {
 
 export default function Profile() {
   const navigate = useNavigate();
-  const { user, isLoading, logout, token } = useAuth();
+  const { user, isLoading, logout } = useAuth();
   const [titles, setTitles] = useState<UserTitleEntry[]>([]);
   const [showTitleSelector, setShowTitleSelector] = useState(false);
   const [titleLoading, setTitleLoading] = useState(false);
@@ -96,10 +96,10 @@ export default function Profile() {
 
   // Fetch titles
   const fetchTitles = useCallback(async () => {
-    if (!token) return;
+    if (!user) return;
     try {
       const res = await fetch('/api/achievements/titles', {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
       });
       if (res.ok) {
         const data = await res.json();
@@ -108,19 +108,19 @@ export default function Profile() {
     } catch {
       // silently fail
     }
-  }, [token]);
+  }, [user]);
 
   // Fetch recent games
   const fetchRecentGames = useCallback(async (page: number = 1, limit: number = 5) => {
-    if (!token) return;
+    if (!user) return;
     setHistoryLoading(true);
     try {
       const [historyRes, statsRes] = await Promise.all([
         fetch(`/api/history?page=${page}&limit=${limit}`, {
-          headers: { Authorization: `Bearer ${token}` },
+          credentials: 'include',
         }),
         fetch('/api/history/stats', {
-          headers: { Authorization: `Bearer ${token}` },
+          credentials: 'include',
         }),
       ]);
 
@@ -140,7 +140,7 @@ export default function Profile() {
     } finally {
       setHistoryLoading(false);
     }
-  }, [token]);
+  }, [user]);
 
   // Handle pagination
   const handlePageChange = useCallback((newPage: number) => {
@@ -165,11 +165,11 @@ export default function Profile() {
 
   // Fetch game details
   const fetchGameDetails = async (gameId: string) => {
-    if (!token) return;
+    if (!user) return;
     setGameDetailsLoading(true);
     try {
       const res = await fetch(`/api/history/${gameId}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include',
       });
       if (res.ok) {
         const data = await res.json();
@@ -183,15 +183,15 @@ export default function Profile() {
   };
 
   const handleSelectTitle = async (titleId: string | null) => {
-    if (!token) return;
+    if (!user) return;
     setTitleLoading(true);
     try {
       const res = await fetch('/api/achievements/title', {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
         },
+        credentials: 'include',
         body: JSON.stringify({ titleId }),
       });
       if (res.ok) {
@@ -372,7 +372,11 @@ export default function Profile() {
                       style={{ cursor: 'pointer' }}
                     >
                       <div className={`profile-game__position ${isWin ? 'winner' : ''}`}>
-                        {game.position === 1 ? <TrophyIcon size="sm" color="#fbbf24" /> : `#${game.position}`}
+                        {game.position === 1
+                          ? <TrophyIcon size="sm" color="#fbbf24" />
+                          : game.position
+                            ? `#${game.position}`
+                            : <span className="profile-game__dnf">DNF</span>}
                       </div>
                       <div className="profile-game__info">
                         <span className="profile-game__date">{formatDate(game.createdAt)}</span>
@@ -384,6 +388,9 @@ export default function Profile() {
                       <div className="profile-game__stats">
                         <span className="profile-game__stat"><SkullIcon size="xs" color="#a1a1aa" /> {game.kills}</span>
                         <span className="profile-game__stat"><DamageIcon size="xs" color="#a1a1aa" /> {game.damageDealt}</span>
+                        {game.xpEarned !== null && game.xpEarned > 0 && (
+                          <span className="profile-game__stat profile-game__stat--xp">+{game.xpEarned} XP</span>
+                        )}
                       </div>
                       {game.lpChange !== null && (
                         <div className={`profile-game__elo ${game.lpChange >= 0 ? 'positive' : 'negative'}`}>
@@ -517,7 +524,8 @@ export default function Profile() {
                         <span className="p-col p-stat">D</span>
                         <span className="p-col p-stat">Dano</span>
                         <span className="p-col p-stat">Tiros</span>
-                        <span className="p-col p-elo">ELO</span>
+                        <span className="p-col p-stat">XP</span>
+                        <span className="p-col p-elo">LP</span>
                       </div>
                       {selectedGame.participants
                         .sort((a, b) => (a.position || 99) - (b.position || 99))
@@ -534,6 +542,11 @@ export default function Profile() {
                             <span className="p-col p-stat">{p.deaths}</span>
                             <span className="p-col p-stat">{p.damageDealt}</span>
                             <span className="p-col p-stat">{p.shotsFired}</span>
+                            <span className="p-col p-stat">
+                              {p.xpEarned !== null && p.xpEarned > 0 ? (
+                                <span className="xp-value">+{p.xpEarned}</span>
+                              ) : '-'}
+                            </span>
                             <span className="p-col p-elo">
                               {p.lpChange !== null && (
                                 <span className={p.lpChange >= 0 ? 'positive' : 'negative'}>

@@ -9,6 +9,18 @@ import { env } from '../config/env.config';
 import prisma from '../lib/prisma';
 
 // ==========================================
+// TOKEN VALIDATION CACHE
+// ==========================================
+
+interface CachedValidation {
+  valid: boolean;
+  timestamp: number;
+}
+
+const tokenValidationCache = new Map<string, CachedValidation>();
+const CACHE_TTL = 60 * 1000; // 1 minute - shorter for faster logout propagation
+
+// ==========================================
 // TYPES
 // ==========================================
 
@@ -145,11 +157,9 @@ export class AuthService {
         return null;
       }
 
-      console.log('[Auth] Validating token with secret length:', secret.length);
-      console.log('[Auth] Token preview:', token.substring(0, 50) + '...');
-
+      // Validate JWT (don't log token content for security)
       const decoded = jwt.verify(token, secret, { algorithms: ['HS256'] }) as GamesAdminTokenPayload;
-      console.log('[Auth] Token decoded successfully:', { sub: decoded.sub, game: decoded.game });
+      console.log('[Auth] Token decoded successfully, game:', decoded.game);
 
       // SSO: Accept tokens from any game (PORTAL, BANGSHOT, etc.)
       // This allows centralized login via MySys Portal
@@ -179,34 +189,49 @@ export class AuthService {
   }
 
   /**
-   * Validate token with MySys API to check if user is still logged in
+   * Validate token with Portal API using internal API_KEY
    * Returns false if user has logged out (even if JWT signature is valid)
+   * Uses caching to reduce API calls (5 min TTL)
    */
   private async validateTokenWithMySys(token: string): Promise<boolean> {
+    // Check cache first
+    const cached = tokenValidationCache.get(token);
+    if (cached && Date.now() - cached.timestamp < CACHE_TTL) {
+      console.log('[Auth] Using cached Portal validation:', cached.valid);
+      return cached.valid;
+    }
+
     try {
+      // Use internal API with API_KEY for server-to-server communication
       const response = await fetch(
-        `${env.GAMES_ADMIN_API_URL}/api/games/${env.GAME_CODE}/auth/validate`,
+        `${env.GAMES_ADMIN_API_URL}/api/internal/validate`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
+            'X-API-Key': env.PORTAL_API_KEY,
           },
           body: JSON.stringify({ token }),
         }
       );
 
       if (!response.ok) {
-        console.log('[Auth] MySys API returned error status:', response.status);
+        console.error('[Auth] Portal API returned error status:', response.status);
+        // Always fail closed - never accept tokens when API fails
+        tokenValidationCache.set(token, { valid: false, timestamp: Date.now() });
         return false;
       }
 
       const data = await response.json() as { valid: boolean };
-      console.log('[Auth] MySys API validation result:', data.valid);
+      console.log('[Auth] Portal API validation result:', data.valid);
+
+      // Cache the result
+      tokenValidationCache.set(token, { valid: data.valid === true, timestamp: Date.now() });
       return data.valid === true;
     } catch (error) {
       console.error('[Auth] Error validating token with MySys:', error);
-      // If we can't reach MySys, fail closed (reject the token)
-      // This is safer than allowing potentially logged-out users
+      // Always fail closed - never accept tokens when network fails
+      tokenValidationCache.set(token, { valid: false, timestamp: Date.now() });
       return false;
     }
   }

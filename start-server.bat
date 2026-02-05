@@ -11,5 +11,9 @@ if not exist "node_modules" (
 
 echo Starting Buckshot Roulette Server...
 echo.
+
+REM Allow self-signed certificates in development (Caddy local SSL)
+set NODE_TLS_REJECT_UNAUTHORIZED=0
+
 npm run dev
 pause

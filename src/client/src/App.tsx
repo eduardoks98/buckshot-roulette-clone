@@ -1,7 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Home from './pages/Home/Home';
 import Lobby from './pages/Lobby/Lobby';
-import SinglePlayer from './pages/SinglePlayer/SinglePlayer';
 import WaitingRoom from './pages/Multiplayer/WaitingRoom/WaitingRoom';
 import MultiplayerGame from './pages/Multiplayer/Game/MultiplayerGame';
 import Leaderboard from './pages/Leaderboard/Leaderboard';
@@ -12,7 +11,7 @@ import TermsOfService from './pages/TermsOfService/TermsOfService';
 import CookiePolicy from './pages/CookiePolicy/CookiePolicy';
 import ChangelogPage from './pages/ChangelogPage/ChangelogPage';
 import Debug from './pages/Debug/Debug';
-import Preview from './pages/Preview/Preview';
+// Preview movido para main.tsx (fora dos providers)
 import { useSocket } from './context/SocketContext';
 import { SessionInvalidatedModal } from './components/common/SessionInvalidatedModal';
 import { ActiveGameModal } from './components/common/ActiveGameModal';
@@ -34,11 +33,9 @@ function App() {
       <ActiveGameModal />
 
       <Routes>
-        {/* Preview route for iframe embedding - no UI, just visuals */}
-        <Route path="/preview" element={<Preview />} />
+        {/* Preview movido para main.tsx (fora dos providers) */}
         <Route path="/" element={<Home />} />
         <Route path="/lobby" element={<Lobby />} />
-        <Route path="/singleplayer" element={<SinglePlayer />} />
         {/* /multiplayer redireciona para /lobby */}
         <Route path="/multiplayer" element={<Navigate to="/lobby" replace />} />
         <Route path="/multiplayer/room" element={<WaitingRoom />} />

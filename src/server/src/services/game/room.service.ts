@@ -752,7 +752,14 @@ export class RoomService {
 
     // DESPAUSAR O JOGO se estava pausado por este jogador
     const wasPaused = room.pausedForReconnect;
-    if (wasPaused) {
+    if (wasPaused && room.pauseStartTime) {
+      // CRÍTICO: Ajustar turnStartTime para compensar tempo de pausa
+      // Isso evita que o turno expire prematuramente após reconexão
+      const pauseDuration = Date.now() - room.pauseStartTime;
+      if (room.turnStartTime) {
+        room.turnStartTime += pauseDuration;
+        console.log(`[Room] turnStartTime ajustado em +${pauseDuration}ms para compensar pausa`);
+      }
       room.pausedForReconnect = false;
       room.pausedPlayerId = null;
       room.pausedPlayerName = null;
@@ -816,7 +823,14 @@ export class RoomService {
 
     // DESPAUSAR O JOGO se estava pausado por este jogador
     const wasPaused = room.pausedForReconnect;
-    if (wasPaused) {
+    if (wasPaused && room.pauseStartTime) {
+      // CRÍTICO: Ajustar turnStartTime para compensar tempo de pausa
+      // Isso evita que o turno expire prematuramente após reconexão
+      const pauseDuration = Date.now() - room.pauseStartTime;
+      if (room.turnStartTime) {
+        room.turnStartTime += pauseDuration;
+        console.log(`[Room] turnStartTime ajustado em +${pauseDuration}ms para compensar pausa (rejoin)`);
+      }
       room.pausedForReconnect = false;
       room.pausedPlayerId = null;
       room.pausedPlayerName = null;
@@ -897,6 +911,29 @@ export class RoomService {
       // Se era a vez do jogador que abandonou, passar para o próximo
       if (room.currentPlayerIndex === playerIndex) {
         this.advanceToNextPlayer(room);
+      }
+
+      // =============================================
+      // VERIFICAR SE É TREINO E SÓ RESTAM BOTS
+      // Se sim, cancelar a partida (bots não devem jogar sozinhos)
+      // Importante: Só cancela se ABANDONOU (não desconectou temporariamente)
+      // =============================================
+      const isTrainingMode = room.gameMode === GameMode.SINGLEPLAYER;
+      if (isTrainingMode) {
+        // Contar humanos que ainda podem jogar (vivos OU podem reconectar)
+        const activeHumans = room.players.filter(p =>
+          !p.name.includes('[BOT]') && // Não é bot
+          !p.abandoned && // Não abandonou permanentemente
+          (p.alive || p.disconnected) // Está vivo OU pode reconectar
+        );
+
+        if (activeHumans.length === 0) {
+          // Todos os humanos abandonaram permanentemente - cancelar partida
+          console.log(`[Room] Treino cancelado - todos humanos abandonaram: ${roomCode}`);
+          this.onGameCancelled?.(roomCode, room.players.map(p => p.id));
+          this.rooms.delete(roomCode);
+          return { deleted: true, players: [] };
+        }
       }
 
       console.log(`[Room] ${playerName} abandonou partida em andamento`);
@@ -1040,5 +1077,151 @@ export class RoomService {
     console.log(`[Room] Sala ${code} deletada após game over`);
 
     return true;
+  }
+
+  // ==========================================
+  // GAME STATE SERIALIZATION (for persistence)
+  // ==========================================
+
+  /**
+   * Serialize room state to JSON for database persistence
+   * This enables crash recovery - room can be restored from DB after server restart
+   */
+  serializeRoomState(code: string): object | null {
+    const room = this.rooms.get(code);
+    if (!room) return null;
+
+    // Serialize everything except timeouts (they can't be serialized)
+    return {
+      code: room.code,
+      host: room.host,
+      hostName: room.hostName,
+      password: room.password,
+      started: room.started,
+      currentRound: room.currentRound,
+      turnDirection: room.turnDirection,
+      currentPlayerIndex: room.currentPlayerIndex,
+      shells: room.shells,
+      currentShellIndex: room.currentShellIndex,
+      initialShellCount: room.initialShellCount,
+      revealedShell: room.revealedShell,
+      turnStartTime: room.turnStartTime,
+      firstToDie: room.firstToDie,
+      pausedForReconnect: room.pausedForReconnect,
+      pausedPlayerId: room.pausedPlayerId,
+      pausedPlayerName: room.pausedPlayerName,
+      pauseStartTime: room.pauseStartTime,
+      gameMode: room.gameMode,
+      debugRankEnabled: room.debugRankEnabled,
+      // Serialize players (excluding non-serializable data)
+      players: room.players.map(p => ({
+        id: p.id,
+        name: p.name,
+        hp: p.hp,
+        maxHp: p.maxHp,
+        items: p.items,
+        handcuffed: p.handcuffed,
+        handcuffImmune: p.handcuffImmune,
+        sawedOff: p.sawedOff,
+        alive: p.alive,
+        hadZeroItems: p.hadZeroItems,
+        roundWins: p.roundWins,
+        disconnected: p.disconnected,
+        disconnectTime: p.disconnectTime,
+        reconnectToken: p.reconnectToken,
+        originalSocketId: p.originalSocketId,
+        odUserId: p.odUserId,
+        abandoned: p.abandoned,
+        stats: p.stats,
+      })),
+    };
+  }
+
+  /**
+   * Restore a room from serialized state (called during server startup)
+   */
+  restoreRoomFromState(state: object): Room | null {
+    try {
+      const s = state as {
+        code: string;
+        host: string;
+        hostName: string;
+        password: string | null;
+        started: boolean;
+        currentRound: number;
+        turnDirection: 1 | -1;
+        currentPlayerIndex: number;
+        shells: ('live' | 'blank')[];
+        currentShellIndex: number;
+        initialShellCount: number;
+        revealedShell: 'live' | 'blank' | null;
+        turnStartTime: number | null;
+        firstToDie: number | null;
+        pausedForReconnect: boolean;
+        pausedPlayerId: string | null;
+        pausedPlayerName: string | null;
+        pauseStartTime: number | null;
+        gameMode: GameMode;
+        debugRankEnabled: boolean;
+        players: Player[];
+      };
+
+      // Reconstruct room with timeouts as null (will be re-established on reconnection)
+      const room: Room = {
+        code: s.code,
+        host: s.host,
+        hostName: s.hostName,
+        password: s.password,
+        started: s.started,
+        currentRound: s.currentRound,
+        turnDirection: s.turnDirection,
+        currentPlayerIndex: s.currentPlayerIndex,
+        shells: s.shells,
+        currentShellIndex: s.currentShellIndex,
+        initialShellCount: s.initialShellCount,
+        revealedShell: s.revealedShell,
+        turnStartTime: null, // Will be reset when game resumes
+        firstToDie: s.firstToDie,
+        turnTimeout: null, // Will be re-established
+        emptyRoomTimeout: null,
+        pausedForReconnect: true, // Always paused after restore until players reconnect
+        pausedPlayerId: null,
+        pausedPlayerName: 'Servidor reiniciado',
+        pauseStartTime: Date.now(),
+        gameMode: s.gameMode || GameMode.NORMAL,
+        debugRankEnabled: s.debugRankEnabled || false,
+        players: s.players.map(p => ({
+          ...p,
+          // Mark all players as disconnected after server restart
+          disconnected: true,
+          disconnectTime: Date.now(),
+        })),
+      };
+
+      // Add to rooms map
+      this.rooms.set(room.code, room);
+
+      // Log detalhado para debug
+      const humanPlayers = room.players.filter(p => !p.name.includes('[BOT]'));
+      const botPlayers = room.players.filter(p => p.name.includes('[BOT]'));
+      console.log(`[Room] Sala ${room.code} restaurada do banco de dados:`);
+      console.log(`[Room]   - Round: ${room.currentRound}, Shells: ${room.shells.length - room.currentShellIndex} restantes`);
+      console.log(`[Room]   - Jogadores: ${humanPlayers.length} humanos, ${botPlayers.length} bots`);
+      humanPlayers.forEach(p => {
+        console.log(`[Room]   - ${p.name}: HP=${p.hp}/${p.maxHp}, itens=${p.items.length}, odUserId=${p.odUserId || 'guest'}`);
+      });
+
+      return room;
+    } catch (error) {
+      console.error('[Room] Erro ao restaurar sala:', error);
+      return null;
+    }
+  }
+
+  /**
+   * Get all active room codes (for cleanup/monitoring)
+   */
+  getActiveRoomCodes(): string[] {
+    return Array.from(this.rooms.keys());
   }
 }

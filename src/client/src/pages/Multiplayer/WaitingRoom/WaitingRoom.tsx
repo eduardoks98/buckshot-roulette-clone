@@ -22,19 +22,17 @@ import type {
   BotErrorPayload,
 } from '../../../hooks';
 import { PageLayout, InlineAd } from '../../../components/layout/PageLayout';
-import { PlayerPublicState, RoundStartedPayload } from '../../../../../shared/types';
+import { PlayerPublicState, RoundStartedPayload, GameMode } from '../../../../../shared/types';
 import { GAME_RULES } from '../../../../../shared/constants';
 import { useSounds } from '../../../audio/useSounds';
 import './WaitingRoom.css';
-
-// Verificar se está em modo de desenvolvimento
-const isDevelopment = import.meta.env.DEV;
 
 interface LocationState {
   roomCode: string;
   isHost: boolean;
   players: PlayerPublicState[];
   fromRematch?: boolean;
+  gameMode?: GameMode;
 }
 
 export default function WaitingRoom() {
@@ -60,11 +58,15 @@ export default function WaitingRoom() {
   const [roomCode, setRoomCode] = useState(state?.roomCode || '');
   const [isHost, setIsHost] = useState(state?.isHost || false);
   const [players, setPlayers] = useState<PlayerPublicState[]>(state?.players || []);
+  const [gameMode, setGameMode] = useState<GameMode | undefined>(state?.gameMode);
 
   const [error, setError] = useState('');
   const [copied, setCopied] = useState(false);
   const reconnectingRef = useRef(false);  // Usar ref para evitar race condition
   const [addingBot, setAddingBot] = useState(false);
+
+  // Mostrar botões de bot apenas no modo singleplayer
+  const canShowBotControls = gameMode === GameMode.SINGLEPLAYER;
 
   // Manter musica do menu tocando
   useEffect(() => {
@@ -143,10 +145,13 @@ export default function WaitingRoom() {
     navigate('/multiplayer');
   }, [clearSession, navigate]);
 
-  const handleRoomJoined = useCallback((data: { code: string; isHost: boolean; players: PlayerPublicState[] }) => {
+  const handleRoomJoined = useCallback((data: { code: string; isHost: boolean; players: PlayerPublicState[]; gameMode?: GameMode }) => {
     setRoomCode(data.code);
     setIsHost(data.isHost);
     setPlayers(data.players);
+    if (data.gameMode) {
+      setGameMode(data.gameMode);
+    }
     reconnectingRef.current = false;
   }, []);
 
@@ -221,20 +226,20 @@ export default function WaitingRoom() {
   }, [isHost, startGame]);
 
   const handleAddBot = useCallback(() => {
-    if (!isHost || !isDevelopment) return;
+    if (!isHost || !canShowBotControls) return;
     if (players.length >= GAME_RULES.MAX_PLAYERS) {
       setError('Sala cheia');
       return;
     }
     setAddingBot(true);
     setError('');
-    addBot('medium');
-  }, [isHost, players.length, addBot]);
+    addBot(undefined, 'medium');
+  }, [isHost, canShowBotControls, players.length, addBot]);
 
   const handleRemoveBot = useCallback((botId: string) => {
-    if (!isHost || !isDevelopment) return;
+    if (!isHost || !canShowBotControls) return;
     removeBot(botId);
-  }, [isHost, removeBot]);
+  }, [isHost, canShowBotControls, removeBot]);
 
   const handleCopyCode = async () => {
     try {
@@ -297,7 +302,7 @@ export default function WaitingRoom() {
                     {isBot && <span className="bot-badge">BOT</span>}
                     {player.disconnected && <span className="reconnecting-badge">Reconectando...</span>}
                   </div>
-                  {isHost && isDevelopment && isBot && (
+                  {isHost && canShowBotControls && isBot && (
                     <button
                       className="remove-bot-btn"
                       onClick={() => handleRemoveBot(player.id)}
@@ -321,14 +326,14 @@ export default function WaitingRoom() {
             ))}
           </div>
 
-          {/* Add Bot button (Development only) */}
-          {isDevelopment && isHost && players.length < GAME_RULES.MAX_PLAYERS && (
+          {/* Add Bot button (only in singleplayer mode) */}
+          {canShowBotControls && isHost && players.length < GAME_RULES.MAX_PLAYERS && (
             <button
               className="add-bot-btn"
               onClick={handleAddBot}
               disabled={addingBot}
             >
-              {addingBot ? 'Adicionando...' : '+ Adicionar Bot (DEV)'}
+              {addingBot ? 'Adicionando...' : '+ Adicionar Bot'}
             </button>
           )}
         </div>

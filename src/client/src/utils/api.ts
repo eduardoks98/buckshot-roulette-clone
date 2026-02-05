@@ -3,11 +3,9 @@
 // Funções utilitárias para chamadas de API
 // ==========================================
 
-import { AUTH_TOKEN_KEY } from '../constants/storage';
-
 /**
- * Faz uma requisição fetch com token de autenticação
- * Adiciona automaticamente o header Authorization com o token do localStorage
+ * Faz uma requisição fetch autenticada via httpOnly cookie
+ * O cookie mysys_token é enviado automaticamente com credentials: 'include'
  *
  * @example
  * const response = await authenticatedFetch('/api/profile');
@@ -23,13 +21,7 @@ export async function authenticatedFetch(
   url: string,
   options?: RequestInit
 ): Promise<Response> {
-  const token = localStorage.getItem(AUTH_TOKEN_KEY);
-
   const headers = new Headers(options?.headers);
-
-  if (token) {
-    headers.set('Authorization', `Bearer ${token}`);
-  }
 
   // Se o body é JSON e não tem Content-Type, adicionar
   if (options?.body && typeof options.body === 'string' && !headers.has('Content-Type')) {
@@ -44,6 +36,7 @@ export async function authenticatedFetch(
   return fetch(url, {
     ...options,
     headers,
+    credentials: 'include', // Send httpOnly cookie automatically
   });
 }
 

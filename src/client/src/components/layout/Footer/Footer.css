@@ -1,114 +1,100 @@
-/* ==========================================
-   FOOTER - Estilos unificados do footer
-   ========================================== */
+/* ==========================================================================
+   Footer Component - Portal MySys Style
+   ========================================================================== */
 
-.app-footer {
+.footer {
+  background: #111;
+  padding: 32px 24px;
+  border-top: 1px solid #2a2a2a;
   margin-top: auto;
-  padding: 3rem 2rem 1.5rem;
-  background: rgba(0, 0, 0, 0.5);
-  border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+  overflow: hidden;
 }
 
-.app-footer__content {
+.footer__content {
+  max-width: 1400px;
+  margin: 0 auto;
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  max-width: 1200px;
-  margin: 0 auto 2rem;
-  gap: 2rem;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 16px;
 }
 
-.app-footer__brand {
+.footer__logo {
+  font-family: 'Orbitron', sans-serif;
+  font-size: 1rem;
+  font-weight: 600;
+  color: #888;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.footer__links {
   display: flex;
-  flex-direction: column;
-  gap: 0.25rem;
+  gap: 32px;
 }
 
-.app-footer__logo {
-  font-size: 1.5rem;
-  font-weight: 900;
-  color: var(--gold-accent, #d4a418);
-  letter-spacing: 0.1em;
+.footer__link {
+  color: #666;
+  font-size: 0.875rem;
+  text-decoration: none;
+  transition: all 0.25s ease;
+  position: relative;
 }
 
-.app-footer__brand p {
-  font-size: 0.85rem;
-  color: var(--text-dim, #888);
-  margin: 0;
+.footer__link::after {
+  content: '';
+  position: absolute;
+  bottom: -4px;
+  left: 0;
+  width: 0;
+  height: 1px;
+  background: #ff0040;
+  transition: width 0.25s ease;
 }
 
-.app-footer__links {
-  display: flex;
-  gap: 1.5rem;
+.footer__link:hover {
+  color: #ff0040;
 }
 
-.app-footer__links button {
-  background: none;
-  border: none;
-  color: var(--text-dim, #888);
-  font-size: 0.9rem;
-  cursor: pointer;
-  transition: color 0.2s;
-  padding: 0;
+.footer__link:hover::after {
+  width: 100%;
 }
 
-.app-footer__links button:hover {
-  color: var(--gold-accent, #d4a418);
-}
-
-.app-footer__bottom {
+.footer__copy {
+  width: 100%;
   text-align: center;
-  padding-top: 1.5rem;
-  border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.1));
+  font-size: 0.8125rem;
+  color: #666;
+  margin: 16px 0 0 0;
+  padding-top: 16px;
+  position: relative;
 }
 
-.app-footer__bottom p {
-  font-size: 0.75rem;
-  color: var(--text-dim, #888);
-  opacity: 0.6;
-  margin: 0;
+/* Linha divisória full width */
+.footer__copy::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: calc(-50vw + 50%);
+  right: calc(-50vw + 50%);
+  height: 1px;
+  background: #1f1f1f;
 }
 
-/* ==========================================
-   RESPONSIVE
-   ========================================== */
+/* ==========================================================================
+   Responsive
+   ========================================================================== */
 
 @media (max-width: 768px) {
-  .app-footer__content {
+  .footer__content {
     flex-direction: column;
     text-align: center;
   }
-}
 
-@media (max-width: 480px) {
-  .app-footer {
-    padding: 2rem 1rem 1rem;
-  }
-
-  .app-footer__content {
-    margin-bottom: 1.5rem;
-    gap: 1.5rem;
-  }
-
-  .app-footer__logo {
-    font-size: 1.25rem;
-  }
-
-  .app-footer__links {
-    gap: 1rem;
+  .footer__links {
     flex-wrap: wrap;
     justify-content: center;
-  }
-
-  .app-footer__links button {
-    font-size: 0.8rem;
-  }
-
-  .app-footer__bottom {
-    padding-top: 1rem;
-  }
-
-  .app-footer__bottom p {
-    font-size: 0.7rem;
+    gap: 16px;
   }
 }

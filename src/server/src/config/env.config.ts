@@ -37,6 +37,9 @@ export const ENV = {
   GAMES_ADMIN_JWT_SECRET: process.env.GAMES_ADMIN_JWT_SECRET || '',
   GAME_CODE: process.env.GAME_CODE || 'BANGSHOT',
 
+  // Portal Internal API (server-to-server token validation)
+  PORTAL_API_KEY: process.env.PORTAL_API_KEY || '',
+
   // OAuth 2.0 (SSO with Portal)
   OAUTH_CLIENT_ID: process.env.OAUTH_CLIENT_ID || 'BANGSHOT',
   OAUTH_CLIENT_SECRET: process.env.OAUTH_CLIENT_SECRET || '',

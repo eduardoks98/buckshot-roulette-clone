@@ -5,3 +5,4 @@
 export * from './game-rules';
 export * from './items';
 export * from './achievements';
+export * from './stats';

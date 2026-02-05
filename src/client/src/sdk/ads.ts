@@ -1,5 +1,4 @@
 import { getGameApiUrl, debugLog, handleError } from './config';
-import { getToken } from './auth';
 import type {
   AdCreative,
   AdPlacement,
@@ -160,29 +159,28 @@ export async function trackVideoProgress(
 
 /**
  * Claim reward after watching a rewarded video
- * Requires user authentication
+ * Requires user authentication (via httpOnly cookie)
  */
 export async function claimReward(creativeId: string): Promise<RewardedAdResult> {
   try {
-    const token = getToken();
+    const response = await fetch(
+      `${getGameApiUrl()}/ads/${creativeId}/claim-reward`,
+      {
+        method: 'POST',
+        credentials: 'include', // Send httpOnly cookie
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      }
+    );
 
-    if (!token) {
+    // Check if not authenticated
+    if (response.status === 401) {
       return {
         success: false,
         error: 'User must be logged in to claim rewards',
       };
     }
-
-    const response = await fetch(
-      `${getGameApiUrl()}/ads/${creativeId}/claim-reward`,
-      {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      }
-    );
 
     if (!response.ok) {
       const errorData = await response.json();

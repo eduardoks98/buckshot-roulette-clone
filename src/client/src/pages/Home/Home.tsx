@@ -2,13 +2,12 @@
 // HOME PAGE - Landing Page
 // ==========================================
 
-import { useEffect } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { useTabSync } from '../../context/TabSyncContext';
 import { Footer } from '../../components/layout/Footer';
 import { AdBanner } from '../../components/common/AdBanner';
-import { MultiProviderLogin } from '../../components/auth/MultiProviderLogin';
 import { PlayersIcon, StarIcon, AchievementIcon, GridIcon } from '../../components/icons';
 import { ADSENSE_PUBLISHER_ID, AD_SLOTS, ADSENSE_TEST_MODE, PORTAL_URL } from '../../config';
 import { useSounds } from '../../audio/useSounds';
@@ -18,9 +17,28 @@ import './Home.css';
 
 export default function Home() {
   const navigate = useNavigate();
-  const { isAuthenticated, isLoading, authError, clearAuthError } = useAuth();
+  const { isAuthenticated, isLoading, authError, clearAuthError, user, logout, login } = useAuth();
   const { playMusic } = useSounds();
   const { isFocused } = useTabSync();
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setDropdownOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const handleLogout = async () => {
+    setDropdownOpen(false);
+    await logout();
+    navigate('/');
+  };
 
   // Tocar musica ambiente do menu (só quando focado)
   useEffect(() => {
@@ -52,13 +70,71 @@ export default function Home() {
       {/* Header igual ao portal */}
       <header className="landing__header">
         <div className="landing__header-content">
-          <a href={PORTAL_URL} className="landing__logo">
-            <div className="landing__logo-icon">M</div>
-            <span>MySys Games</span>
-          </a>
-          <nav className="landing__nav">
-            <a href="#features" className="landing__nav-link">Sobre</a>
-          </nav>
+          <div className="landing__header-left">
+            <a href={PORTAL_URL} className="landing__logo">
+              <div className="landing__logo-icon">M</div>
+              <span>MySys Games</span>
+            </a>
+          </div>
+          <div className="landing__header-right">
+            {isAuthenticated && user ? (
+              <div
+                ref={dropdownRef}
+                className={`user-profile ${dropdownOpen ? 'open' : ''}`}
+              >
+                <div
+                  className="user-profile-trigger"
+                  onClick={() => setDropdownOpen(!dropdownOpen)}
+                >
+                  {user.avatar_url ? (
+                    <img src={user.avatar_url} alt="Avatar" className="user-avatar" />
+                  ) : (
+                    <div className="user-avatar user-avatar--placeholder">
+                      {(user.nickname || user.display_name || 'U')[0].toUpperCase()}
+                    </div>
+                  )}
+                  <span className="user-name">{user.nickname || user.display_name}</span>
+                  <svg className="dropdown-arrow" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M6 9l6 6 6-6"/>
+                  </svg>
+                </div>
+                {dropdownOpen && (
+                  <div className="user-dropdown">
+                    <div className="dropdown-header">
+                      {user.avatar_url ? (
+                        <img src={user.avatar_url} alt="Avatar" className="user-avatar-large" />
+                      ) : (
+                        <div className="user-avatar-large user-avatar--placeholder">
+                          {(user.nickname || user.display_name || 'U')[0].toUpperCase()}
+                        </div>
+                      )}
+                      <div className="dropdown-header-info">
+                        <div className="user-name-large">{user.nickname || user.display_name}</div>
+                        <div className="user-email">{user.email}</div>
+                      </div>
+                    </div>
+                    <div className="dropdown-menu">
+                      <button className="dropdown-item logout" onClick={handleLogout}>
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/>
+                          <polyline points="16,17 21,12 16,7"/>
+                          <line x1="21" y1="12" x2="9" y2="12"/>
+                        </svg>
+                        Sair
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <button onClick={login} className="btn-login btn-primary-outline">
+                <svg fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ width: 18, height: 18 }}>
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M11 16l-4-4m0 0l4-4m-4 4h14m-5 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h7a3 3 0 013 3v1"></path>
+                </svg>
+                <span>Entrar</span>
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
@@ -87,11 +163,10 @@ export default function Home() {
                 Multiplayer
               </button>
             ) : (
-              <MultiProviderLogin className="landing__providers" />
+              <button onClick={login} className="landing__btn landing__btn--gold">
+                Entrar / Criar Conta
+              </button>
             )}
-            <button className="landing__btn landing__btn--secondary" onClick={() => navigate('/singleplayer')}>
-              Jogar Solo (Treino)
-            </button>
           </div>
         </div>
 

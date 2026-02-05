@@ -4,7 +4,7 @@
 
 import { useEffect, useRef } from 'react';
 import { useSocket } from '../../context/SocketContext';
-import { PlayerPublicState } from '../../../../shared/types';
+import { PlayerPublicState, GameMode } from '../../../../shared/types';
 
 // Room info from server
 export interface RoomInfo {
@@ -20,12 +20,14 @@ export interface RoomCreatedPayload {
   code: string;
   isHost: boolean;
   players: PlayerPublicState[];
+  gameMode?: GameMode;
 }
 
 export interface RoomJoinedPayload {
   code: string;
   isHost: boolean;
   players: PlayerPublicState[];
+  gameMode?: GameMode;
 }
 
 // Already in game payload
