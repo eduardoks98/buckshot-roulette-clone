@@ -2,8 +2,9 @@
 // GAME PERSISTENCE SERVICE
 // ==========================================
 
-import { GameStatus, LeaderboardPeriod } from '@prisma/client';
+import { GameStatus } from '@prisma/client';
 import prisma from '../../lib/prisma';
+import { leaderboardService } from '../leaderboard.service';
 import {
   calculatePerformanceBasedElo,
   EloCalculationInput,
@@ -470,68 +471,19 @@ export class GamePersistenceService {
           });
 
           // Atualizar leaderboard (apenas se for ranked game)
-          // NOTA: a lógica do leaderboardService.updatePlayerStats é inlinada
-          // aqui usando `tx` para que os writes de leaderboard façam parte da
-          // MESMA transação atômica (o service usa o prisma global, fora da tx).
+          // Passamos `tx` para que os writes de leaderboard façam parte da
+          // MESMA transação atômica do endGame (o user já foi atualizado acima
+          // com `elo_rating: newElo`, então o service lê o ELO correto via tx).
           if (isRankedGame) {
-            const periods: LeaderboardPeriod[] = ['DAILY', 'WEEKLY', 'MONTHLY'];
-            const lbStats = {
-              games_played: 1,
-              games_won: isWinner ? 1 : 0,
-              elo_change: eloChange,
-            };
-
-            for (const period of periods) {
-              const dates = this.getLeaderboardPeriodDates(
-                period.toLowerCase() as 'daily' | 'weekly' | 'monthly'
-              );
-
-              const existingEntry = await tx.leaderboardEntry.findFirst({
-                where: {
-                  user_id: participant.user_id,
-                  period,
-                  period_start: dates.start,
-                },
-              });
-
-              // newElo já reflete o ELO atualizado deste jogo (peak_elo usa ele)
-              if (existingEntry) {
-                const newGamesPlayed = existingEntry.games_played + lbStats.games_played;
-                const newGamesWon = existingEntry.games_won + lbStats.games_won;
-                const newWinRate = newGamesPlayed > 0 ? (newGamesWon / newGamesPlayed) * 100 : 0;
-                const newEloGain = existingEntry.elo_gain + lbStats.elo_change;
-                const newPeakElo = Math.max(existingEntry.peak_elo, newElo);
-
-                await tx.leaderboardEntry.update({
-                  where: { id: existingEntry.id },
-                  data: {
-                    games_played: newGamesPlayed,
-                    games_won: newGamesWon,
-                    win_rate: newWinRate,
-                    elo_gain: newEloGain,
-                    peak_elo: newPeakElo,
-                  },
-                });
-              } else {
-                const winRate = lbStats.games_played > 0
-                  ? (lbStats.games_won / lbStats.games_played) * 100
-                  : 0;
-
-                await tx.leaderboardEntry.create({
-                  data: {
-                    user_id: participant.user_id,
-                    period,
-                    period_start: dates.start,
-                    period_end: dates.end,
-                    games_played: lbStats.games_played,
-                    games_won: lbStats.games_won,
-                    win_rate: winRate,
-                    elo_gain: lbStats.elo_change,
-                    peak_elo: newElo,
-                  },
-                });
-              }
-            }
+            await leaderboardService.updatePlayerStats(
+              participant.user_id,
+              {
+                games_played: 1,
+                games_won: isWinner ? 1 : 0,
+                elo_change: eloChange,
+              },
+              tx
+            );
           }
 
           // Store XP result for returning to handler
@@ -622,41 +574,6 @@ export class GamePersistenceService {
       console.error('[DB] Erro ao finalizar jogo:', error);
       return null;
     }
-  }
-
-  // Helper: período (start/end) para entradas de leaderboard.
-  // Replica leaderboardService.getPeriodDates (privado) para uso dentro da
-  // transação atômica do endGame.
-  private getLeaderboardPeriodDates(
-    period: 'daily' | 'weekly' | 'monthly'
-  ): { start: Date; end: Date } {
-    const now = new Date();
-    let start: Date;
-    let end: Date;
-
-    switch (period) {
-      case 'daily':
-        start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-        end = new Date(start);
-        end.setDate(end.getDate() + 1);
-        break;
-
-      case 'weekly': {
-        const dayOfWeek = now.getDay();
-        const diff = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-        start = new Date(now.getFullYear(), now.getMonth(), diff);
-        end = new Date(start);
-        end.setDate(end.getDate() + 7);
-        break;
-      }
-
-      case 'monthly':
-        start = new Date(now.getFullYear(), now.getMonth(), 1);
-        end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
-        break;
-    }
-
-    return { start, end };
   }
 
   // Save a round result

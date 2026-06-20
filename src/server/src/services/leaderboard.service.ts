@@ -2,7 +2,7 @@
 // LEADERBOARD SERVICE
 // ==========================================
 
-import { LeaderboardPeriod } from '@prisma/client';
+import { LeaderboardPeriod, Prisma } from '@prisma/client';
 import prisma from '../lib/prisma';
 import { getDisplayRank, TIERS, Tier } from '../../../shared/utils/rankingCalculator';
 
@@ -237,8 +237,13 @@ export class LeaderboardService {
       games_played: number;
       games_won: number;
       elo_change: number;
-    }
+    },
+    tx?: Prisma.TransactionClient
   ): Promise<void> {
+    // Quando chamado de dentro de uma transação interativa (endGame), `tx` é
+    // passado para que os writes de leaderboard façam parte da MESMA transação
+    // atômica. Sem `tx`, usa o prisma global (comportamento original).
+    const db = tx ?? prisma;
     const periods: LeaderboardPeriod[] = ['DAILY', 'WEEKLY', 'MONTHLY'];
 
     for (const period of periods) {
@@ -247,7 +252,7 @@ export class LeaderboardService {
       );
 
       // Find or create entry
-      const existing = await prisma.leaderboardEntry.findFirst({
+      const existing = await db.leaderboardEntry.findFirst({
         where: {
           user_id: userId,
           period,
@@ -255,7 +260,7 @@ export class LeaderboardService {
         },
       });
 
-      const user = await prisma.user.findUnique({ where: { id: userId } });
+      const user = await db.user.findUnique({ where: { id: userId } });
       if (!user) continue;
 
       if (existing) {
@@ -265,7 +270,7 @@ export class LeaderboardService {
         const newEloGain = existing.elo_gain + stats.elo_change;
         const newPeakElo = Math.max(existing.peak_elo, user.elo_rating);
 
-        await prisma.leaderboardEntry.update({
+        await db.leaderboardEntry.update({
           where: { id: existing.id },
           data: {
             games_played: newGamesPlayed,
@@ -280,7 +285,7 @@ export class LeaderboardService {
           ? (stats.games_won / stats.games_played) * 100
           : 0;
 
-        await prisma.leaderboardEntry.create({
+        await db.leaderboardEntry.create({
           data: {
             user_id: userId,
             period,
