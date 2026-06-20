@@ -596,14 +596,15 @@
 }
 
 .landing__step:not(:last-child)::after {
+  /* liga a borda DIREITA deste circulo a borda ESQUERDA do proximo (gap 1.5rem, circulo 48px).
+     antes usava translateX(100%) + largura de coluna e vazava por baixo do numero seguinte. */
   content: '';
   position: absolute;
-  top: 24px;
-  right: -0.75rem;
-  width: calc(100% - 48px);
+  top: 23px;
+  left: calc(50% + 24px);
+  width: calc(100% - 24px);
   height: 2px;
   background: linear-gradient(90deg, var(--gold-accent, #d4a418) 0%, transparent 100%);
-  transform: translateX(100%);
 }
 
 .landing__step-number {
