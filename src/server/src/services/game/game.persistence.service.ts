@@ -2,9 +2,8 @@
 // GAME PERSISTENCE SERVICE
 // ==========================================
 
-import { GameStatus } from '@prisma/client';
+import { GameStatus, LeaderboardPeriod } from '@prisma/client';
 import prisma from '../../lib/prisma';
-import { leaderboardService } from '../leaderboard.service';
 import {
   calculatePerformanceBasedElo,
   EloCalculationInput,
@@ -232,62 +231,75 @@ export class GamePersistenceService {
       const isRankedGame = existingGame.is_ranked;
       console.log(`[DB] Jogo encontrado: ${existingGame.id} (status: ${existingGame.status}, isRanked: ${isRankedGame})`);
 
-      // Update game status
-      const game = await prisma.game.update({
-        where: { room_code: roomCode },
-        data: {
-          status: GameStatus.COMPLETED,
-          winner_id: winnerUserId,
-          ended_at: new Date(),
-        },
-        include: {
-          game_participants: {
-            include: {
-              user: {
-                select: {
-                  id: true,
-                  elo_rating: true,
-                  // Novo sistema de ranking
-                  tier: true,
-                  division: true,
-                  lp: true,
-                  mmr_hidden: true,
-                  games_since_promo: true,
+      // ==========================================
+      // TRANSAÇÃO ATÔMICA (P0 fix)
+      // ==========================================
+      // Todas as writes críticas (game + participant + user + leaderboard)
+      // acontecem em UMA transação interativa. Se qualquer write falhar,
+      // TUDO sofre rollback (tudo-ou-nada) — evita estado inconsistente
+      // (ex.: ELO atualizado mas XP faltando).
+      //
+      // I/O externo (broadcast/socket) NÃO entra aqui: o emit é feito pelos
+      // handlers DEPOIS que endGame() retorna (após o commit).
+      const { gameId, xpResults: txXpResults } = await prisma.$transaction(async (tx) => {
+        const localXpResults: PlayerXpResult[] = [];
+
+        // Update game status
+        const game = await tx.game.update({
+          where: { room_code: roomCode },
+          data: {
+            status: GameStatus.COMPLETED,
+            winner_id: winnerUserId,
+            ended_at: new Date(),
+          },
+          include: {
+            game_participants: {
+              include: {
+                user: {
+                  select: {
+                    id: true,
+                    elo_rating: true,
+                    // Novo sistema de ranking
+                    tier: true,
+                    division: true,
+                    lp: true,
+                    mmr_hidden: true,
+                    games_since_promo: true,
+                  },
                 },
               },
             },
           },
-        },
-      });
+        });
 
-      // Coletar ELOs de todos os jogadores para cálculo (legacy)
-      const playersElos: number[] = game.game_participants.map(p =>
-        p.user?.elo_rating || 0
-      );
-
-      // Coletar MMRs para novo sistema de ranking
-      const playersMmrs: number[] = game.game_participants.map(p =>
-        p.user?.mmr_hidden || 0
-      );
-
-      const totalPlayers = game.game_participants.length;
-
-      // Calcular contexto do jogo para o cálculo de performance
-      const gameContext = {
-        totalPlayers,
-        totalKills: playerStats.reduce((sum, p) => sum + p.kills, 0),
-        totalDamage: playerStats.reduce((sum, p) => sum + p.damageDealt, 0),
-        totalRounds: game.current_round,
-      };
-
-      // Update each participant with their stats
-      for (const stats of playerStats) {
-        // Find participant by odUserId
-        const participant = game.game_participants.find(
-          p => stats.odUserId && p.user_id === stats.odUserId
+        // Coletar ELOs de todos os jogadores para cálculo (legacy)
+        const playersElos: number[] = game.game_participants.map(p =>
+          p.user?.elo_rating || 0
         );
 
-        if (participant && participant.user_id) {
+        // Coletar MMRs para novo sistema de ranking
+        const playersMmrs: number[] = game.game_participants.map(p =>
+          p.user?.mmr_hidden || 0
+        );
+
+        const totalPlayers = game.game_participants.length;
+
+        // Calcular contexto do jogo para o cálculo de performance
+        const gameContext = {
+          totalPlayers,
+          totalKills: playerStats.reduce((sum, p) => sum + p.kills, 0),
+          totalDamage: playerStats.reduce((sum, p) => sum + p.damageDealt, 0),
+          totalRounds: game.current_round,
+        };
+
+        // Update each participant with their stats
+        for (const stats of playerStats) {
+          // Find participant by odUserId
+          const participant = game.game_participants.find(
+            p => stats.odUserId && p.user_id === stats.odUserId
+          );
+
+          if (participant && participant.user_id) {
           const isWinner = participant.user_id === winnerUserId;
           const playerElo = participant.user?.elo_rating || 0;
 
@@ -375,7 +387,7 @@ export class GamePersistenceService {
           }
 
           // Calculate XP
-          const currentUser = await prisma.user.findUnique({
+          const currentUser = await tx.user.findUnique({
             where: { id: participant.user_id },
             select: { total_xp: true },
           });
@@ -399,7 +411,7 @@ export class GamePersistenceService {
           const newLevelInfo = getLevelInfo(newTotalXp);
 
           // Update participant stats with eloChange, xpEarned, lpChange, mmrChange
-          await prisma.gameParticipant.update({
+          await tx.gameParticipant.update({
             where: { id: participant.id },
             data: {
               position: stats.position,
@@ -429,7 +441,7 @@ export class GamePersistenceService {
           }
 
           // Atualizar User com stats, XP, e rank (se for ranked)
-          await prisma.user.update({
+          await tx.user.update({
             where: { id: participant.user_id },
             data: {
               // Stats (sempre atualizados)
@@ -458,16 +470,72 @@ export class GamePersistenceService {
           });
 
           // Atualizar leaderboard (apenas se for ranked game)
+          // NOTA: a lógica do leaderboardService.updatePlayerStats é inlinada
+          // aqui usando `tx` para que os writes de leaderboard façam parte da
+          // MESMA transação atômica (o service usa o prisma global, fora da tx).
           if (isRankedGame) {
-            await leaderboardService.updatePlayerStats(participant.user_id, {
+            const periods: LeaderboardPeriod[] = ['DAILY', 'WEEKLY', 'MONTHLY'];
+            const lbStats = {
               games_played: 1,
               games_won: isWinner ? 1 : 0,
               elo_change: eloChange,
-            });
+            };
+
+            for (const period of periods) {
+              const dates = this.getLeaderboardPeriodDates(
+                period.toLowerCase() as 'daily' | 'weekly' | 'monthly'
+              );
+
+              const existingEntry = await tx.leaderboardEntry.findFirst({
+                where: {
+                  user_id: participant.user_id,
+                  period,
+                  period_start: dates.start,
+                },
+              });
+
+              // newElo já reflete o ELO atualizado deste jogo (peak_elo usa ele)
+              if (existingEntry) {
+                const newGamesPlayed = existingEntry.games_played + lbStats.games_played;
+                const newGamesWon = existingEntry.games_won + lbStats.games_won;
+                const newWinRate = newGamesPlayed > 0 ? (newGamesWon / newGamesPlayed) * 100 : 0;
+                const newEloGain = existingEntry.elo_gain + lbStats.elo_change;
+                const newPeakElo = Math.max(existingEntry.peak_elo, newElo);
+
+                await tx.leaderboardEntry.update({
+                  where: { id: existingEntry.id },
+                  data: {
+                    games_played: newGamesPlayed,
+                    games_won: newGamesWon,
+                    win_rate: newWinRate,
+                    elo_gain: newEloGain,
+                    peak_elo: newPeakElo,
+                  },
+                });
+              } else {
+                const winRate = lbStats.games_played > 0
+                  ? (lbStats.games_won / lbStats.games_played) * 100
+                  : 0;
+
+                await tx.leaderboardEntry.create({
+                  data: {
+                    user_id: participant.user_id,
+                    period,
+                    period_start: dates.start,
+                    period_end: dates.end,
+                    games_played: lbStats.games_played,
+                    games_won: lbStats.games_won,
+                    win_rate: winRate,
+                    elo_gain: lbStats.elo_change,
+                    peak_elo: newElo,
+                  },
+                });
+              }
+            }
           }
 
           // Store XP result for returning to handler
-          xpResults.push({
+          localXpResults.push({
             odId: stats.odId,
             odUserId: participant.user_id,
             xpEarned: xpResult.totalXp,
@@ -507,7 +575,7 @@ export class GamePersistenceService {
 
           if (guestParticipant) {
             // Atualizar stats do guest/bot (sem ELO/XP pois não tem conta)
-            await prisma.gameParticipant.update({
+            await tx.gameParticipant.update({
               where: { id: guestParticipant.id },
               data: {
                 position: stats.position,
@@ -527,14 +595,68 @@ export class GamePersistenceService {
             console.warn(`[DB] Participante não encontrado para stats: odId=${stats.odId}, odUserId=${stats.odUserId}`);
           }
         }
-      }
+        }
+
+        // Retorno do callback da transação: só é entregue após o COMMIT.
+        // Se qualquer write acima lançar, a transação faz rollback (tudo-ou-nada)
+        // e o erro propaga para o catch externo (que retorna null).
+        return { gameId: game.id, xpResults: localXpResults };
+      }, {
+        // Timeout generoso: uma partida cheia faz várias writes por jogador
+        // (participant + user + 3 entradas de leaderboard). O default do Prisma
+        // é 5s, que pode estourar sob carga. maxWait = tempo p/ obter conexão.
+        maxWait: 10000,
+        timeout: 30000,
+      });
+
+      // ==========================================
+      // PÓS-COMMIT (I/O externo fica FORA da transação)
+      // ==========================================
+      // A partir daqui os dados já estão persistidos atomicamente.
+      // O broadcast/socket é feito pelos handlers que consomem o retorno.
+      xpResults.push(...txXpResults);
 
       console.log(`[DB] Jogo finalizado com stats: ${roomCode}`);
-      return { gameId: game.id, xpResults };
+      return { gameId, xpResults };
     } catch (error) {
       console.error('[DB] Erro ao finalizar jogo:', error);
       return null;
     }
+  }
+
+  // Helper: período (start/end) para entradas de leaderboard.
+  // Replica leaderboardService.getPeriodDates (privado) para uso dentro da
+  // transação atômica do endGame.
+  private getLeaderboardPeriodDates(
+    period: 'daily' | 'weekly' | 'monthly'
+  ): { start: Date; end: Date } {
+    const now = new Date();
+    let start: Date;
+    let end: Date;
+
+    switch (period) {
+      case 'daily':
+        start = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        end = new Date(start);
+        end.setDate(end.getDate() + 1);
+        break;
+
+      case 'weekly': {
+        const dayOfWeek = now.getDay();
+        const diff = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+        start = new Date(now.getFullYear(), now.getMonth(), diff);
+        end = new Date(start);
+        end.setDate(end.getDate() + 7);
+        break;
+      }
+
+      case 'monthly':
+        start = new Date(now.getFullYear(), now.getMonth(), 1);
+        end = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+        break;
+    }
+
+    return { start, end };
   }
 
   // Save a round result
