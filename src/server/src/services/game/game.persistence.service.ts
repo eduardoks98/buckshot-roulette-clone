@@ -245,14 +245,30 @@ export class GamePersistenceService {
       const { gameId, xpResults: txXpResults } = await prisma.$transaction(async (tx) => {
         const localXpResults: PlayerXpResult[] = [];
 
-        // Update game status
-        const game = await tx.game.update({
-          where: { room_code: roomCode },
+        // ==========================================
+        // GATE DE IDEMPOTÊNCIA (anti double-credit)
+        // ==========================================
+        // Finaliza o jogo de forma ATÔMICA e condicional: só transiciona se ainda NÃO estiver
+        // COMPLETED. Sob replay (mesmo evento 2x, reconexão, restart no meio do fim) ou
+        // concorrência, apenas UMA chamada "ganha" (count=1); as demais veem count=0 e retornam
+        // sem creditar XP/ELO/stats de novo (senão é XP/ELO/stats-printer).
+        const claim = await tx.game.updateMany({
+          where: { room_code: roomCode, status: { not: GameStatus.COMPLETED } },
           data: {
             status: GameStatus.COMPLETED,
             winner_id: winnerUserId,
             ended_at: new Date(),
           },
+        });
+
+        if (claim.count === 0) {
+          console.log(`[DB] endGame ignorado (jogo já finalizado): ${roomCode}`);
+          return { gameId: existingGame.id, xpResults: [] as PlayerXpResult[] };
+        }
+
+        // Carregar o jogo + participantes já com o status COMPLETED aplicado
+        const game = await tx.game.findUniqueOrThrow({
+          where: { room_code: roomCode },
           include: {
             game_participants: {
               include: {
