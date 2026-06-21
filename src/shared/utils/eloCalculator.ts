@@ -202,7 +202,9 @@ function calculateKillContribution(
  */
 function calculateRoundDominance(perf: PlayerPerformance): number {
   if (perf.totalRounds === 0) return 0.5;
-  return perf.roundsWon / perf.totalRounds;
+  // Clampar em [0,1] como os outros sub-scores: roundsWon inflado (> totalRounds)
+  // nao pode estourar o score de performance e furar o cap anti-exploit de ELO.
+  return Math.max(0, Math.min(1, perf.roundsWon / perf.totalRounds));
 }
 
 /**
@@ -264,11 +266,13 @@ function performanceToEloModifier(performanceScore: number): number {
   const centered = performanceScore - 0.5;
 
   // Escalar para limites
-  if (centered >= 0) {
-    return centered * 2 * MAX_PERFORMANCE_BONUS;
-  } else {
-    return centered * 2 * Math.abs(MIN_PERFORMANCE_PENALTY);
-  }
+  const modifier = centered >= 0
+    ? centered * 2 * MAX_PERFORMANCE_BONUS
+    : centered * 2 * Math.abs(MIN_PERFORMANCE_PENALTY);
+
+  // Cap RIGIDO anti-exploit (defesa em profundidade): o modificador nunca pode passar dos
+  // limites declarados, mesmo que algum sub-score venha fora de [0,1] por stats inflados.
+  return Math.max(MIN_PERFORMANCE_PENALTY, Math.min(MAX_PERFORMANCE_BONUS, modifier));
 }
 
 // ==========================================

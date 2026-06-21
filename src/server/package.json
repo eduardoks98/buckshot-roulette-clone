@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "nodemon src/index.ts",
     "build": "tsc",
+    "test": "node --require ts-node/register/transpile-only --test \"tests/**/*.test.ts\"",
     "start": "node dist/index.js",
     "db:push": "prisma db push",
     "db:migrate": "prisma migrate dev",
@@ -31,6 +32,7 @@
     "socket.io": "^4.7.2"
   },
   "devDependencies": {
+    "@eduardoks98/testing": "file:../../../package-testing-js",
     "@types/cookie-parser": "^1.4.10",
     "@types/cors": "^2.8.17",
     "@types/express": "^4.17.21",
