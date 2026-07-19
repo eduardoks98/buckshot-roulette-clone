@@ -15,7 +15,6 @@ import {
   ProfileIcon,
   AchievementIcon,
   LeaderboardIcon,
-  SettingsIcon,
   BugIcon,
   RankIcon,
   GamepadIcon,
@@ -85,17 +84,6 @@ export function Header({ variant = 'full' }: HeaderProps) {
             <LeaderboardIcon size={20} />
             <span>Ranking</span>
           </button>
-          {user?.is_admin && (
-            <a
-              href="https://admin.mysys.shop/admin"
-              target="_blank"
-              rel="noopener noreferrer"
-              className="app-nav-item app-nav-item--admin"
-            >
-              <SettingsIcon size={20} />
-              <span>Admin</span>
-            </a>
-          )}
         </nav>
 
         <div className="app-header__right">

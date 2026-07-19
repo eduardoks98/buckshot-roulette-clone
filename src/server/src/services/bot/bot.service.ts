@@ -62,13 +62,6 @@ class BotService {
   // ==========================================
 
   /**
-   * Verifica se o ambiente é de desenvolvimento
-   */
-  private isDevelopment(): boolean {
-    return process.env.NODE_ENV !== 'production';
-  }
-
-  /**
    * Gera um ID único para o bot
    */
   private generateBotId(botName: string): string {
@@ -85,11 +78,6 @@ class BotService {
     botName: string,
     difficulty: BotDifficulty = 'medium'
   ): { success: boolean; error?: string; bot?: Player } {
-    // Verificar modo de desenvolvimento
-    if (!this.isDevelopment()) {
-      return { success: false, error: 'Bots disponíveis apenas em modo de desenvolvimento' };
-    }
-
     // Buscar sala
     const room = roomService.getRoom(roomCode);
     if (!room) {

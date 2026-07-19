@@ -3,7 +3,6 @@ import { IconProps, getIconSize } from '../Icon';
 // Cores fixas do emoji de coroa 👑
 const CROWN_GOLD = '#FFD700';
 const CROWN_DARK_GOLD = '#DAA520';
-const CROWN_LIGHT_GOLD = '#FFE55C';
 const JEWEL_RED = '#E53935';
 const JEWEL_BLUE = '#1E88E5';
 const JEWEL_GREEN = '#43A047';

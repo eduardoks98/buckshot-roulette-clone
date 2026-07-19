@@ -6,11 +6,13 @@ import { Request, Response, NextFunction } from 'express';
 import { authService } from '../services/auth.service';
 import { User as PrismaUser } from '@prisma/client';
 
-// Extend Express.User (from passport types) with Prisma User fields
+// Extend Express Request with user property (previously from passport types)
 declare global {
   namespace Express {
-    // eslint-disable-next-line @typescript-eslint/no-empty-interface
     interface User extends PrismaUser {}
+    interface Request {
+      user?: User;
+    }
   }
 }
 

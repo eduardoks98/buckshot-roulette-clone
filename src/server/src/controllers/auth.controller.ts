@@ -95,6 +95,15 @@ export const logout = async (req: Request, res: Response) => {
       await authService.invalidateAllSessions(user.id);
     }
 
+    // Clear SSO cookie from browser
+    res.clearCookie('mysys_token', {
+      domain: '.mysys.shop',
+      path: '/',
+      secure: true,
+      httpOnly: true,
+      sameSite: 'lax',
+    });
+
     res.json({ message: 'Logout realizado' });
   } catch (error) {
     console.error('[Auth] Erro no logout:', error);

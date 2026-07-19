@@ -54,10 +54,14 @@ export function useAuth() {
     const token = handleCallback();
     if (token) {
       loadUser();
-    } else if (isLoggedIn()) {
-      loadUser();
     } else {
-      setLoading(false);
+      isLoggedIn().then(loggedIn => {
+        if (loggedIn) {
+          loadUser();
+        } else {
+          setLoading(false);
+        }
+      });
     }
   }, []);
 

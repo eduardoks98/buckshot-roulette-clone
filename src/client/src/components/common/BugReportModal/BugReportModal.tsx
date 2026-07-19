@@ -124,7 +124,7 @@ export default function BugReportModal({ isOpen, onClose, gameState }: BugReport
         description: description.trim(),
         category,
         priority,
-        user_id: user?.odUserId || null,
+        user_id: user?.game_user_id || null,
         game_room_code: gameState?.roomCode || null,
         game_round: gameState?.round || null,
         game_state: gameState ? JSON.stringify(gameState) : null,
