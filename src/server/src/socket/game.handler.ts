@@ -690,8 +690,10 @@ export async function handleRoundEnd(
       });
       xpResults = endResult?.xpResults;
 
-      // Process achievements and badges if game was persisted
-      if (endResult) {
+      // Process achievements and badges SÓ quando o endGame REALMENTE finalizou agora
+      // (finalized). No replay/concorrência (finalized:false) pular — senão processGameEnd
+      // re-credita achievements/win-streak/stats vitalícios (double-credit).
+      if (endResult && endResult.finalized) {
         try {
           // Build extended stats for achievement service
           const extendedStats: PlayerEndGameStats[] = sortedPlayers.map((p, index) => {

@@ -206,7 +206,7 @@ export class GamePersistenceService {
   }
 
   // End a game and update stats
-  async endGame(params: EndGameParams): Promise<{ gameId: string; xpResults: PlayerXpResult[] } | null> {
+  async endGame(params: EndGameParams): Promise<{ gameId: string; xpResults: PlayerXpResult[]; finalized: boolean } | null> {
     const { roomCode, winnerUserId, playerStats } = params;
     const xpResults: PlayerXpResult[] = [];
 
@@ -242,7 +242,7 @@ export class GamePersistenceService {
       //
       // I/O externo (broadcast/socket) NÃO entra aqui: o emit é feito pelos
       // handlers DEPOIS que endGame() retorna (após o commit).
-      const { gameId, xpResults: txXpResults } = await prisma.$transaction(async (tx) => {
+      const { gameId, xpResults: txXpResults, finalized } = await prisma.$transaction(async (tx) => {
         const localXpResults: PlayerXpResult[] = [];
 
         // ==========================================
@@ -263,7 +263,9 @@ export class GamePersistenceService {
 
         if (claim.count === 0) {
           console.log(`[DB] endGame ignorado (jogo já finalizado): ${roomCode}`);
-          return { gameId: existingGame.id, xpResults: [] as PlayerXpResult[] };
+          // finalized:false → o handler NÃO deve rodar processGameEnd (achievements/streak/
+          // stats vitalícios não são gateados; rodá-los no replay = double-credit).
+          return { gameId: existingGame.id, xpResults: [] as PlayerXpResult[], finalized: false };
         }
 
         // Carregar o jogo + participantes já com o status COMPLETED aplicado
@@ -300,6 +302,17 @@ export class GamePersistenceService {
         );
 
         const totalPlayers = game.game_participants.length;
+
+        // ANTI ELO-FARM (server-authoritative): o cliente escolhe gameMode/debugRankEnabled no
+        // createRoom, mas só vale RANKED se o roster REAL for todo de humanos autenticados
+        // (user_id != null) e houver >= 2 deles. Bot/guest (user_id null) no jogo => tratado como
+        // NÃO-ranked (sem ELO/LP/MMR/leaderboard) — fecha o farm de rank contra bots.
+        const humanParticipants = game.game_participants.filter(p => p.user_id != null).length;
+        const hasBotOrGuest = game.game_participants.some(p => p.user_id == null);
+        const rankedGame = isRankedGame && !hasBotOrGuest && humanParticipants >= 2;
+        if (isRankedGame && !rankedGame) {
+          console.log(`[DB] ${roomCode}: is_ranked=true mas roster tem bot/guest ou <2 humanos → tratado como NÃO-ranked (anti ELO-farm)`);
+        }
 
         // Calcular contexto do jogo para o cálculo de performance
         const gameContext = {
@@ -363,7 +376,7 @@ export class GamePersistenceService {
             demoted: false,
           };
 
-          if (isRankedGame) {
+          if (rankedGame) {
             // Calcular ELO com performance (legacy)
             const eloResult = calculatePerformanceBasedElo(eloInput);
             eloChange = eloResult.totalChange;
@@ -470,8 +483,8 @@ export class GamePersistenceService {
               total_deaths: { increment: stats.deaths },
               // XP (sempre atualizado)
               total_xp: { increment: xpResult.totalXp },
-              // Rank (apenas se for ranked game)
-              ...(isRankedGame ? {
+              // Rank (apenas se for ranked game — roster todo-humano validado no servidor)
+              ...(rankedGame ? {
                 // Legacy ELO
                 elo_rating: newElo,
                 rank: newRank,
@@ -490,7 +503,7 @@ export class GamePersistenceService {
           // Passamos `tx` para que os writes de leaderboard façam parte da
           // MESMA transação atômica do endGame (o user já foi atualizado acima
           // com `elo_rating: newElo`, então o service lê o ELO correto via tx).
-          if (isRankedGame) {
+          if (rankedGame) {
             await leaderboardService.updatePlayerStats(
               participant.user_id,
               {
@@ -568,7 +581,7 @@ export class GamePersistenceService {
         // Retorno do callback da transação: só é entregue após o COMMIT.
         // Se qualquer write acima lançar, a transação faz rollback (tudo-ou-nada)
         // e o erro propaga para o catch externo (que retorna null).
-        return { gameId: game.id, xpResults: localXpResults };
+        return { gameId: game.id, xpResults: localXpResults, finalized: true };
       }, {
         // Timeout generoso: uma partida cheia faz várias writes por jogador
         // (participant + user + 3 entradas de leaderboard). O default do Prisma
@@ -585,7 +598,7 @@ export class GamePersistenceService {
       xpResults.push(...txXpResults);
 
       console.log(`[DB] Jogo finalizado com stats: ${roomCode}`);
-      return { gameId, xpResults };
+      return { gameId, xpResults, finalized };
     } catch (error) {
       console.error('[DB] Erro ao finalizar jogo:', error);
       return null;

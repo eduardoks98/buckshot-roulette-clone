@@ -154,7 +154,9 @@ export function setupRoomCallbacks(
         playerStats,
       });
 
-      if (endResult) {
+      // SÓ processa achievements quando o endGame REALMENTE finalizou agora (finalized).
+      // Replay/WO duplicado (finalized:false) pula — senão re-credita achievements/streak/stats.
+      if (endResult && endResult.finalized) {
         try {
           // Build extended stats for achievement service
           const extendedStats: PlayerEndGameStats[] = sortedPlayers.map((p, index) => {
