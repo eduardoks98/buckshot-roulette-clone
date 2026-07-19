@@ -4,6 +4,7 @@
 
 import { useState, useEffect, useMemo } from 'react';
 import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 import { Header } from '../../layout/Header';
 import { Footer } from '../../layout/Footer';
 import { GAME_CODE, ADMIN_API_URL } from '../../../config';
@@ -60,10 +61,11 @@ export function LegalPage({ endpoint, defaultTitle, errorMessage }: LegalPagePro
     }
   };
 
-  // Converter Markdown para HTML
+  // Converter Markdown para HTML — SANITIZAR: content vem do admin-API (não confiável) e
+  // vai em dangerouslySetInnerHTML; DOMPurify remove <script>/on*/javascript: (anti-XSS).
   const htmlContent = useMemo(() => {
     if (!content) return '';
-    return marked(content) as string;
+    return DOMPurify.sanitize(marked(content) as string);
   }, [content]);
 
   return (

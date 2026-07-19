@@ -4,6 +4,7 @@
 
 import { useState, useEffect } from 'react';
 import { marked } from 'marked';
+import DOMPurify from 'dompurify';
 import { Header } from '../../components/layout/Header';
 import { Footer } from '../../components/layout/Footer';
 import { GAME_CODE, ADMIN_API_URL } from '../../config';
@@ -58,9 +59,11 @@ export default function ChangelogPage() {
     }
   };
 
-  // Converter Markdown para HTML
+  // Converter Markdown para HTML — SANITIZAR: entry.content vem do admin-API em runtime
+  // (não confiável) e vai em dangerouslySetInnerHTML; sem DOMPurify, <img onerror>/<script>
+  // executam no domínio autenticado do bangshot e roubam o cookie/token de sessão SSO.
   const parseContent = (content: string) => {
-    return marked(content) as string;
+    return DOMPurify.sanitize(marked(content) as string);
   };
 
   return (
