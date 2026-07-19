@@ -4,6 +4,7 @@
 
 import { Request, Response } from 'express';
 import { authService } from '../services/auth.service';
+import { ENV } from '../config/env.config';
 
 // ==========================================
 // HELPERS
@@ -97,7 +98,7 @@ export const logout = async (req: Request, res: Response) => {
 
     // Clear SSO cookie from browser
     res.clearCookie('mysys_token', {
-      domain: '.mysys.shop',
+      domain: ENV.COOKIE_DOMAIN,
       path: '/',
       secure: true,
       httpOnly: true,

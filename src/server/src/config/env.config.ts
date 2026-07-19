@@ -46,6 +46,9 @@ export const ENV = {
   OAUTH_AUTHORIZE_URL: process.env.OAUTH_AUTHORIZE_URL || 'https://mysys.shop/oauth/authorize',
   OAUTH_TOKEN_URL: process.env.OAUTH_TOKEN_URL || 'https://mysys.shop/oauth/token',
   OAUTH_REDIRECT_URI: process.env.OAUTH_REDIRECT_URI || 'https://bangshot.mysys.shop/auth/callback',
+
+  // Domínio do cookie SSO compartilhado (env-driven: .mysys.shop em prod, .mysys.net no espelho local)
+  COOKIE_DOMAIN: process.env.COOKIE_DOMAIN || '.mysys.shop',
 } as const;
 
 // Alias para compatibilidade
